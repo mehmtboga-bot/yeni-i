@@ -49,19 +49,34 @@ export class HeliusMonitor {
   private mainWebSocket: WebSocket | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private eventEmitter: (event: string, data: any) => void;
+  private isRunning: boolean = false;
 
   constructor(eventEmitter: (event: string, data: any) => void) {
     this.eventEmitter = eventEmitter;
   }
 
   async start() {
+    if (this.isRunning) {
+      console.log("⚠️ Monitor zaten çalışıyor");
+      return;
+    }
+    this.isRunning = true;
     console.log("🚀 Helius Monitor başlatılıyor...");
+    this.eventEmitter("monitoring_state", { isMonitoring: true });
     this.connect();
+  }
+  
+  getState() {
+    return this.isRunning;
   }
 
   private connect() {
     if (!HELIUS_API_KEY) {
       console.error("❌ HELIUS_API_KEY ortam değişkeni bulunamadı!");
+      this.eventEmitter("error", {
+        message: "HELIUS_API_KEY ortam değişkeni bulunamadı",
+        type: "config",
+      });
       return;
     }
 
@@ -76,7 +91,10 @@ export class HeliusMonitor {
         params: [{ mentions: [SPL_TOKEN_PROGRAM_ID] }, { commitment: "finalized" }],
       };
       this.mainWebSocket?.send(JSON.stringify(sub));
-      this.eventEmitter("connection_status", { connected: true });
+      this.eventEmitter("connection_status", { 
+        connected: true, 
+        isMonitoring: this.isRunning 
+      });
     });
 
     this.mainWebSocket.on("message", async (data: Buffer) => {
@@ -97,22 +115,36 @@ export class HeliusMonitor {
       }
     });
 
-    this.mainWebSocket.on("error", (err) => {
+    this.mainWebSocket.on("error", (err: any) => {
       console.error("❌ WebSocket hatası:", err);
+      
+      const isAuthError = err.message && err.message.includes("401");
+      
+      if (isAuthError) {
+        this.eventEmitter("error", {
+          message: "Helius API anahtarı geçersiz. Lütfen HELIUS_API_KEY environment variable'ını kontrol edin.",
+          type: "auth",
+        });
+      }
+      
       this.eventEmitter("connection_status", { 
         connected: false, 
-        message: "Bağlantı hatası" 
+        message: isAuthError ? "API anahtarı hatası" : "Bağlantı hatası",
+        isMonitoring: this.isRunning
       });
     });
 
     this.mainWebSocket.on("close", () => {
-      console.log("🔌 Bağlantı kapandı, 3 saniye sonra yeniden bağlanılacak...");
+      console.log("🔌 Bağlantı kapandı");
       this.eventEmitter("connection_status", { 
         connected: false, 
-        message: "Yeniden bağlanıyor..." 
+        message: this.isRunning ? "Yeniden bağlanıyor..." : "Monitor durduruldu",
+        isMonitoring: this.isRunning
       });
       
-      this.reconnectTimeout = setTimeout(() => this.connect(), 3000);
+      if (this.isRunning) {
+        this.reconnectTimeout = setTimeout(() => this.connect(), 3000);
+      }
     });
   }
 
@@ -303,14 +335,22 @@ export class HeliusMonitor {
   }
 
   stop() {
+    if (!this.isRunning) {
+      console.log("⚠️ Monitor zaten durdurulmuş");
+      return;
+    }
+    
     console.log("🛑 Helius Monitor durduruluyor...");
+    this.isRunning = false;
     
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
     }
 
     if (this.mainWebSocket) {
       this.mainWebSocket.close();
+      this.mainWebSocket = null;
     }
 
     this.activeMints.forEach((mintData) => {
@@ -320,5 +360,11 @@ export class HeliusMonitor {
     });
 
     this.activeMints.clear();
+    this.eventEmitter("monitoring_state", { isMonitoring: false });
+    this.eventEmitter("connection_status", { 
+      connected: false, 
+      message: "Monitor durduruldu",
+      isMonitoring: false
+    });
   }
 }

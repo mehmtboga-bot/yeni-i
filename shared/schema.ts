@@ -39,6 +39,20 @@ export const wsMessageSchema = z.discriminatedUnion("type", [
     data: z.object({
       connected: z.boolean(),
       message: z.string().optional(),
+      isMonitoring: z.boolean().optional(),
+    }),
+  }),
+  z.object({
+    type: z.literal("monitoring_state"),
+    data: z.object({
+      isMonitoring: z.boolean(),
+    }),
+  }),
+  z.object({
+    type: z.literal("error"),
+    data: z.object({
+      message: z.string(),
+      type: z.string().optional(),
     }),
   }),
 ]);

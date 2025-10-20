@@ -26,6 +26,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastToClients({ type: "lp_detected", data });
     } else if (event === "connection_status") {
       broadcastToClients({ type: "connection_status", data });
+    } else if (event === "monitoring_state") {
+      broadcastToClients({ type: "monitoring_state", data });
+    } else if (event === "error") {
+      broadcastToClients({ type: "error", data });
     }
   });
 
@@ -37,10 +41,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     ws.send(
       JSON.stringify({
-        type: "connection_status",
-        data: { connected: true, message: "Bağlantı kuruldu" },
+        type: "monitoring_state",
+        data: { isMonitoring: monitor.getState() },
       })
     );
+
+    ws.on("message", (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString());
+        if (message.type === "toggle_monitoring") {
+          if (message.data.enabled) {
+            console.log("▶️ Monitor başlatılıyor...");
+            monitor.start();
+          } else {
+            console.log("⏸️ Monitor durduruluyor...");
+            monitor.stop();
+          }
+        }
+      } catch (error) {
+        console.error("❌ Client mesaj hatası:", error);
+      }
+    });
 
     ws.on("close", () => {
       console.log("👋 Client bağlantısı kesildi");
