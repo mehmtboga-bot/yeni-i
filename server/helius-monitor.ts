@@ -1,0 +1,324 @@
+import WebSocket from "ws";
+
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const WS_URL = `wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+const HTTP_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+
+const MAX_TRACKED = 7;
+const MAX_AGE_MS = 120000;
+
+const LP_KEYWORDS = [
+  "add_liquidity",
+  "initialize_pool",
+  "CreatePool",
+  "initialize2",
+  "addLiquidity",
+  "InitPool",
+  "initializePool",
+  "init_pool",
+  "addLiquidityToPool",
+  "create_pool",
+  "AddLiquidity",
+  "createLiquidity",
+  "mintToPool",
+  "depositLiquidity",
+  "deposit_liquidity",
+  "pool_initialize",
+  "PoolInit",
+  "create_pool_account",
+  "initialize_pool_account",
+  "addLiquiditySOL",
+  "addLiquidityToken",
+  "addLiquiditySingle",
+];
+
+interface TokenMetadata {
+  name: string;
+  symbol: string;
+}
+
+interface ActiveMint {
+  timestamp: number;
+  metadata: TokenMetadata;
+  lpWebSocket?: WebSocket;
+}
+
+export class HeliusMonitor {
+  private activeMints: Map<string, ActiveMint> = new Map();
+  private mainWebSocket: WebSocket | null = null;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private eventEmitter: (event: string, data: any) => void;
+
+  constructor(eventEmitter: (event: string, data: any) => void) {
+    this.eventEmitter = eventEmitter;
+  }
+
+  async start() {
+    console.log("🚀 Helius Monitor başlatılıyor...");
+    this.connect();
+  }
+
+  private connect() {
+    if (!HELIUS_API_KEY) {
+      console.error("❌ HELIUS_API_KEY ortam değişkeni bulunamadı!");
+      return;
+    }
+
+    this.mainWebSocket = new WebSocket(WS_URL);
+
+    this.mainWebSocket.on("open", () => {
+      console.log("✅ Helius WebSocket bağlantısı kuruldu");
+      const sub = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "logsSubscribe",
+        params: [{ mentions: [SPL_TOKEN_PROGRAM_ID] }, { commitment: "finalized" }],
+      };
+      this.mainWebSocket?.send(JSON.stringify(sub));
+      this.eventEmitter("connection_status", { connected: true });
+    });
+
+    this.mainWebSocket.on("message", async (data: Buffer) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        const logs = msg?.params?.result?.value?.logs;
+        const signature = msg?.params?.result?.value?.signature;
+
+        if (!logs || !signature) return;
+
+        for (const log of logs) {
+          if (log.includes("Program log: Instruction: InitializeMint")) {
+            await this.handleMintDetection(signature);
+          }
+        }
+      } catch (err) {
+        console.error("❌ Mesaj işleme hatası:", err);
+      }
+    });
+
+    this.mainWebSocket.on("error", (err) => {
+      console.error("❌ WebSocket hatası:", err);
+      this.eventEmitter("connection_status", { 
+        connected: false, 
+        message: "Bağlantı hatası" 
+      });
+    });
+
+    this.mainWebSocket.on("close", () => {
+      console.log("🔌 Bağlantı kapandı, 3 saniye sonra yeniden bağlanılacak...");
+      this.eventEmitter("connection_status", { 
+        connected: false, 
+        message: "Yeniden bağlanıyor..." 
+      });
+      
+      this.reconnectTimeout = setTimeout(() => this.connect(), 3000);
+    });
+  }
+
+  private async handleMintDetection(signature: string) {
+    try {
+      const mintAddress = await this.fetchMintAddress(signature);
+      if (!mintAddress) return;
+
+      if (this.activeMints.size >= MAX_TRACKED) {
+        const oldestKey = Array.from(this.activeMints.keys())[0];
+        const oldest = this.activeMints.get(oldestKey);
+        if (oldest?.lpWebSocket) {
+          oldest.lpWebSocket.close();
+        }
+        this.activeMints.delete(oldestKey);
+      }
+
+      if (this.activeMints.has(mintAddress)) return;
+
+      const metadata = await this.fetchTokenMetadata(mintAddress);
+      if (!metadata) return;
+
+      console.log(`🪙 Yeni mint tespit edildi: ${metadata.name} (${metadata.symbol})`);
+
+      const detectedAt = Date.now();
+      const expiresAt = detectedAt + (3 * 60 * 1000);
+
+      this.activeMints.set(mintAddress, {
+        timestamp: detectedAt,
+        metadata,
+      });
+
+      this.eventEmitter("mint_detected", {
+        id: mintAddress,
+        mintAddress,
+        name: metadata.name,
+        symbol: metadata.symbol,
+        detectedAt,
+        expiresAt,
+      });
+
+      this.monitorLP(mintAddress, metadata);
+    } catch (err) {
+      console.error("❌ Mint tespit hatası:", err);
+    }
+  }
+
+  private async fetchMintAddress(signature: string): Promise<string | null> {
+    try {
+      const body = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getTransaction",
+        params: [signature, { encoding: "json", maxSupportedTransactionVersion: 0 }],
+      };
+
+      const res = await fetch(HTTP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      const result = data.result;
+      if (!result) return null;
+
+      const message = result.transaction?.message;
+      const accountKeys = message?.accountKeys;
+      const instructions = message?.instructions;
+
+      if (!accountKeys || !instructions) return null;
+
+      for (const ix of instructions) {
+        const pid = ix.programIdIndex;
+        if (pid !== undefined && accountKeys[pid] === SPL_TOKEN_PROGRAM_ID) {
+          const accounts = ix.accounts;
+          if (accounts && accounts.length > 0) {
+            return accountKeys[accounts[0]];
+          }
+        }
+      }
+
+      return null;
+    } catch (err) {
+      console.error("❌ Mint adresi fetch hatası:", err);
+      return null;
+    }
+  }
+
+  private async fetchTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {
+    try {
+      const body = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getAsset",
+        params: { id: mintAddress },
+      };
+
+      const res = await fetch(HTTP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      const result = data.result;
+      if (!result) return null;
+
+      const name = result.content?.metadata?.name || "Bilinmiyor";
+      const symbol = result.content?.metadata?.symbol || "Bilinmiyor";
+
+      if (name === "Bilinmiyor" && symbol === "Bilinmiyor") return null;
+
+      return { name, symbol };
+    } catch (err) {
+      console.error("❌ Token metadata fetch hatası:", err);
+      return null;
+    }
+  }
+
+  private monitorLP(mintAddress: string, metadata: TokenMetadata) {
+    const wsLP = new WebSocket(WS_URL);
+
+    wsLP.on("open", () => {
+      const sub = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "logsSubscribe",
+        params: [{ mentions: [mintAddress] }, { commitment: "finalized" }],
+      };
+      wsLP.send(JSON.stringify(sub));
+    });
+
+    wsLP.on("message", (data: Buffer) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        const logs = msg?.params?.result?.value?.logs;
+        if (!logs) return;
+
+        const now = Date.now();
+        const mintData = this.activeMints.get(mintAddress);
+        if (!mintData || now - mintData.timestamp > MAX_AGE_MS) {
+          console.log(`⏳ LP izleme süresi doldu: ${mintAddress}`);
+          wsLP.close();
+          this.activeMints.delete(mintAddress);
+          return;
+        }
+
+        for (const log of logs) {
+          if (LP_KEYWORDS.some((keyword) => log.includes(keyword))) {
+            console.log(`💧 LP tespit edildi: ${metadata.name} (${metadata.symbol})`);
+
+            const detectedAt = Date.now();
+            const expiresAt = detectedAt + (2 * 60 * 1000);
+
+            this.eventEmitter("lp_detected", {
+              id: `${mintAddress}-${detectedAt}`,
+              mintAddress,
+              name: metadata.name,
+              symbol: metadata.symbol,
+              detectedAt,
+              expiresAt,
+              raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
+              jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
+              dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
+            });
+
+            wsLP.close();
+            this.activeMints.delete(mintAddress);
+            break;
+          }
+        }
+      } catch (err) {
+        console.error("❌ LP mesaj işleme hatası:", err);
+      }
+    });
+
+    wsLP.on("close", () => {
+      if (this.activeMints.has(mintAddress)) {
+        this.activeMints.delete(mintAddress);
+      }
+    });
+
+    const mintData = this.activeMints.get(mintAddress);
+    if (mintData) {
+      mintData.lpWebSocket = wsLP;
+    }
+  }
+
+  stop() {
+    console.log("🛑 Helius Monitor durduruluyor...");
+    
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+
+    if (this.mainWebSocket) {
+      this.mainWebSocket.close();
+    }
+
+    this.activeMints.forEach((mintData) => {
+      if (mintData.lpWebSocket) {
+        mintData.lpWebSocket.close();
+      }
+    });
+
+    this.activeMints.clear();
+  }
+}
