@@ -1,18 +1,46 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const mintedTokenSchema = z.object({
+  id: z.string(),
+  mintAddress: z.string(),
+  name: z.string(),
+  symbol: z.string(),
+  detectedAt: z.number(),
+  expiresAt: z.number(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export type MintedToken = z.infer<typeof mintedTokenSchema>;
+
+export const lpDetectionSchema = z.object({
+  id: z.string(),
+  mintAddress: z.string(),
+  name: z.string(),
+  symbol: z.string(),
+  detectedAt: z.number(),
+  expiresAt: z.number(),
+  raydiumUrl: z.string(),
+  jupiterUrl: z.string(),
+  dexscreenerUrl: z.string(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type LPDetection = z.infer<typeof lpDetectionSchema>;
+
+export const wsMessageSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("mint_detected"),
+    data: mintedTokenSchema,
+  }),
+  z.object({
+    type: z.literal("lp_detected"),
+    data: lpDetectionSchema,
+  }),
+  z.object({
+    type: z.literal("connection_status"),
+    data: z.object({
+      connected: z.boolean(),
+      message: z.string().optional(),
+    }),
+  }),
+]);
+
+export type WSMessage = z.infer<typeof wsMessageSchema>;
