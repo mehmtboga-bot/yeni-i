@@ -17,22 +17,34 @@ export default function Home() {
   const [mintedTokens, setMintedTokens] = useState<MintedToken[]>([]);
   const [lpLogs, setLpLogs] = useState<LPDetection[]>([]);
   const [newTokenId, setNewTokenId] = useState<string | null>(null);
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+
+  const toggleMonitoring = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ 
+        type: "toggle_monitoring", 
+        data: { enabled: !isMonitoring } 
+      }));
+    }
+  };
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
-    let ws: WebSocket | null = null;
+    let wsInstance: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout;
 
     const connect = () => {
-      ws = new WebSocket(wsUrl);
+      wsInstance = new WebSocket(wsUrl);
+      setWs(wsInstance);
 
-      ws.onopen = () => {
+      wsInstance.onopen = () => {
         setIsConnected(true);
         setConnectionMessage("");
       };
 
-      ws.onmessage = (event) => {
+      wsInstance.onmessage = (event) => {
         try {
           const message: WSMessage = JSON.parse(event.data);
 
@@ -55,20 +67,29 @@ export default function Home() {
           } else if (message.type === "connection_status") {
             setIsConnected(message.data.connected);
             setConnectionMessage(message.data.message || "");
+            if (message.data.isMonitoring !== undefined) {
+              setIsMonitoring(message.data.isMonitoring);
+            }
+          } else if (message.type === "monitoring_state") {
+            setIsMonitoring(message.data.isMonitoring);
+          } else if (message.type === "error") {
+            console.error("Server hatası:", message.data.message);
+            setConnectionMessage(message.data.message);
           }
         } catch (error) {
           console.error("WebSocket mesaj hatası:", error);
         }
       };
 
-      ws.onerror = () => {
+      wsInstance.onerror = () => {
         setIsConnected(false);
         setConnectionMessage("Bağlantı hatası");
       };
 
-      ws.onclose = () => {
+      wsInstance.onclose = () => {
         setIsConnected(false);
         setConnectionMessage("Yeniden bağlanıyor...");
+        setWs(null);
         reconnectTimeout = setTimeout(connect, 3000);
       };
     };
@@ -84,8 +105,8 @@ export default function Home() {
     return () => {
       clearInterval(cleanupInterval);
       clearTimeout(reconnectTimeout);
-      if (ws) {
-        ws.close();
+      if (wsInstance) {
+        wsInstance.close();
       }
     };
   }, []);
@@ -108,7 +129,12 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <ConnectionStatus isConnected={isConnected} message={connectionMessage} />
+            <ConnectionStatus 
+              isConnected={isConnected} 
+              message={connectionMessage}
+              isMonitoring={isMonitoring}
+              onToggleMonitoring={toggleMonitoring}
+            />
           </div>
         </div>
       </header>
