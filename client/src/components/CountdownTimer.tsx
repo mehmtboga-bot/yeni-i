@@ -2,33 +2,33 @@ import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
 
 interface CountdownTimerProps {
-  expiresAt: number;
+  detectedAt: number;
   className?: string;
 }
 
-export function CountdownTimer({ expiresAt, className = "" }: CountdownTimerProps) {
-  const [timeLeft, setTimeLeft] = useState(0);
+export function CountdownTimer({ detectedAt, className = "" }: CountdownTimerProps) {
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     const updateTimer = () => {
-      const remaining = Math.max(0, expiresAt - Date.now());
-      setTimeLeft(remaining);
+      const elapsedTime = Math.max(0, Date.now() - detectedAt);
+      setElapsed(elapsedTime);
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [expiresAt]);
+  }, [detectedAt]);
 
-  const seconds = Math.floor(timeLeft / 1000);
+  const seconds = Math.floor(elapsed / 1000);
   const minutes = Math.floor(seconds / 60);
   const displaySeconds = seconds % 60;
 
   const getColorClass = () => {
-    if (seconds > 60) return "text-chart-4";
-    if (seconds > 30) return "text-chart-5";
-    return "text-destructive";
+    if (seconds < 30) return "text-chart-4";
+    if (seconds < 60) return "text-chart-5";
+    return "text-muted-foreground";
   };
 
   return (

@@ -50,7 +50,7 @@ export function MintedTokenCard({ token, isNew = false }: MintedTokenCardProps) 
               </Badge>
             </div>
           </div>
-          <CountdownTimer expiresAt={token.expiresAt} />
+          <CountdownTimer detectedAt={token.detectedAt} />
         </div>
 
         <div className="flex items-center gap-2">

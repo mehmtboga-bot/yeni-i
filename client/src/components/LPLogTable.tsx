@@ -123,7 +123,7 @@ export function LPLogTable({ logs }: LPLogTableProps) {
             </div>
 
             <div className="sm:ml-auto">
-              <CountdownTimer expiresAt={log.expiresAt} />
+              <CountdownTimer detectedAt={log.detectedAt} />
             </div>
           </div>
         </div>
