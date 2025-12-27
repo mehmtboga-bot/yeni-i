@@ -234,59 +234,64 @@ export class HeliusMonitor {
 
   private async checkLiquidityPool(mintAddress: string): Promise<boolean> {
     try {
-      const raydiumPromise = fetch("https://api.raydium.io/v2/pools", {
-        method: "GET",
-        signal: AbortSignal.timeout(3000),
-      })
-        .then((r) => r.json())
-        .then((data) =>
-          Array.isArray(data) &&
-          data.some(
-            (p: any) =>
-              p.mintA === mintAddress ||
-              p.mintB === mintAddress ||
-              p.baseMint === mintAddress ||
-              p.quoteMint === mintAddress
-          )
-        )
-        .catch(() => false);
+      const body = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getSignaturesForAddress",
+        params: [
+          mintAddress,
+          { limit: 100 },
+        ],
+      };
 
-      const jupiterPromise = fetch("https://token.jup.ag/all", {
-        signal: AbortSignal.timeout(3000),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          const tokens = Object.values(data || {});
-          return tokens.some(
-            (t: any) =>
-              t.address === mintAddress ||
-              (t.tags && t.tags.includes("pool"))
-          );
-        })
-        .catch(() => false);
+      const res = await fetch(HTTP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-      const meteora = fetch("https://amm-api.meteora.ag/pools", {
-        signal: AbortSignal.timeout(3000),
-      })
-        .then((r) => r.json())
-        .then((data) =>
-          Array.isArray(data) &&
-          data.some(
-            (p: any) =>
-              p.tokenAMint === mintAddress || p.tokenBMint === mintAddress
-          )
-        )
-        .catch(() => false);
+      const data = await res.json();
+      const signatures = data.result || [];
 
-      const [raydiumResult, jupiterResult, meteoraResult] = await Promise.all([
-        raydiumPromise,
-        jupiterPromise,
-        meteora,
-      ]);
+      if (signatures.length === 0) return false;
 
-      if (raydiumResult || jupiterResult || meteoraResult) {
-        console.log(`💧 LP bulundu: ${mintAddress}`);
-        return true;
+      // İlk işlemleri kontrol et
+      for (const sig of signatures.slice(0, 10)) {
+        const txBody = {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getTransaction",
+          params: [sig.signature, { maxSupportedTransactionVersion: 0 }],
+        };
+
+        const txRes = await fetch(HTTP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(txBody),
+        });
+
+        const txData = await txRes.json();
+        const tx = txData.result;
+        if (!tx) continue;
+
+        const logs = tx.meta?.logMessages || [];
+        
+        // LP pool keywords ara
+        const lpIndicators = [
+          "initialize_pool",
+          "initialize_amm",
+          "add_liquidity",
+          "addLiquidity",
+          "InitPool",
+          "CreatePool",
+        ];
+
+        for (const log of logs) {
+          if (lpIndicators.some((keyword) => log.includes(keyword))) {
+            console.log(`💧 LP bulundu: ${mintAddress}`);
+            return true;
+          }
+        }
       }
 
       return false;
