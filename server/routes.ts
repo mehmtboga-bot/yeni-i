@@ -24,6 +24,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastToClients({ type: "mint_detected", data });
     } else if (event === "lp_detected") {
       broadcastToClients({ type: "lp_detected", data });
+    } else if (event === "lp_locked") {
+      broadcastToClients({ type: "lp_locked", data });
     } else if (event === "connection_status") {
       broadcastToClients({ type: "connection_status", data });
     } else if (event === "monitoring_state") {

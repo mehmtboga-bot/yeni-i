@@ -72,6 +72,14 @@ export default function Home() {
             }
           } else if (message.type === "monitoring_state") {
             setIsMonitoring(message.data.isMonitoring);
+          } else if (message.type === "lp_locked") {
+            setMintedTokens((prev) =>
+              prev.map((t) =>
+                t.mintAddress === message.data.mintAddress
+                  ? { ...t, isLpLocked: true }
+                  : t
+              )
+            );
           } else if (message.type === "error") {
             console.error("Server hatası:", message.data.message);
             setConnectionMessage(message.data.message);

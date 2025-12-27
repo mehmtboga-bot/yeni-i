@@ -41,13 +41,21 @@ export function MintedTokenCard({ token, isNew = false }: MintedTokenCardProps) 
             <h3 className="text-lg font-semibold text-foreground truncate" data-testid="text-token-name">
               {token.name}
             </h3>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge
                 className="bg-gradient-to-r from-primary to-chart-2 text-primary-foreground border-0"
                 data-testid="badge-symbol"
               >
                 {token.symbol}
               </Badge>
+              {token.isLpLocked && (
+                <Badge
+                  className="bg-chart-4 text-primary-foreground border-0"
+                  data-testid="badge-locked"
+                >
+                  🔒 Kilitli
+                </Badge>
+              )}
             </div>
           </div>
           <CountdownTimer detectedAt={token.detectedAt} />
