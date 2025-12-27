@@ -182,6 +182,7 @@ export class HeliusMonitor {
         symbol: metadata.symbol,
         detectedAt,
         expiresAt,
+        isLpLocked: false,
       });
 
       this.monitorLP(mintAddress, metadata);
@@ -296,8 +297,7 @@ export class HeliusMonitor {
             console.log(`💧 LP tespit edildi: ${metadata.name} (${metadata.symbol})`);
 
             const detectedAt = Date.now();
-            const expiresAt = detectedAt
-+ (3 * 60 * 1000);
+            const expiresAt = detectedAt + (2 * 60 * 1000);
 
             this.eventEmitter("lp_detected", {
               id: `${mintAddress}-${detectedAt}`,
@@ -309,6 +309,11 @@ export class HeliusMonitor {
               raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
               jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
               dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
+            });
+
+            this.eventEmitter("lp_locked", {
+              mintAddress,
+              isLpLocked: true,
             });
 
             wsLP.close();
