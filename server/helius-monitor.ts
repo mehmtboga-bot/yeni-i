@@ -148,7 +148,7 @@ export class HeliusMonitor {
 
   private async handleMintDetection(signature: string) {
     try {
-      const mintAddress = await this.fetchMintAddress(signature);
+      const { mintAddress, txLogs } = await this.fetchMintAddress(signature);
       if (!mintAddress) return;
 
       if (this.activeMints.size >= MAX_TRACKED) {
@@ -162,7 +162,7 @@ export class HeliusMonitor {
 
       if (this.activeMints.has(mintAddress)) return;
 
-      const metadata = await this.fetchTokenMetadata(mintAddress);
+      const metadata = await this.fetchTokenMetadata(mintAddress, txLogs);
       if (!metadata) return;
 
       console.log(`🪙 Yeni mint tespit edildi: ${metadata.name} (${metadata.symbol})`);
@@ -190,7 +190,7 @@ export class HeliusMonitor {
     }
   }
 
-  private async fetchMintAddress(signature: string): Promise<string | null> {
+  private async fetchMintAddress(signature: string): Promise<{ mintAddress: string | null; txLogs: string[] }> {
     try {
       const body = {
         jsonrpc: "2.0",
@@ -207,101 +207,53 @@ export class HeliusMonitor {
 
       const data = await res.json();
       const result = data.result;
-      if (!result) return null;
+      if (!result) return { mintAddress: null, txLogs: [] };
 
       const message = result.transaction?.message;
       const accountKeys = message?.accountKeys;
       const instructions = message?.instructions;
+      const txLogs = result.meta?.logMessages || [];
 
-      if (!accountKeys || !instructions) return null;
+      if (!accountKeys || !instructions) return { mintAddress: null, txLogs };
 
       for (const ix of instructions) {
         const pid = ix.programIdIndex;
         if (pid !== undefined && accountKeys[pid] === SPL_TOKEN_PROGRAM_ID) {
           const accounts = ix.accounts;
           if (accounts && accounts.length > 0) {
-            return accountKeys[accounts[0]];
+            return { mintAddress: accountKeys[accounts[0]], txLogs };
           }
         }
       }
 
-      return null;
+      return { mintAddress: null, txLogs };
     } catch (err) {
       console.error("❌ Mint adresi fetch hatası:", err);
-      return null;
+      return { mintAddress: null, txLogs: [] };
     }
   }
 
-  private async checkLiquidityPool(mintAddress: string): Promise<boolean> {
-    try {
-      const body = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getSignaturesForAddress",
-        params: [
-          mintAddress,
-          { limit: 100 },
-        ],
-      };
+  private checkLiquidityPoolFromLogs(txLogs: string[]): boolean {
+    const lpIndicators = [
+      "initialize_pool",
+      "initialize_amm",
+      "add_liquidity",
+      "addLiquidity",
+      "InitPool",
+      "CreatePool",
+      "InitializeInstruction",
+    ];
 
-      const res = await fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-      const signatures = data.result || [];
-
-      if (signatures.length === 0) return false;
-
-      // İlk işlemleri kontrol et
-      for (const sig of signatures.slice(0, 10)) {
-        const txBody = {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getTransaction",
-          params: [sig.signature, { maxSupportedTransactionVersion: 0 }],
-        };
-
-        const txRes = await fetch(HTTP_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(txBody),
-        });
-
-        const txData = await txRes.json();
-        const tx = txData.result;
-        if (!tx) continue;
-
-        const logs = tx.meta?.logMessages || [];
-        
-        // LP pool keywords ara
-        const lpIndicators = [
-          "initialize_pool",
-          "initialize_amm",
-          "add_liquidity",
-          "addLiquidity",
-          "InitPool",
-          "CreatePool",
-        ];
-
-        for (const log of logs) {
-          if (lpIndicators.some((keyword) => log.includes(keyword))) {
-            console.log(`💧 LP bulundu: ${mintAddress}`);
-            return true;
-          }
-        }
+    for (const log of txLogs) {
+      if (lpIndicators.some((keyword) => log.toLowerCase().includes(keyword.toLowerCase()))) {
+        return true;
       }
-
-      return false;
-    } catch (err) {
-      console.error("❌ LP pool kontrol hatası:", err);
-      return false;
     }
+
+    return false;
   }
 
-  private async fetchTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {
+  private async fetchTokenMetadata(mintAddress: string, txLogs: string[] = []): Promise<TokenMetadata | null> {
     try {
       const assetBody = {
         jsonrpc: "2.0",
@@ -329,12 +281,9 @@ export class HeliusMonitor {
         body: JSON.stringify(accountBody),
       });
 
-      const lpPromise = this.checkLiquidityPool(mintAddress);
-
-      const [assetRes, accountRes, lpExists] = await Promise.all([
+      const [assetRes, accountRes] = await Promise.all([
         assetPromise,
         accountPromise,
-        lpPromise,
       ]);
 
       const assetData = await assetRes.json();
@@ -351,10 +300,13 @@ export class HeliusMonitor {
 
       let isLpLocked = false;
       
+      // Transaction log'larından LP kontrol et
+      const lpFromTx = this.checkLiquidityPoolFromLogs(txLogs);
+      
       // Mint authority null ise veya LP bulunduysa kilitli
       if (
         accountResult?.value?.data?.parsed?.info?.mintAuthority === null ||
-        lpExists
+        lpFromTx
       ) {
         isLpLocked = true;
         console.log(`🔒 Token kilitli: ${name} (${symbol})`);
