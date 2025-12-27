@@ -33,6 +33,7 @@ const  LP_KEYWORDS = [
 interface TokenMetadata {
   name: string;
   symbol: string;
+  isLpLocked: boolean;
 }
 
 interface ActiveMint {
@@ -182,10 +183,8 @@ export class HeliusMonitor {
         symbol: metadata.symbol,
         detectedAt,
         expiresAt,
-        isLpLocked: false,
+        isLpLocked: metadata.isLpLocked,
       });
-
-      this.monitorLP(mintAddress, metadata);
     } catch (err) {
       console.error("❌ Mint tespit hatası:", err);
     }
@@ -235,108 +234,58 @@ export class HeliusMonitor {
 
   private async fetchTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {
     try {
-      const body = {
+      const assetBody = {
         jsonrpc: "2.0",
         id: 1,
         method: "getAsset",
         params: { id: mintAddress },
       };
 
-      const res = await fetch(HTTP_URL, {
+      const assetRes = await fetch(HTTP_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(assetBody),
       });
 
-      const data = await res.json();
-      const result = data.result;
-      if (!result) return null;
+      const assetData = await assetRes.json();
+      const assetResult = assetData.result;
+      if (!assetResult) return null;
 
-      const name = result.content?.metadata?.name || "Bilinmiyor";
-      const symbol = result.content?.metadata?.symbol || "Bilinmiyor";
+      const name = assetResult.content?.metadata?.name || "Bilinmiyor";
+      const symbol = assetResult.content?.metadata?.symbol || "Bilinmiyor";
 
       if (name === "Bilinmiyor" && symbol === "Bilinmiyor") return null;
 
-      return { name, symbol };
+      // Mint authority kontrol et
+      const accountBody = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getAccount",
+        params: [mintAddress, { encoding: "jsonParsed" }],
+      };
+
+      const accountRes = await fetch(HTTP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(accountBody),
+      });
+
+      const accountData = await accountRes.json();
+      const accountResult = accountData.result;
+      
+      let isLpLocked = false;
+      if (accountResult?.value?.data?.parsed?.info?.mintAuthority === null) {
+        isLpLocked = true;
+        console.log(`🔒 Token kilitli: ${name} (${symbol})`);
+      }
+
+      return { name, symbol, isLpLocked };
     } catch (err) {
       console.error("❌ Token metadata fetch hatası:", err);
       return null;
     }
   }
 
-  private monitorLP(mintAddress: string, metadata: TokenMetadata) {
-    const wsLP = new WebSocket(WS_URL);
-
-    wsLP.on("open", () => {
-      const sub = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "logsSubscribe",
-        params: [{ mentions: [mintAddress] }, { commitment: "finalized" }],
-      };
-      wsLP.send(JSON.stringify(sub));
-    });
-
-    wsLP.on("message", (data: Buffer) => {
-      try {
-        const msg = JSON.parse(data.toString());
-        const logs = msg?.params?.result?.value?.logs;
-        if (!logs) return;
-
-        const now = Date.now();
-        const mintData = this.activeMints.get(mintAddress);
-        if (!mintData || now - mintData.timestamp > MAX_AGE_MS) {
-          console.log(`⏳ LP izleme süresi doldu: ${mintAddress}`);
-          wsLP.close();
-          this.activeMints.delete(mintAddress);
-          return;
-        }
-
-        for (const log of logs) {
-          if (LP_KEYWORDS.some((keyword) => log.includes(keyword))) {
-            console.log(`💧 LP tespit edildi: ${metadata.name} (${metadata.symbol})`);
-
-            const detectedAt = Date.now();
-            const expiresAt = detectedAt + (2 * 60 * 1000);
-
-            this.eventEmitter("lp_detected", {
-              id: `${mintAddress}-${detectedAt}`,
-              mintAddress,
-              name: metadata.name,
-              symbol: metadata.symbol,
-              detectedAt,
-              expiresAt,
-              raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
-              jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
-              dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
-            });
-
-            this.eventEmitter("lp_locked", {
-              mintAddress,
-              isLpLocked: true,
-            });
-
-            wsLP.close();
-            this.activeMints.delete(mintAddress);
-            break;
-          }
-        }
-      } catch (err) {
-        console.error("❌ LP mesaj işleme hatası:", err);
-      }
-    });
-
-    wsLP.on("close", () => {
-      if (this.activeMints.has(mintAddress)) {
-        this.activeMints.delete(mintAddress);
-      }
-    });
-
-    const mintData = this.activeMints.get(mintAddress);
-    if (mintData) {
-      mintData.lpWebSocket = wsLP;
-    }
-  }
 
   stop() {
     if (!this.isRunning) {
