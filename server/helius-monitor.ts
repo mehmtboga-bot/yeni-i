@@ -232,6 +232,70 @@ export class HeliusMonitor {
     }
   }
 
+  private async checkLiquidityPool(mintAddress: string): Promise<boolean> {
+    try {
+      const raydiumPromise = fetch("https://api.raydium.io/v2/pools", {
+        method: "GET",
+        signal: AbortSignal.timeout(3000),
+      })
+        .then((r) => r.json())
+        .then((data) =>
+          Array.isArray(data) &&
+          data.some(
+            (p: any) =>
+              p.mintA === mintAddress ||
+              p.mintB === mintAddress ||
+              p.baseMint === mintAddress ||
+              p.quoteMint === mintAddress
+          )
+        )
+        .catch(() => false);
+
+      const jupiterPromise = fetch("https://token.jup.ag/all", {
+        signal: AbortSignal.timeout(3000),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          const tokens = Object.values(data || {});
+          return tokens.some(
+            (t: any) =>
+              t.address === mintAddress ||
+              (t.tags && t.tags.includes("pool"))
+          );
+        })
+        .catch(() => false);
+
+      const meteora = fetch("https://amm-api.meteora.ag/pools", {
+        signal: AbortSignal.timeout(3000),
+      })
+        .then((r) => r.json())
+        .then((data) =>
+          Array.isArray(data) &&
+          data.some(
+            (p: any) =>
+              p.tokenAMint === mintAddress || p.tokenBMint === mintAddress
+          )
+        )
+        .catch(() => false);
+
+      const [raydiumResult, jupiterResult, meteoraResult] = await Promise.all([
+        raydiumPromise,
+        jupiterPromise,
+        meteora,
+      ]);
+
+      if (raydiumResult || jupiterResult || meteoraResult) {
+        console.log(`💧 LP bulundu: ${mintAddress}`);
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.error("❌ LP pool kontrol hatası:", err);
+      return false;
+    }
+  }
+
   private async fetchTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {
     try {
       const assetBody = {
@@ -241,11 +305,32 @@ export class HeliusMonitor {
         params: { id: mintAddress },
       };
 
-      const assetRes = await fetch(HTTP_URL, {
+      const assetPromise = fetch(HTTP_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(assetBody),
       });
+
+      const accountBody = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getAccount",
+        params: [mintAddress, { encoding: "jsonParsed" }],
+      };
+
+      const accountPromise = fetch(HTTP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(accountBody),
+      });
+
+      const lpPromise = this.checkLiquidityPool(mintAddress);
+
+      const [assetRes, accountRes, lpExists] = await Promise.all([
+        assetPromise,
+        accountPromise,
+        lpPromise,
+      ]);
 
       const assetData = await assetRes.json();
       const assetResult = assetData.result;
@@ -256,25 +341,16 @@ export class HeliusMonitor {
 
       if (name === "Bilinmiyor" && symbol === "Bilinmiyor") return null;
 
-      // Mint authority kontrol et
-      const accountBody = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getAccount",
-        params: [mintAddress, { encoding: "jsonParsed" }],
-      };
-
-      const accountRes = await fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(accountBody),
-      });
-
       const accountData = await accountRes.json();
       const accountResult = accountData.result;
-      
+
       let isLpLocked = false;
-      if (accountResult?.value?.data?.parsed?.info?.mintAuthority === null) {
+      
+      // Mint authority null ise veya LP bulunduysa kilitli
+      if (
+        accountResult?.value?.data?.parsed?.info?.mintAuthority === null ||
+        lpExists
+      ) {
         isLpLocked = true;
         console.log(`🔒 Token kilitli: ${name} (${symbol})`);
       }
