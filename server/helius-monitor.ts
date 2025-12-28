@@ -33,7 +33,6 @@ const  LP_KEYWORDS = [
 interface TokenMetadata {
   name: string;
   symbol: string;
-  isLpLocked: boolean;
 }
 
 interface ActiveMint {
@@ -48,9 +47,6 @@ export class HeliusMonitor {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private eventEmitter: (event: string, data: any) => void;
   private isRunning: boolean = false;
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 10;
-  private baseReconnectDelay: number = 5000; // 5 seconds base delay
 
   constructor(eventEmitter: (event: string, data: any) => void) {
     this.eventEmitter = eventEmitter;
@@ -62,7 +58,6 @@ export class HeliusMonitor {
       return;
     }
     this.isRunning = true;
-    this.reconnectAttempts = 0;
     console.log("🚀 Helius Monitor başlatılıyor...");
     this.eventEmitter("monitoring_state", { isMonitoring: true });
     this.connect();
@@ -70,25 +65,6 @@ export class HeliusMonitor {
 
   getState() {
     return this.isRunning;
-  }
-
-  private scheduleReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("❌ Max reconnect attempts aşıldı");
-      this.eventEmitter("error", {
-        message: "Helius bağlantısı kurulamıyor. Lütfen API anahtarını kontrol edin.",
-      });
-      return;
-    }
-
-    const delay = this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts);
-    const maxDelay = 60000; // Max 1 minute
-    const actualDelay = Math.min(delay, maxDelay);
-
-    console.log(`⏳ ${(actualDelay / 1000).toFixed(1)}s sonra yeniden bağlanılacak (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
-    
-    this.reconnectTimeout = setTimeout(() => this.connect(), actualDelay);
-    this.reconnectAttempts++;
   }
 
   private connect() {
@@ -105,7 +81,6 @@ export class HeliusMonitor {
 
     this.mainWebSocket.on("open", () => {
       console.log("✅ Helius WebSocket bağlantısı kuruldu");
-      this.reconnectAttempts = 0;
       const sub = {
         jsonrpc: "2.0",
         id: 1,
@@ -165,14 +140,14 @@ export class HeliusMonitor {
       });
 
       if (this.isRunning) {
-        this.scheduleReconnect();
+        this.reconnectTimeout = setTimeout(() => this.connect(), 3000);
       }
     });
   }
 
   private async handleMintDetection(signature: string) {
     try {
-      const { mintAddress, txLogs } = await this.fetchMintAddress(signature);
+      const mintAddress = await this.fetchMintAddress(signature);
       if (!mintAddress) return;
 
       if (this.activeMints.size >= MAX_TRACKED) {
@@ -186,7 +161,7 @@ export class HeliusMonitor {
 
       if (this.activeMints.has(mintAddress)) return;
 
-      const metadata = await this.fetchTokenMetadata(mintAddress, txLogs);
+      const metadata = await this.fetchTokenMetadata(mintAddress);
       if (!metadata) return;
 
       console.log(`🪙 Yeni mint tespit edildi: ${metadata.name} (${metadata.symbol})`);
@@ -207,14 +182,15 @@ export class HeliusMonitor {
         symbol: metadata.symbol,
         detectedAt,
         expiresAt,
-        isLpLocked: metadata.isLpLocked,
       });
+
+      this.monitorLP(mintAddress, metadata);
     } catch (err) {
       console.error("❌ Mint tespit hatası:", err);
     }
   }
 
-  private async fetchMintAddress(signature: string): Promise<{ mintAddress: string | null; txLogs: string[] }> {
+  private async fetchMintAddress(signature: string): Promise<string | null> {
     try {
       const body = {
         jsonrpc: "2.0",
@@ -231,118 +207,131 @@ export class HeliusMonitor {
 
       const data = await res.json();
       const result = data.result;
-      if (!result) return { mintAddress: null, txLogs: [] };
+      if (!result) return null;
 
       const message = result.transaction?.message;
       const accountKeys = message?.accountKeys;
       const instructions = message?.instructions;
-      const txLogs = result.meta?.logMessages || [];
 
-      if (!accountKeys || !instructions) return { mintAddress: null, txLogs };
+      if (!accountKeys || !instructions) return null;
 
       for (const ix of instructions) {
         const pid = ix.programIdIndex;
         if (pid !== undefined && accountKeys[pid] === SPL_TOKEN_PROGRAM_ID) {
           const accounts = ix.accounts;
           if (accounts && accounts.length > 0) {
-            return { mintAddress: accountKeys[accounts[0]], txLogs };
+            return accountKeys[accounts[0]];
           }
         }
       }
 
-      return { mintAddress: null, txLogs };
+      return null;
     } catch (err) {
       console.error("❌ Mint adresi fetch hatası:", err);
-      return { mintAddress: null, txLogs: [] };
+      return null;
     }
   }
 
-  private checkLiquidityPoolFromLogs(txLogs: string[]): boolean {
-    const lpIndicators = [
-      "initialize_pool",
-      "initialize_amm",
-      "add_liquidity",
-      "addLiquidity",
-      "InitPool",
-      "CreatePool",
-      "InitializeInstruction",
-    ];
-
-    for (const log of txLogs) {
-      if (lpIndicators.some((keyword) => log.toLowerCase().includes(keyword.toLowerCase()))) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private async fetchTokenMetadata(mintAddress: string, txLogs: string[] = []): Promise<TokenMetadata | null> {
+  private async fetchTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {
     try {
-      const assetBody = {
+      const body = {
         jsonrpc: "2.0",
         id: 1,
         method: "getAsset",
         params: { id: mintAddress },
       };
 
-      const assetPromise = fetch(HTTP_URL, {
+      const res = await fetch(HTTP_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(assetBody),
+        body: JSON.stringify(body),
       });
 
-      const accountBody = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getAccount",
-        params: [mintAddress, { encoding: "jsonParsed" }],
-      };
+      const data = await res.json();
+      const result = data.result;
+      if (!result) return null;
 
-      const accountPromise = fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(accountBody),
-      });
-
-      const [assetRes, accountRes] = await Promise.all([
-        assetPromise,
-        accountPromise,
-      ]);
-
-      const assetData = await assetRes.json();
-      const assetResult = assetData.result;
-      if (!assetResult) return null;
-
-      const name = assetResult.content?.metadata?.name || "Bilinmiyor";
-      const symbol = assetResult.content?.metadata?.symbol || "Bilinmiyor";
+      const name = result.content?.metadata?.name || "Bilinmiyor";
+      const symbol = result.content?.metadata?.symbol || "Bilinmiyor";
 
       if (name === "Bilinmiyor" && symbol === "Bilinmiyor") return null;
 
-      const accountData = await accountRes.json();
-      const accountResult = accountData.result;
-
-      let isLpLocked = false;
-      
-      // Transaction log'larından LP kontrol et
-      const lpFromTx = this.checkLiquidityPoolFromLogs(txLogs);
-      
-      // Mint authority null ise veya LP bulunduysa kilitli
-      if (
-        accountResult?.value?.data?.parsed?.info?.mintAuthority === null ||
-        lpFromTx
-      ) {
-        isLpLocked = true;
-        console.log(`🔒 Token kilitli: ${name} (${symbol})`);
-      }
-
-      return { name, symbol, isLpLocked };
+      return { name, symbol };
     } catch (err) {
       console.error("❌ Token metadata fetch hatası:", err);
       return null;
     }
   }
 
+  private monitorLP(mintAddress: string, metadata: TokenMetadata) {
+    const wsLP = new WebSocket(WS_URL);
+
+    wsLP.on("open", () => {
+      const sub = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "logsSubscribe",
+        params: [{ mentions: [mintAddress] }, { commitment: "finalized" }],
+      };
+      wsLP.send(JSON.stringify(sub));
+    });
+
+    wsLP.on("message", (data: Buffer) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        const logs = msg?.params?.result?.value?.logs;
+        if (!logs) return;
+
+        const now = Date.now();
+        const mintData = this.activeMints.get(mintAddress);
+        if (!mintData || now - mintData.timestamp > MAX_AGE_MS) {
+          console.log(`⏳ LP izleme süresi doldu: ${mintAddress}`);
+          wsLP.close();
+          this.activeMints.delete(mintAddress);
+          return;
+        }
+
+        for (const log of logs) {
+          if (LP_KEYWORDS.some((keyword) => log.includes(keyword))) {
+            console.log(`💧 LP tespit edildi: ${metadata.name} (${metadata.symbol})`);
+
+            const detectedAt = Date.now();
+            const expiresAt = detectedAt
++ (3 * 60 * 1000);
+
+            this.eventEmitter("lp_detected", {
+              id: `${mintAddress}-${detectedAt}`,
+              mintAddress,
+              name: metadata.name,
+              symbol: metadata.symbol,
+              detectedAt,
+              expiresAt,
+              raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
+              jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
+              dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
+            });
+
+            wsLP.close();
+            this.activeMints.delete(mintAddress);
+            break;
+          }
+        }
+      } catch (err) {
+        console.error("❌ LP mesaj işleme hatası:", err);
+      }
+    });
+
+    wsLP.on("close", () => {
+      if (this.activeMints.has(mintAddress)) {
+        this.activeMints.delete(mintAddress);
+      }
+    });
+
+    const mintData = this.activeMints.get(mintAddress);
+    if (mintData) {
+      mintData.lpWebSocket = wsLP;
+    }
+  }
 
   stop() {
     if (!this.isRunning) {
