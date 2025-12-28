@@ -7,7 +7,6 @@ export const mintedTokenSchema = z.object({
   symbol: z.string(),
   detectedAt: z.number(),
   expiresAt: z.number(),
-  isLpLocked: z.boolean().default(false),
 });
 
 export type MintedToken = z.infer<typeof mintedTokenSchema>;
@@ -54,13 +53,6 @@ export const wsMessageSchema = z.discriminatedUnion("type", [
     data: z.object({
       message: z.string(),
       type: z.string().optional(),
-    }),
-  }),
-  z.object({
-    type: z.literal("lp_locked"),
-    data: z.object({
-      mintAddress: z.string(),
-      isLpLocked: z.boolean(),
     }),
   }),
 ]);
