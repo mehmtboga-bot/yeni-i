@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;"c1935abe-eb98-493f-9776-ab2967e350f4"
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const WS_URL = `wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const HTTP_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -47,6 +47,8 @@ export class HeliusMonitor {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private eventEmitter: (event: string, data: any) => void;
   private isRunning: boolean = false;
+  private reconnectAttempts: number = 0;
+  private maxReconnectDelay: number = 60000;
 
   constructor(eventEmitter: (event: string, data: any) => void) {
     this.eventEmitter = eventEmitter;
