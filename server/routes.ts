@@ -35,8 +35,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  monitor.start();
-
   wss.on("connection", (ws: WebSocket) => {
     console.log("👤 Yeni client bağlandı");
     clients.add(ws);

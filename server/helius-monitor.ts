@@ -48,6 +48,9 @@ export class HeliusMonitor {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private eventEmitter: (event: string, data: any) => void;
   private isRunning: boolean = false;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 10;
+  private baseReconnectDelay: number = 5000; // 5 seconds base delay
 
   constructor(eventEmitter: (event: string, data: any) => void) {
     this.eventEmitter = eventEmitter;
@@ -59,6 +62,7 @@ export class HeliusMonitor {
       return;
     }
     this.isRunning = true;
+    this.reconnectAttempts = 0;
     console.log("🚀 Helius Monitor başlatılıyor...");
     this.eventEmitter("monitoring_state", { isMonitoring: true });
     this.connect();
@@ -66,6 +70,25 @@ export class HeliusMonitor {
 
   getState() {
     return this.isRunning;
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error("❌ Max reconnect attempts aşıldı");
+      this.eventEmitter("error", {
+        message: "Helius bağlantısı kurulamıyor. Lütfen API anahtarını kontrol edin.",
+      });
+      return;
+    }
+
+    const delay = this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts);
+    const maxDelay = 60000; // Max 1 minute
+    const actualDelay = Math.min(delay, maxDelay);
+
+    console.log(`⏳ ${(actualDelay / 1000).toFixed(1)}s sonra yeniden bağlanılacak (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
+    
+    this.reconnectTimeout = setTimeout(() => this.connect(), actualDelay);
+    this.reconnectAttempts++;
   }
 
   private connect() {
@@ -82,6 +105,7 @@ export class HeliusMonitor {
 
     this.mainWebSocket.on("open", () => {
       console.log("✅ Helius WebSocket bağlantısı kuruldu");
+      this.reconnectAttempts = 0;
       const sub = {
         jsonrpc: "2.0",
         id: 1,
@@ -141,7 +165,7 @@ export class HeliusMonitor {
       });
 
       if (this.isRunning) {
-        this.reconnectTimeout = setTimeout(() => this.connect(), 3000);
+        this.scheduleReconnect();
       }
     });
   }
