@@ -7,8 +7,6 @@ const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 const MAX_TRACKED = 7;
 const MAX_AGE_MS = 120000;
-const INITIAL_BACKOFF = 1000;
-const MAX_BACKOFF = 30000;
 
 const LP_KEYWORDS = [
   "add_liquidity",
@@ -43,20 +41,15 @@ interface TokenMetadata {
 interface ActiveMint {
   timestamp: number;
   metadata: TokenMetadata;
+  lpWebSocket?: WebSocket;
 }
 
 export class HeliusMonitor {
   private activeMints: Map<string, ActiveMint> = new Map();
   private mainWebSocket: WebSocket | null = null;
-  private lpWebSocket: WebSocket | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
-  private lpReconnectTimeout: NodeJS.Timeout | null = null;
   private eventEmitter: (event: string, data: any) => void;
   private isRunning: boolean = false;
-  private reconnectAttempts: number = 0;
-  private lpReconnectAttempts: number = 0;
-  private mintQueue: Set<string> = new Set();
-  private isProcessingQueue: boolean = false;
 
   constructor(eventEmitter: (event: string, data: any) => void) {
     this.eventEmitter = eventEmitter;
@@ -70,7 +63,6 @@ export class HeliusMonitor {
     this.isRunning = true;
     console.log("🚀 Helius Monitor başlatılıyor...");
     this.eventEmitter("monitoring_state", { isMonitoring: true });
-    this.reconnectAttempts = 0;
     this.connect();
   }
   
@@ -92,8 +84,6 @@ export class HeliusMonitor {
 
     this.mainWebSocket.on("open", () => {
       console.log("✅ Helius WebSocket bağlantısı kuruldu");
-      this.reconnectAttempts = 0;
-      
       const sub = {
         jsonrpc: "2.0",
         id: 1,
@@ -117,8 +107,7 @@ export class HeliusMonitor {
 
         for (const log of logs) {
           if (log.includes("Program log: Instruction: InitializeMint")) {
-            this.mintQueue.add(signature);
-            this.processQueue();
+            await this.handleMintDetection(signature);
           }
         }
       } catch (err) {
@@ -130,21 +119,17 @@ export class HeliusMonitor {
       console.error("❌ WebSocket hatası:", err);
       
       const isAuthError = err.message && err.message.includes("401");
-      const isRateLimit = err.message && err.message.includes("429");
       
       if (isAuthError) {
         this.eventEmitter("error", {
           message: "Helius API anahtarı geçersiz. Lütfen HELIUS_API_KEY environment variable'ını kontrol edin.",
           type: "auth",
         });
-      } else if (isRateLimit) {
-        console.warn("⚠️ Rate limit reached. Backing off...");
-        this.reconnectAttempts = Math.min(this.reconnectAttempts + 3, 10);
       }
       
       this.eventEmitter("connection_status", { 
         connected: false, 
-        message: isAuthError ? "API anahtarı hatası" : isRateLimit ? "API sınırlaması - bekleniliyor..." : "Bağlantı hatası",
+        message: isAuthError ? "API anahtarı hatası" : "Bağlantı hatası",
         isMonitoring: this.isRunning
       });
     });
@@ -158,35 +143,9 @@ export class HeliusMonitor {
       });
       
       if (this.isRunning) {
-        const backoff = Math.min(
-          INITIAL_BACKOFF * Math.pow(2, this.reconnectAttempts),
-          MAX_BACKOFF
-        ) + Math.random() * 1000;
-        this.reconnectAttempts++;
-        this.reconnectTimeout = setTimeout(() => this.connect(), backoff);
+        this.reconnectTimeout = setTimeout(() => this.connect(), 5000);
       }
     });
-  }
-
-  private async processQueue() {
-    if (this.isProcessingQueue || this.mintQueue.size === 0) return;
-    
-    this.isProcessingQueue = true;
-    
-    while (this.mintQueue.size > 0) {
-      const signature = Array.from(this.mintQueue)[0];
-      this.mintQueue.delete(signature);
-      
-      try {
-        await this.handleMintDetection(signature);
-      } catch (err) {
-        console.error("❌ Mint işleme hatası:", err);
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    this.isProcessingQueue = false;
   }
 
   private async handleMintDetection(signature: string) {
@@ -196,6 +155,10 @@ export class HeliusMonitor {
 
       if (this.activeMints.size >= MAX_TRACKED) {
         const oldestKey = Array.from(this.activeMints.keys())[0];
+        const oldest = this.activeMints.get(oldestKey);
+        if (oldest?.lpWebSocket) {
+          oldest.lpWebSocket.close();
+        }
         this.activeMints.delete(oldestKey);
       }
 
@@ -303,77 +266,55 @@ export class HeliusMonitor {
   }
 
   private monitorLP(mintAddress: string, metadata: TokenMetadata) {
-    if (!this.lpWebSocket || this.lpWebSocket.readyState !== WebSocket.OPEN) {
-      this.createLPWebSocket();
-    }
+    const wsLP = new WebSocket(WS_URL);
 
-    const checkInterval = setInterval(() => {
-      const now = Date.now();
-      const mintData = this.activeMints.get(mintAddress);
-      
-      if (!mintData || now - mintData.timestamp > MAX_AGE_MS) {
-        console.log(`⏳ LP izleme süresi doldu: ${mintAddress}`);
-        clearInterval(checkInterval);
-        this.activeMints.delete(mintAddress);
-      }
-    }, 1000);
-  }
-
-  private createLPWebSocket() {
-    if (this.lpWebSocket && this.lpWebSocket.readyState === WebSocket.OPEN) {
-      return;
-    }
-
-    this.lpWebSocket = new WebSocket(WS_URL);
-    this.lpReconnectAttempts = 0;
-
-    this.lpWebSocket.on("open", () => {
-      console.log("✅ LP İzleme WebSocket bağlantısı kuruldu");
-      this.lpReconnectAttempts = 0;
-      
-      const mentions: string[] = Array.from(this.activeMints.keys());
-      if (mentions.length > 0) {
-        const sub = {
-          jsonrpc: "2.0",
-          id: 2,
-          method: "logsSubscribe",
-          params: [{ mentions }, { commitment: "finalized" }],
-        };
-        this.lpWebSocket?.send(JSON.stringify(sub));
-      }
+    wsLP.on("open", () => {
+      const sub = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "logsSubscribe",
+        params: [{ mentions: [mintAddress] }, { commitment: "finalized" }],
+      };
+      wsLP.send(JSON.stringify(sub));
     });
 
-    this.lpWebSocket.on("message", (data: Buffer) => {
+    wsLP.on("message", (data: Buffer) => {
       try {
         const msg = JSON.parse(data.toString());
         const logs = msg?.params?.result?.value?.logs;
-        const signature = msg?.params?.result?.value?.signature;
-        
-        if (!logs || !signature) return;
+        if (!logs) return;
 
-        for (const [mintAddress, mintData] of this.activeMints.entries()) {
-          for (const log of logs) {
-            if (LP_KEYWORDS.some((keyword) => log.includes(keyword))) {
-              console.log(`💧 LP tespit edildi: ${mintData.metadata.name} (${mintData.metadata.symbol})`);
+        const now = Date.now();
+        const mintData = this.activeMints.get(mintAddress);
+        if (!mintData || now - mintData.timestamp > MAX_AGE_MS) {
+          console.log(`⏳ LP izleme süresi doldu: ${mintAddress}`);
+          wsLP.close();
+          this.activeMints.delete(mintAddress);
+          return;
+        }
 
-              const detectedAt = Date.now();
-              const expiresAt = detectedAt + (2 * 60 * 1000);
+        for (const log of logs) {
+          if (LP_KEYWORDS.some((keyword) => log.includes(keyword))) {
+            console.log(`💧 LP tespit edildi: ${metadata.name} (${metadata.symbol})`);
 
-              this.eventEmitter("lp_detected", {
-                id: `${mintAddress}-${detectedAt}`,
-                mintAddress,
-                name: mintData.metadata.name,
-                symbol: mintData.metadata.symbol,
-                detectedAt,
-                expiresAt,
-                raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
-                jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
-                dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
-              });
+            const detectedAt = Date.now();
+            const expiresAt = detectedAt + (2 * 60 * 1000);
 
-              this.activeMints.delete(mintAddress);
-              break;
-            }
+            this.eventEmitter("lp_detected", {
+              id: `${mintAddress}-${detectedAt}`,
+              mintAddress,
+              name: metadata.name,
+              symbol: metadata.symbol,
+              detectedAt,
+              expiresAt,
+              raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
+              jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
+              dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
+            });
+
+            wsLP.close();
+            this.activeMints.delete(mintAddress);
+            break;
           }
         }
       } catch (err) {
@@ -381,22 +322,16 @@ export class HeliusMonitor {
       }
     });
 
-    this.lpWebSocket.on("error", (err: any) => {
-      console.error("❌ LP WebSocket hatası:", err);
-    });
-
-    this.lpWebSocket.on("close", () => {
-      console.log("🔌 LP izleme bağlantısı kapandı");
-      
-      if (this.isRunning && this.activeMints.size > 0) {
-        const backoff = Math.min(
-          INITIAL_BACKOFF * Math.pow(2, this.lpReconnectAttempts),
-          MAX_BACKOFF
-        ) + Math.random() * 1000;
-        this.lpReconnectAttempts++;
-        this.lpReconnectTimeout = setTimeout(() => this.createLPWebSocket(), backoff);
+    wsLP.on("close", () => {
+      if (this.activeMints.has(mintAddress)) {
+        this.activeMints.delete(mintAddress);
       }
     });
+
+    const mintData = this.activeMints.get(mintAddress);
+    if (mintData) {
+      mintData.lpWebSocket = wsLP;
+    }
   }
 
   stop() {
@@ -413,23 +348,18 @@ export class HeliusMonitor {
       this.reconnectTimeout = null;
     }
 
-    if (this.lpReconnectTimeout) {
-      clearTimeout(this.lpReconnectTimeout);
-      this.lpReconnectTimeout = null;
-    }
-
     if (this.mainWebSocket) {
       this.mainWebSocket.close();
       this.mainWebSocket = null;
     }
 
-    if (this.lpWebSocket) {
-      this.lpWebSocket.close();
-      this.lpWebSocket = null;
-    }
+    this.activeMints.forEach((mintData) => {
+      if (mintData.lpWebSocket) {
+        mintData.lpWebSocket.close();
+      }
+    });
 
     this.activeMints.clear();
-    this.mintQueue.clear();
     this.eventEmitter("monitoring_state", { isMonitoring: false });
     this.eventEmitter("connection_status", { 
       connected: false, 
