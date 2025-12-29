@@ -143,7 +143,7 @@ export class HeliusMonitor {
       });
       
       if (this.isRunning) {
-        this.reconnectTimeout = setTimeout(() => this.connect(), 5000);
+        this.reconnectTimeout = setTimeout(() => this.connect(), 3000);
       }
     });
   }

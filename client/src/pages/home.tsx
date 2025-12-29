@@ -90,7 +90,7 @@ export default function Home() {
         setIsConnected(false);
         setConnectionMessage("Yeniden bağlanıyor...");
         setWs(null);
-        reconnectTimeout = setTimeout(connect, 5000);
+        reconnectTimeout = setTimeout(connect, 3000);
       };
     };
 
