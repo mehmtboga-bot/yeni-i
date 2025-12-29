@@ -34,6 +34,7 @@ export default function Home() {
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     let wsInstance: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout;
+    let reconnectAttempts = 0;
 
     const connect = () => {
       wsInstance = new WebSocket(wsUrl);
@@ -42,6 +43,7 @@ export default function Home() {
       wsInstance.onopen = () => {
         setIsConnected(true);
         setConnectionMessage("");
+        reconnectAttempts = 0;
       };
 
       wsInstance.onmessage = (event) => {
@@ -90,7 +92,9 @@ export default function Home() {
         setIsConnected(false);
         setConnectionMessage("Yeniden bağlanıyor...");
         setWs(null);
-        reconnectTimeout = setTimeout(connect, 3000);
+        const backoff = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000) + Math.random() * 1000;
+        reconnectAttempts++;
+        reconnectTimeout = setTimeout(connect, backoff);
       };
     };
 
