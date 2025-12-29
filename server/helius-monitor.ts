@@ -1,33 +1,36 @@
 import WebSocket from "ws";
 
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;"c1935abe-eb98-493f-9776-ab2967e350f4"
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const WS_URL = `wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const HTTP_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 const MAX_TRACKED = 7;
-const MAX_AGE_MS = 240000;
+const MAX_AGE_MS = 120000;
 
-const  LP_KEYWORDS = [
-  "add_liquidity", "remove_liquidity", "initialize_pool", "CreatePool", 
-  "initialize2", "addLiquidity", "InitPool", "initializePool", "init_pool",
-  "addLiquidityToPool", "create_pool", "AddLiquidity", "createLiquidity",
-  "mintToPool", "depositLiquidity", "deposit_liquidity", "pool_initialize",
-  "PoolInit", "create_pool_account", "initialize_pool_account", 
-  "addLiquiditySOL", "addLiquidityToken", "addLiquiditySingle",
-  "initialize", "Initialize", "swap", "Swap", "create", "Create",
-  "open_position", "close_position", "increase_liquidity",
-  "decrease_liquidity", "initialize_account", "sync_native",
-  // Raydium specific
-  "initialize_amm", "initialize_amm2", "pre_initialize", 
-  "initialize_account2", "initialize_account3",
-  // Orca specific
-  "initialize_pool_whirlpool", "open_position_whirlpool",
-  "increase_liquidity_whirlpool", "decrease_liquidity_whirlpool",
-  // Lifinity specific
-  "initialize_floating_price_model", "initialize_observation",
-  // Meteora specific
-  "initialize_permissionless_pool", "add_liquidity_meteora"
+const LP_KEYWORDS = [
+  "add_liquidity",
+  "initialize_pool",
+  "CreatePool",
+  "initialize2",
+  "addLiquidity",
+  "InitPool",
+  "initializePool",
+  "init_pool",
+  "addLiquidityToPool",
+  "create_pool",
+  "AddLiquidity",
+  "createLiquidity",
+  "mintToPool",
+  "depositLiquidity",
+  "deposit_liquidity",
+  "pool_initialize",
+  "PoolInit",
+  "create_pool_account",
+  "initialize_pool_account",
+  "addLiquiditySOL",
+  "addLiquidityToken",
+  "addLiquiditySingle",
 ];
 
 interface TokenMetadata {
@@ -62,7 +65,7 @@ export class HeliusMonitor {
     this.eventEmitter("monitoring_state", { isMonitoring: true });
     this.connect();
   }
-
+  
   getState() {
     return this.isRunning;
   }
@@ -114,16 +117,16 @@ export class HeliusMonitor {
 
     this.mainWebSocket.on("error", (err: any) => {
       console.error("❌ WebSocket hatası:", err);
-
+      
       const isAuthError = err.message && err.message.includes("401");
-
+      
       if (isAuthError) {
         this.eventEmitter("error", {
           message: "Helius API anahtarı geçersiz. Lütfen HELIUS_API_KEY environment variable'ını kontrol edin.",
           type: "auth",
         });
       }
-
+      
       this.eventEmitter("connection_status", { 
         connected: false, 
         message: isAuthError ? "API anahtarı hatası" : "Bağlantı hatası",
@@ -138,7 +141,7 @@ export class HeliusMonitor {
         message: this.isRunning ? "Yeniden bağlanıyor..." : "Monitor durduruldu",
         isMonitoring: this.isRunning
       });
-
+      
       if (this.isRunning) {
         this.reconnectTimeout = setTimeout(() => this.connect(), 3000);
       }
@@ -167,8 +170,7 @@ export class HeliusMonitor {
       console.log(`🪙 Yeni mint tespit edildi: ${metadata.name} (${metadata.symbol})`);
 
       const detectedAt = Date.now();
-      const expiresAt = detectedAt + 
-        (3 * 60 * 1000);
+      const expiresAt = detectedAt + (3 * 60 * 1000);
 
       this.activeMints.set(mintAddress, {
         timestamp: detectedAt,
@@ -296,8 +298,7 @@ export class HeliusMonitor {
             console.log(`💧 LP tespit edildi: ${metadata.name} (${metadata.symbol})`);
 
             const detectedAt = Date.now();
-            const expiresAt = detectedAt
-+ (3 * 60 * 1000);
+            const expiresAt = detectedAt + (2 * 60 * 1000);
 
             this.eventEmitter("lp_detected", {
               id: `${mintAddress}-${detectedAt}`,
@@ -338,10 +339,10 @@ export class HeliusMonitor {
       console.log("⚠️ Monitor zaten durdurulmuş");
       return;
     }
-
+    
     console.log("🛑 Helius Monitor durduruluyor...");
     this.isRunning = false;
-
+    
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
