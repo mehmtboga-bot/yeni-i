@@ -31,6 +31,15 @@ const LP_KEYWORDS = [
   "addLiquiditySOL",
   "addLiquidityToken",
   "addLiquiditySingle",
+  "Instruction: InitializePool",
+  "Instruction: AddLiquidity",
+  "Instruction: CreatePool",
+  "Instruction: Deposit",
+  "initialize market",
+  "create market",
+  "place order",
+  "Program log",
+  "InitializeStateV2",
 ];
 
 interface TokenMetadata {
@@ -269,6 +278,7 @@ export class HeliusMonitor {
     const wsLP = new WebSocket(WS_URL);
 
     wsLP.on("open", () => {
+      console.log(`📡 LP izleme başlatıldı: ${mintAddress}`);
       const sub = {
         jsonrpc: "2.0",
         id: 1,
@@ -276,6 +286,10 @@ export class HeliusMonitor {
         params: [{ mentions: [mintAddress] }, { commitment: "finalized" }],
       };
       wsLP.send(JSON.stringify(sub));
+    });
+
+    wsLP.on("error", (err) => {
+      console.error(`❌ LP WebSocket hatası ${mintAddress}:`, err);
     });
 
     wsLP.on("message", (data: Buffer) => {
@@ -300,7 +314,7 @@ export class HeliusMonitor {
             const detectedAt = Date.now();
             const expiresAt = detectedAt + (2 * 60 * 1000);
 
-            this.eventEmitter("lp_detected", {
+            const lpData = {
               id: `${mintAddress}-${detectedAt}`,
               mintAddress,
               name: metadata.name,
@@ -310,7 +324,9 @@ export class HeliusMonitor {
               raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
               jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
               dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
-            });
+            };
+            console.log("💧 LP emit ediliyor:", lpData);
+            this.eventEmitter("lp_detected", lpData);
 
             wsLP.close();
             this.activeMints.delete(mintAddress);
