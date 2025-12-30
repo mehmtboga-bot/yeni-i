@@ -31,7 +31,9 @@ export default function Home() {
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const host = window.location.host || "localhost:5000";
+    const wsUrl = `${protocol}//${host}/ws`;
+    console.log("🔗 WebSocket URL:", wsUrl);
     let wsInstance: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout;
 
@@ -40,6 +42,7 @@ export default function Home() {
       setWs(wsInstance);
 
       wsInstance.onopen = () => {
+        console.log("✅ Uygulama WebSocket bağlandı");
         setIsConnected(true);
         setConnectionMessage("");
       };
@@ -47,6 +50,7 @@ export default function Home() {
       wsInstance.onmessage = (event) => {
         try {
           const message: WSMessage = JSON.parse(event.data);
+          console.log("📨 WebSocket mesaj alındı:", message.type);
 
           if (message.type === "mint_detected") {
             const token = message.data;
@@ -59,9 +63,11 @@ export default function Home() {
             setTimeout(() => setNewTokenId(null), 1000);
           } else if (message.type === "lp_detected") {
             const lpLog = message.data;
+            console.log("📋 LP alındı:", lpLog);
             setLpLogs((prev) => {
               const filtered = prev.filter((l) => l.id !== lpLog.id);
               const updated = [lpLog, ...filtered].slice(0, MAX_LP_LOGS);
+              console.log("📋 LP listesi güncellendi, toplam:", updated.length);
               return updated;
             });
           } else if (message.type === "connection_status") {
