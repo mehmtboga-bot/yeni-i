@@ -274,6 +274,36 @@ export class HeliusMonitor {
     }
   }
 
+  private async checkLiquidityLock(mintAddress: string): Promise<boolean> {
+    try {
+      const body = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getMint",
+        params: [mintAddress],
+      };
+
+      const res = await fetch(HTTP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      const result = data.result;
+      if (!result) return false;
+
+      const freezeAuthority = result.freezeAuthority;
+      const isLocked = freezeAuthority !== null;
+      
+      console.log(`🔒 LP Kilit durumu ${mintAddress}: ${isLocked ? "KİLİTLİ" : "Açık"}`);
+      return isLocked;
+    } catch (err) {
+      console.error("❌ Kilit durumu kontrol hatası:", err);
+      return false;
+    }
+  }
+
   private monitorLP(mintAddress: string, metadata: TokenMetadata) {
     const wsLP = new WebSocket(WS_URL);
 
@@ -292,7 +322,7 @@ export class HeliusMonitor {
       console.error(`❌ LP WebSocket hatası ${mintAddress}:`, err);
     });
 
-    wsLP.on("message", (data: Buffer) => {
+    wsLP.on("message", async (data: Buffer) => {
       try {
         const msg = JSON.parse(data.toString());
         const logs = msg?.params?.result?.value?.logs;
@@ -313,6 +343,8 @@ export class HeliusMonitor {
 
             const detectedAt = Date.now();
             const expiresAt = detectedAt + (2 * 60 * 1000);
+            
+            const isLocked = await this.checkLiquidityLock(mintAddress);
 
             const lpData = {
               id: `${mintAddress}-${detectedAt}`,
@@ -321,6 +353,7 @@ export class HeliusMonitor {
               symbol: metadata.symbol,
               detectedAt,
               expiresAt,
+              isLocked,
               raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
               jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
               dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
