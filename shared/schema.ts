@@ -21,6 +21,7 @@ export const lpDetectionSchema = z.object({
   raydiumUrl: z.string(),
   jupiterUrl: z.string(),
   dexscreenerUrl: z.string(),
+  isLocked: z.boolean().optional(),
 });
 
 export type LPDetection = z.infer<typeof lpDetectionSchema>;

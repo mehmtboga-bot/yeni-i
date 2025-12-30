@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { CountdownTimer } from "./CountdownTimer";
 import type { LPDetection } from "@shared/schema";
 
@@ -55,6 +56,12 @@ export function LPLogTable({ logs }: LPLogTableProps) {
                 <span className="text-sm font-medium text-primary" data-testid="text-lp-symbol">
                   ({log.symbol})
                 </span>
+                {log.isLocked && (
+                  <Badge variant="destructive" className="gap-1" data-testid="badge-lp-locked">
+                    <Lock className="h-3 w-3" />
+                    Kilitli
+                  </Badge>
+                )}
                 <span className="text-xs text-muted-foreground" data-testid="text-lp-time">
                   {getRelativeTime(log.detectedAt)}
                 </span>
