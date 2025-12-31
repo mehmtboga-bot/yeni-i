@@ -12,8 +12,19 @@ interface WalletBalanceProps {
 }
 
 export function WalletBalance({ onGetBalance, balance, lastPublicKey, setWalletBalance }: WalletBalanceProps) {
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState(() => {
+    return localStorage.getItem("solana_wallet_address") || "";
+  });
   const [loading, setLoading] = useState(false);
+
+  // İlk yüklemede kaydedilmiş adres varsa bakiye sorgula
+  useEffect(() => {
+    const savedAddress = localStorage.getItem("solana_wallet_address");
+    if (savedAddress) {
+      onGetBalance(savedAddress);
+      setLoading(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (balance !== null) {
@@ -38,6 +49,10 @@ export function WalletBalance({ onGetBalance, balance, lastPublicKey, setWalletB
     e.preventDefault();
     const cleanAddress = address.trim();
     if (!cleanAddress) return;
+    
+    // Adresi yerel depolamaya kaydet
+    localStorage.setItem("solana_wallet_address", cleanAddress);
+    
     console.log("🔍 Bakiye sorgusu gönderiliyor:", cleanAddress);
     setLoading(true);
     setWalletBalance(null);
