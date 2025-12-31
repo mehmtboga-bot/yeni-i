@@ -56,6 +56,13 @@ export const wsMessageSchema = z.discriminatedUnion("type", [
       type: z.string().optional(),
     }),
   }),
+  z.object({
+    type: z.literal("balance_update"),
+    data: z.object({
+      balance: z.number(),
+      publicKey: z.string(),
+    }),
+  }),
 ]);
 
 export type WSMessage = z.infer<typeof wsMessageSchema>;
