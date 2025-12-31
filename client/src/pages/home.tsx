@@ -91,6 +91,7 @@ export default function Home() {
           } else if (message.type === "monitoring_state") {
             setIsMonitoring(message.data.isMonitoring);
           } else if (message.type === "balance_update") {
+            console.log("💰 Bakiye güncellendi (WebSocket):", message.data.balance, message.data.publicKey);
             setWalletBalance(message.data.balance);
             setLastPublicKey(message.data.publicKey);
           } else if (message.type === "error") {
@@ -212,6 +213,7 @@ export default function Home() {
               onGetBalance={handleGetBalance}
               balance={walletBalance}
               lastPublicKey={lastPublicKey}
+              setWalletBalance={setWalletBalance}
             />
             
             <div className="bg-card border border-card-border rounded-xl p-6 space-y-4">

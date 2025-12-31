@@ -8,25 +8,27 @@ interface WalletBalanceProps {
   onGetBalance: (publicKey: string) => void;
   balance: number | null;
   lastPublicKey: string | null;
+  setWalletBalance: (balance: number | null) => void;
 }
 
-export function WalletBalance({ onGetBalance, balance, lastPublicKey }: WalletBalanceProps) {
+export function WalletBalance({ onGetBalance, balance, lastPublicKey, setWalletBalance }: WalletBalanceProps) {
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (balance !== null && lastPublicKey === address) {
-      console.log("💰 Bakiye güncellendi:", balance);
+    if (balance !== null) {
+      console.log("💰 Bakiye güncellendi UI:", balance, "Last PK:", lastPublicKey);
       setLoading(false);
     }
-  }, [balance, lastPublicKey, address]);
+  }, [balance, lastPublicKey]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanAddress = address.trim();
     if (!cleanAddress) return;
-    console.log("🔍 Bakiye sorgulanıyor:", cleanAddress);
+    console.log("🔍 Bakiye sorgusu gönderiliyor:", cleanAddress);
     setLoading(true);
+    setWalletBalance(null);
     onGetBalance(cleanAddress);
   };
 
@@ -62,13 +64,17 @@ export function WalletBalance({ onGetBalance, balance, lastPublicKey }: WalletBa
             </Button>
           </div>
 
-          {balance !== null && lastPublicKey === address && (
+          {(balance !== null || loading) && (
             <div className="pt-2 border-t border-card-border/50 animate-in fade-in slide-in-from-top-1">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">Bakiye:</span>
-                <span className="text-sm font-bold text-primary" data-testid="text-wallet-balance">
-                  {balance.toLocaleString(undefined, { minimumFractionDigits: 4 })} SOL
-                </span>
+                {loading ? (
+                  <span className="text-xs animate-pulse text-muted-foreground">Yükleniyor...</span>
+                ) : (
+                  <span className="text-sm font-bold text-primary" data-testid="text-wallet-balance">
+                    {balance?.toLocaleString(undefined, { minimumFractionDigits: 4 })} SOL
+                  </span>
+                )}
               </div>
             </div>
           )}
