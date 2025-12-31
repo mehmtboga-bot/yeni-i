@@ -15,16 +15,19 @@ export function WalletBalance({ onGetBalance, balance, lastPublicKey }: WalletBa
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (balance !== null) {
+    if (balance !== null && lastPublicKey === address) {
+      console.log("💰 Bakiye güncellendi:", balance);
       setLoading(false);
     }
-  }, [balance]);
+  }, [balance, lastPublicKey, address]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!address.trim()) return;
+    const cleanAddress = address.trim();
+    if (!cleanAddress) return;
+    console.log("🔍 Bakiye sorgulanıyor:", cleanAddress);
     setLoading(true);
-    onGetBalance(address.trim());
+    onGetBalance(cleanAddress);
   };
 
   return (

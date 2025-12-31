@@ -245,6 +245,7 @@ export class HeliusMonitor {
 
   public async getWalletBalance(publicKey: string): Promise<number> {
     try {
+      console.log(`📡 Helius RPC bakiye sorgulanıyor: ${publicKey}`);
       const body = {
         jsonrpc: "2.0",
         id: 1,
@@ -258,9 +259,19 @@ export class HeliusMonitor {
         body: JSON.stringify(body),
       });
 
+      if (!res.ok) {
+        throw new Error(`RPC hatası: ${res.status}`);
+      }
+
       const data = await res.json();
+      if (data.error) {
+        throw new Error(`RPC Error: ${JSON.stringify(data.error)}`);
+      }
+
       const balance = data.result?.value || 0;
-      return balance / 1e9; // Lamports to SOL
+      const solBalance = balance / 1e9;
+      console.log(`✅ Bakiye çekildi (${publicKey}): ${solBalance} SOL`);
+      return solBalance;
     } catch (err) {
       console.error("❌ Bakiye çekme hatası:", err);
       return 0;

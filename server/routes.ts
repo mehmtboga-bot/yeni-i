@@ -59,7 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } else if (message.type === "get_balance") {
           const publicKey = message.data.publicKey;
+          console.log(`💰 Bakiye sorgusu alındı: ${publicKey}`);
           const balance = await monitor.getWalletBalance(publicKey);
+          console.log(`💰 Bakiye sonucu (${publicKey}): ${balance} SOL`);
           ws.send(JSON.stringify({
             type: "balance_update",
             data: { balance, publicKey }
