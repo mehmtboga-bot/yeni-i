@@ -22,6 +22,18 @@ export function WalletBalance({ onGetBalance, balance, lastPublicKey, setWalletB
     }
   }, [balance, lastPublicKey]);
 
+  // Otomatik güncelleme için interval
+  useEffect(() => {
+    if (!address.trim() || loading) return;
+
+    const interval = setInterval(() => {
+      console.log("🔄 Otomatik bakiye güncellemesi tetiklendi:", address);
+      onGetBalance(address.trim());
+    }, 30000); // 30 saniyede bir
+
+    return () => clearInterval(interval);
+  }, [address, onGetBalance, loading]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanAddress = address.trim();
