@@ -243,6 +243,30 @@ export class HeliusMonitor {
     }
   }
 
+  public async getWalletBalance(publicKey: string): Promise<number> {
+    try {
+      const body = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getBalance",
+        params: [publicKey],
+      };
+
+      const res = await fetch(HTTP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      const balance = data.result?.value || 0;
+      return balance / 1e9; // Lamports to SOL
+    } catch (err) {
+      console.error("❌ Bakiye çekme hatası:", err);
+      return 0;
+    }
+  }
+
   private async fetchTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {
     try {
       const body = {

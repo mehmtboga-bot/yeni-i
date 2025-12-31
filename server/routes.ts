@@ -46,7 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })
     );
 
-    ws.on("message", (data: Buffer) => {
+    ws.on("message", async (data: Buffer) => {
       try {
         const message = JSON.parse(data.toString());
         if (message.type === "toggle_monitoring") {
@@ -57,6 +57,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log("⏸️ Monitor durduruluyor...");
             monitor.stop();
           }
+        } else if (message.type === "get_balance") {
+          const publicKey = message.data.publicKey;
+          const balance = await monitor.getWalletBalance(publicKey);
+          ws.send(JSON.stringify({
+            type: "balance_update",
+            data: { balance, publicKey }
+          }));
         }
       } catch (error) {
         console.error("❌ Client mesaj hatası:", error);
