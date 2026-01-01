@@ -8,6 +8,7 @@ export const mintedTokenSchema = z.object({
   detectedAt: z.number(),
   expiresAt: z.number(),
   isLocked: z.boolean().optional(),
+  liquidityAmount: z.number().optional(),
 });
 
 export type MintedToken = z.infer<typeof mintedTokenSchema>;

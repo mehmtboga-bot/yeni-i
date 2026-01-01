@@ -203,6 +203,8 @@ export class HeliusMonitor {
         console.error("❌ Mint kilit kontrolü hatası:", err);
       }
 
+      const liquidityAmount = await this.getWalletBalance(mintAddress).catch(() => undefined);
+
       this.activeMints.set(mintAddress, {
         timestamp: detectedAt,
         metadata,
@@ -216,6 +218,7 @@ export class HeliusMonitor {
         detectedAt,
         expiresAt,
         isLocked,
+        liquidityAmount,
       });
 
       this.monitorLP(mintAddress, metadata);

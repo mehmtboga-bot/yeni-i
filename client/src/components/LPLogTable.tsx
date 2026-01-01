@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check, Lock } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock, Droplet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CountdownTimer } from "./CountdownTimer";
