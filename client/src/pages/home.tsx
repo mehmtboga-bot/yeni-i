@@ -34,10 +34,13 @@ export default function Home() {
 
   const handleGetBalance = (publicKey: string) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log("📤 Bakiye sorgusu gönderiliyor (WS):", publicKey);
       ws.send(JSON.stringify({
         type: "get_balance",
         data: { publicKey }
       }));
+    } else {
+      console.warn("⚠️ WebSocket hazır değil, bakiye sorgusu gönderilemedi");
     }
   };
 
