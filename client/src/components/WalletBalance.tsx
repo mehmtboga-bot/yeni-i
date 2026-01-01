@@ -16,20 +16,18 @@ export function WalletBalance({ onGetBalance, balance, lastPublicKey, setWalletB
     return localStorage.getItem("solana_wallet_address") || "";
   });
   const [loading, setLoading] = useState(false);
+  const SOL_PRICE_USD = 124.50; // Örnek fiyat (gerçek API eklenebilir)
 
   // İlk yüklemede kaydedilmiş adres varsa bakiye sorgula
   useEffect(() => {
     const savedAddress = localStorage.getItem("solana_wallet_address");
-    if (savedAddress && onGetBalance) {
+    // onGetBalance referansı değiştiği için gereksiz tetiklenmeyi önlemek için check
+    if (savedAddress && onGetBalance && !loading && balance === null) {
       console.log("🚀 Sayfa yüklendi, kayıtlı adres sorgulanıyor:", savedAddress);
-      // WebSocket'in hazır olması için kısa bir gecikme ekle
-      const timer = setTimeout(() => {
-        onGetBalance(savedAddress);
-        setLoading(true);
-      }, 1000);
-      return () => clearTimeout(timer);
+      onGetBalance(savedAddress);
+      setLoading(true);
     }
-  }, [onGetBalance]);
+  }, [onGetBalance, balance]); // balance null ise sorgula
 
   useEffect(() => {
     if (balance !== null) {
@@ -103,9 +101,14 @@ export function WalletBalance({ onGetBalance, balance, lastPublicKey, setWalletB
                 {loading ? (
                   <span className="text-xs animate-pulse text-muted-foreground">Yükleniyor...</span>
                 ) : (
-                  <span className="text-sm font-bold text-primary" data-testid="text-wallet-balance">
-                    {balance?.toLocaleString(undefined, { minimumFractionDigits: 4 })} SOL
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-sm font-bold text-primary" data-testid="text-wallet-balance">
+                      {balance?.toLocaleString(undefined, { minimumFractionDigits: 4 })} SOL
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      ≈ ${((balance || 0) * SOL_PRICE_USD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
