@@ -368,10 +368,19 @@ export class HeliusMonitor {
       const result = data.result;
       if (!result) return false;
 
-      const freezeAuthority = result.freezeAuthority;
-      const isLocked = freezeAuthority !== null;
+      // freezeAuthority'nin null OLMASI aslında güvenli (kilitli olmayan dondurma yetkisi)
+      // Ancak "kilitli" terimi bazen freezeAuthority'nin devredilmesi (null olması) anlamında kullanılır.
+      // Kullanıcı "Kilitli" rozeti bekliyorsa, genellikle freezeAuthority veya mintAuthority'nin null (revoked) olmasını kastediyor olabilir.
+      // Ama teknik olarak freezeAuthority !== null ise tehlikelidir (dev dondurabilir).
+      // Çoğu monitor freezeAuthority === null ise "Güvenli/Kilitli" der.
       
-      console.log(`🔒 LP Kilit durumu ${mintAddress}: ${isLocked ? "KİLİTLİ" : "Açık"}`);
+      const freezeAuthority = result.freezeAuthority;
+      const mintAuthority = result.mintAuthority;
+      
+      // Eğer her iki yetki de null ise (revoked), bu genellikle "Kilitli/Güvenli" kabul edilir
+      const isLocked = freezeAuthority === null && mintAuthority === null;
+      
+      console.log(`🔒 Token Yetki Durumu ${mintAddress}: Freeze=${freezeAuthority}, Mint=${mintAuthority} -> Kilitli=${isLocked}`);
       return isLocked;
     } catch (err) {
       console.error("❌ Kilit durumu kontrol hatası:", err);
