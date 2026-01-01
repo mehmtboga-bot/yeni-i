@@ -20,11 +20,16 @@ export function WalletBalance({ onGetBalance, balance, lastPublicKey, setWalletB
   // İlk yüklemede kaydedilmiş adres varsa bakiye sorgula
   useEffect(() => {
     const savedAddress = localStorage.getItem("solana_wallet_address");
-    if (savedAddress) {
-      onGetBalance(savedAddress);
-      setLoading(true);
+    if (savedAddress && onGetBalance) {
+      console.log("🚀 Sayfa yüklendi, kayıtlı adres sorgulanıyor:", savedAddress);
+      // WebSocket'in hazır olması için kısa bir gecikme ekle
+      const timer = setTimeout(() => {
+        onGetBalance(savedAddress);
+        setLoading(true);
+      }, 1000);
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, [onGetBalance]);
 
   useEffect(() => {
     if (balance !== null) {
