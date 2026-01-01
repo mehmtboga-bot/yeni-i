@@ -24,8 +24,15 @@ export function WalletBalance({ onGetBalance, balance, lastPublicKey, setWalletB
     // onGetBalance referansı değiştiği için gereksiz tetiklenmeyi önlemek için check
     if (savedAddress && onGetBalance && !loading && balance === null) {
       console.log("🚀 Sayfa yüklendi, kayıtlı adres sorgulanıyor:", savedAddress);
-      onGetBalance(savedAddress);
-      setLoading(true);
+      
+      // WebSocket bağlantısının tam olarak oturmasını bekleyelim
+      const checkAndFetch = () => {
+        onGetBalance(savedAddress);
+        setLoading(true);
+      };
+
+      const timer = setTimeout(checkAndFetch, 2000);
+      return () => clearTimeout(timer);
     }
   }, [onGetBalance, balance]); // balance null ise sorgula
 
