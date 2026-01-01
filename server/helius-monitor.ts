@@ -181,6 +181,28 @@ export class HeliusMonitor {
       const detectedAt = Date.now();
       const expiresAt = detectedAt + (3 * 60 * 1000);
 
+      // Kilit durumunu kontrol et (freezeAuthority)
+      let isLocked = false;
+      try {
+        const body = {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getMint",
+          params: [mintAddress],
+        };
+        const res = await fetch(HTTP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.result) {
+          isLocked = data.result.freezeAuthority !== null;
+        }
+      } catch (err) {
+        console.error("❌ Mint kilit kontrolü hatası:", err);
+      }
+
       this.activeMints.set(mintAddress, {
         timestamp: detectedAt,
         metadata,
@@ -193,6 +215,7 @@ export class HeliusMonitor {
         symbol: metadata.symbol,
         detectedAt,
         expiresAt,
+        isLocked,
       });
 
       this.monitorLP(mintAddress, metadata);
