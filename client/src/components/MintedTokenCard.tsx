@@ -49,7 +49,7 @@ export function MintedTokenCard({ token, isNew = false }: MintedTokenCardProps) 
                 {token.symbol}
               </Badge>
               {token.isLocked && (
-                <Badge variant="destructive" className="gap-1" data-testid="badge-token-locked">
+                <Badge variant="outline" className="gap-1 border-chart-2 text-chart-2 bg-chart-2/10" data-testid="badge-token-locked">
                   <Lock className="h-3 w-3" />
                   Kilitli
                 </Badge>

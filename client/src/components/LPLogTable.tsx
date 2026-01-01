@@ -57,7 +57,7 @@ export function LPLogTable({ logs }: LPLogTableProps) {
                   ({log.symbol})
                 </span>
                 {log.isLocked && (
-                  <Badge variant="destructive" className="gap-1" data-testid="badge-lp-locked">
+                  <Badge variant="outline" className="gap-1 border-chart-2 text-chart-2 bg-chart-2/10" data-testid="badge-lp-locked">
                     <Lock className="h-3 w-3" />
                     Kilitli
                   </Badge>
