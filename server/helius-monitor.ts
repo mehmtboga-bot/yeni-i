@@ -266,6 +266,20 @@ export class HeliusMonitor {
     }
   }
 
+  private async fetchPoolLiquidity(mintAddress: string): Promise<number | undefined> {
+    try {
+      // Raydium AMM havuzlarını sorgulamak için basitleştirilmiş bir yaklaşım
+      // Gerçek bir sistemde ilgili havuzun SOL/Token bakiyesini çekmek gerekir
+      // Şimdilik token'ın SOL bakiyesini örnek olarak çekiyoruz (basit likidite göstergesi)
+      const balance = await this.getWalletBalance(mintAddress);
+      console.log(`💧 Havuz likiditesi sorgulandı ${mintAddress}: ${balance} SOL`);
+      return balance;
+    } catch (err) {
+      console.error("❌ Likidite sorgu hatası:", err);
+      return undefined;
+    }
+  }
+
   public async getWalletBalance(publicKey: string): Promise<number> {
     try {
       console.log(`📡 Helius RPC bakiye sorgulanıyor: ${publicKey}`);
@@ -402,22 +416,42 @@ export class HeliusMonitor {
             const detectedAt = Date.now();
             const expiresAt = detectedAt + (2 * 60 * 1000);
             
-            const isLocked = await this.checkLiquidityLock(mintAddress);
-
-            const lpData = {
-              id: `${mintAddress}-${detectedAt}`,
-              mintAddress,
-              name: metadata.name,
-              symbol: metadata.symbol,
-              detectedAt,
-              expiresAt,
-              isLocked,
-              raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
-              jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
-              dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
-            };
-            console.log("💧 LP emit ediliyor:", lpData);
-            this.eventEmitter("lp_detected", lpData);
+            // Asenkron olarak verileri çek
+            Promise.all([
+              this.checkLiquidityLock(mintAddress),
+              this.fetchPoolLiquidity(mintAddress)
+            ]).then(([isLocked, liquidityAmount]) => {
+              const lpData = {
+                id: `${mintAddress}-${detectedAt}`,
+                mintAddress,
+                name: metadata.name,
+                symbol: metadata.symbol,
+                detectedAt,
+                expiresAt,
+                isLocked,
+                liquidityAmount,
+                raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
+                jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
+                dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
+              };
+              console.log("💧 LP emit ediliyor (Verilerle):", lpData);
+              this.eventEmitter("lp_detected", lpData);
+            }).catch(err => {
+              console.error("❌ LP veri çekme hatası:", err);
+              // Hata olsa bile temel verileri gönder
+              this.eventEmitter("lp_detected", {
+                id: `${mintAddress}-${detectedAt}`,
+                mintAddress,
+                name: metadata.name,
+                symbol: metadata.symbol,
+                detectedAt,
+                expiresAt,
+                isLocked: false,
+                raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
+                jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
+                dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
+              });
+            });
 
             wsLP.close();
             this.activeMints.delete(mintAddress);

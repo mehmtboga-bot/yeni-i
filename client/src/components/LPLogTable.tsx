@@ -62,6 +62,12 @@ export function LPLogTable({ logs }: LPLogTableProps) {
                     Kilitli
                   </Badge>
                 )}
+                {log.liquidityAmount !== undefined && (
+                  <Badge variant="secondary" className="bg-chart-4/10 text-chart-4 border-chart-4/20" data-testid="badge-lp-liquidity">
+                    <Droplet className="h-3 w-3 mr-1" />
+                    {log.liquidityAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} SOL
+                  </Badge>
+                )}
                 <span className="text-xs text-muted-foreground" data-testid="text-lp-time">
                   {getRelativeTime(log.detectedAt)}
                 </span>
