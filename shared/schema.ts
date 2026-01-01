@@ -23,6 +23,7 @@ export const lpDetectionSchema = z.object({
   jupiterUrl: z.string(),
   dexscreenerUrl: z.string(),
   isLocked: z.boolean().optional(),
+  liquidityAmount: z.number().optional(),
 });
 
 export type LPDetection = z.infer<typeof lpDetectionSchema>;
