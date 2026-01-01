@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,12 @@ export function MintedTokenCard({ token, isNew = false }: MintedTokenCardProps) 
               >
                 {token.symbol}
               </Badge>
+              {token.isLocked && (
+                <Badge variant="destructive" className="gap-1" data-testid="badge-token-locked">
+                  <Lock className="h-3 w-3" />
+                  Kilitli
+                </Badge>
+              )}
             </div>
           </div>
           <CountdownTimer detectedAt={token.detectedAt} />
