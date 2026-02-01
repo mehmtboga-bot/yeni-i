@@ -59,7 +59,7 @@ export function LPLogTable({ logs }: LPLogTableProps) {
                 {log.isLocked && (
                   <Badge variant="outline" className="gap-1 border-chart-2 text-chart-2 bg-chart-2/10" data-testid="badge-lp-locked">
                     <Lock className="h-3 w-3" />
-                    Kilitli
+                    Kilitli {log.lockDuration && `(${log.lockDuration})`}
                   </Badge>
                 )}
                 {log.liquidityAmount !== undefined && (

@@ -183,22 +183,11 @@ export class HeliusMonitor {
 
       // Kilit durumunu kontrol et (freezeAuthority)
       let isLocked = false;
+      let lockDuration: string | undefined;
       try {
-        const body = {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getMint",
-          params: [mintAddress],
-        };
-        const res = await fetch(HTTP_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (data.result) {
-          isLocked = data.result.freezeAuthority !== null;
-        }
+        const lockInfo = await this.checkLiquidityLock(mintAddress);
+        isLocked = lockInfo.isLocked;
+        lockDuration = lockInfo.lockDuration;
       } catch (err) {
         console.error("❌ Mint kilit kontrolü hatası:", err);
       }
@@ -218,6 +207,7 @@ export class HeliusMonitor {
         detectedAt,
         expiresAt,
         isLocked,
+        lockDuration,
         liquidityAmount,
       });
 
@@ -378,12 +368,13 @@ export class HeliusMonitor {
       
       // Eğer her iki yetki de null ise (revoked), bu genellikle "Kilitli/Güvenli" kabul edilir
       const isLocked = freezeAuthority === null && mintAuthority === null;
+      const lockDuration = isLocked ? "Süresiz" : undefined;
       
       console.log(`🔒 Token Yetki Durumu ${mintAddress}: Freeze=${freezeAuthority}, Mint=${mintAuthority} -> Kilitli=${isLocked}`);
-      return isLocked;
+      return { isLocked, lockDuration };
     } catch (err) {
       console.error("❌ Kilit durumu kontrol hatası:", err);
-      return false;
+      return { isLocked: false };
     }
   }
 
@@ -431,7 +422,7 @@ export class HeliusMonitor {
             Promise.all([
               this.checkLiquidityLock(mintAddress),
               this.fetchPoolLiquidity(mintAddress)
-            ]).then(([isLocked, liquidityAmount]) => {
+            ]).then(([{ isLocked, lockDuration }, liquidityAmount]) => {
               const lpData = {
                 id: `${mintAddress}-${detectedAt}`,
                 mintAddress,
@@ -440,6 +431,7 @@ export class HeliusMonitor {
                 detectedAt,
                 expiresAt,
                 isLocked,
+                lockDuration,
                 liquidityAmount,
                 raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
                 jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
