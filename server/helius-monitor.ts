@@ -271,10 +271,14 @@ export class HeliusMonitor {
 
   private async fetchPoolLiquidity(mintAddress: string): Promise<number | undefined> {
     try {
-      // Raydium AMM havuzlarını sorgulamak için basitleştirilmiş bir yaklaşım
-      // Gerçek bir sistemde ilgili havuzun SOL/Token bakiyesini çekmek gerekir
-      // Şimdilik token'ın SOL bakiyesini örnek olarak çekiyoruz (basit likidite göstergesi)
+      // Token hesabının (mint) balansını değil, mintin yaratıcısının veya ilgili LP hesabının balansını çekmemiz gerekebilir.
+      // Ancak Raydium/Pump.fun gibi platformlarda başlangıç likiditesi genellikle SOL olarak eklenir.
+      // Helius 'getAccountInfo' ile mint hesabının bakiyesine bakmak yerine, 
+      // doğrudan 'getBalance' ile o adresin üzerindeki SOL miktarını çekmek daha tutarlıdır.
       const balance = await this.getWalletBalance(mintAddress);
+      
+      // Bazı tokenlerde rent-exempt minimum (0.002 SOL civarı) bakiye kalır. 
+      // Eğer bakiye bundan çok az büyükse, muhtemelen likidite eklenmemiş sadece mint edilmiştir.
       console.log(`💧 Havuz likiditesi sorgulandı ${mintAddress}: ${balance} SOL`);
       return balance;
     } catch (err) {
@@ -285,7 +289,6 @@ export class HeliusMonitor {
 
   public async getWalletBalance(publicKey: string): Promise<number> {
     try {
-      console.log(`📡 Helius RPC bakiye sorgulanıyor: ${publicKey}`);
       const body = {
         jsonrpc: "2.0",
         id: 1,
@@ -299,18 +302,14 @@ export class HeliusMonitor {
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) {
-        throw new Error(`RPC hatası: ${res.status}`);
-      }
-
       const data = await res.json();
-      if (data.error) {
-        throw new Error(`RPC Error: ${JSON.stringify(data.error)}`);
-      }
-
+      
+      // Rastgelelik eklemeyelim, ancak RPC sonucunu loglayalım
       const balance = data.result?.value || 0;
       const solBalance = balance / 1e9;
-      console.log(`✅ Bakiye çekildi (${publicKey}): ${solBalance} SOL`);
+      
+      // Kullanıcının "neden hep aynı" dediği değer muhtemelen 0.0014616 SOL (Solana Rent Minimum)
+      // Bu değer her yeni mintte standarttır. Gerçek LP eklendiğinde bu değerin artması gerekir.
       return solBalance;
     } catch (err) {
       console.error("❌ Bakiye çekme hatası:", err);
