@@ -338,7 +338,7 @@ export class HeliusMonitor {
     }
   }
 
-  private async checkLiquidityLock(mintAddress: string): Promise<boolean> {
+  private async checkLiquidityLock(mintAddress: string): Promise<{ isLocked: boolean; lockDuration?: string }> {
     try {
       const body = {
         jsonrpc: "2.0",
@@ -355,7 +355,7 @@ export class HeliusMonitor {
 
       const data = await res.json();
       const result = data.result;
-      if (!result) return false;
+      if (!result) return { isLocked: false };
 
       // freezeAuthority'nin null OLMASI aslında güvenli (kilitli olmayan dondurma yetkisi)
       // Ancak "kilitli" terimi bazen freezeAuthority'nin devredilmesi (null olması) anlamında kullanılır.
