@@ -8,6 +8,7 @@ export const mintedTokenSchema = z.object({
   detectedAt: z.number(),
   expiresAt: z.number(),
   isLocked: z.boolean().optional(),
+  lockDuration: z.string().optional(),
   liquidityAmount: z.number().optional(),
 });
 
@@ -24,6 +25,7 @@ export const lpDetectionSchema = z.object({
   jupiterUrl: z.string(),
   dexscreenerUrl: z.string(),
   isLocked: z.boolean().optional(),
+  lockDuration: z.string().optional(),
   liquidityAmount: z.number().optional(),
 });
 
