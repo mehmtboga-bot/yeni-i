@@ -367,7 +367,9 @@ export class HeliusMonitor {
       const mintAuthority = result.mintAuthority;
       
       // Eğer her iki yetki de null ise (revoked), bu genellikle "Kilitli/Güvenli" kabul edilir
-      const isLocked = freezeAuthority === null && mintAuthority === null;
+      // DİKKAT: Bazı platformlar sadece freezeAuthority'nin null olmasını yeterli görür.
+      // Ancak en güvenli durum her ikisinin de null olmasıdır.
+      const isLocked = freezeAuthority === null;
       const lockDuration = isLocked ? "Süresiz" : undefined;
       
       console.log(`🔒 Token Yetki Durumu ${mintAddress}: Freeze=${freezeAuthority}, Mint=${mintAuthority} -> Kilitli=${isLocked}`);
