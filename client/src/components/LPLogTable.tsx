@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check, Lock, Droplet } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock, Unlock, Droplet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CountdownTimer } from "./CountdownTimer";
@@ -56,10 +56,15 @@ export function LPLogTable({ logs }: LPLogTableProps) {
                 <span className="text-sm font-medium text-primary" data-testid="text-lp-symbol">
                   ({log.symbol})
                 </span>
-                {log.isLocked && (
+                {log.isLocked ? (
                   <Badge variant="outline" className="gap-1 border-chart-2 text-chart-2 bg-chart-2/10" data-testid="badge-lp-locked">
                     <Lock className="h-3 w-3" />
                     Kilitli {log.lockDuration && `(${log.lockDuration})`}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1 border-destructive text-destructive bg-destructive/10" data-testid="badge-lp-unlocked">
+                    <Unlock className="h-3 w-3" />
+                    Kilit Açık
                   </Badge>
                 )}
                 {log.liquidityAmount !== undefined && (
