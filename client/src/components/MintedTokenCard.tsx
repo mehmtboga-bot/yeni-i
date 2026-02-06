@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check, Lock, Droplet } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock, Unlock, Droplet } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,10 +48,15 @@ export function MintedTokenCard({ token, isNew = false }: MintedTokenCardProps) 
               >
                 {token.symbol}
               </Badge>
-              {token.isLocked && (
+              {token.isLocked ? (
                 <Badge variant="outline" className="gap-1 border-chart-2 text-chart-2 bg-chart-2/10" data-testid="badge-token-locked">
                   <Lock className="h-3 w-3" />
                   Kilitli {token.lockDuration && `(${token.lockDuration})`}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="gap-1 border-destructive text-destructive bg-destructive/10" data-testid="badge-token-unlocked">
+                  <Unlock className="h-3 w-3" />
+                  Kilit Açık
                 </Badge>
               )}
               {token.liquidityAmount !== undefined && (
