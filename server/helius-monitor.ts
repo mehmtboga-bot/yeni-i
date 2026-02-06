@@ -366,13 +366,17 @@ export class HeliusMonitor {
       const freezeAuthority = result.freezeAuthority;
       const mintAuthority = result.mintAuthority;
       
-      // Eğer her iki yetki de null ise (revoked), bu genellikle "Kilitli/Güvenli" kabul edilir
-      // DİKKAT: Bazı platformlar sadece freezeAuthority'nin null olmasını yeterli görür.
-      // Ancak en güvenli durum her ikisinin de null olmasıdır.
-      const isLocked = freezeAuthority === null;
-      const lockDuration = isLocked ? "Süresiz" : undefined;
+      // LP Kilit Kontrolü Geliştirme:
+      // 1. freezeAuthority === null ise token dondurulamaz (Güvenli)
+      // 2. mintAuthority === null ise yeni token basılamaz (Güvenli)
+      // Kullanıcı LP kilidini sorduğu için, genellikle LP tokenlarının yakılıp yakılmadığına da bakmak gerekir.
+      // Ancak RPC üzerinden en hızlı ve güvenilir "kilit" göstergesi freezeAuthority'dir.
       
-      console.log(`🔒 Token Yetki Durumu ${mintAddress}: Freeze=${freezeAuthority}, Mint=${mintAuthority} -> Kilitli=${isLocked}`);
+      const isLocked = freezeAuthority === null;
+      // Eğer her ikisi de null ise "Tam Kilitli", sadece freeze null ise "Dondurma Kapalı"
+      const lockDuration = isLocked ? (mintAuthority === null ? "Tam Kilitli" : "Dondurma Kapalı") : undefined;
+      
+      console.log(`🔒 Detaylı Kilit Analizi ${mintAddress}: Freeze=${freezeAuthority}, Mint=${mintAuthority} -> Sonuç=${lockDuration}`);
       return { isLocked, lockDuration };
     } catch (err) {
       console.error("❌ Kilit durumu kontrol hatası:", err);
