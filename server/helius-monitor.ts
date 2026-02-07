@@ -338,13 +338,13 @@ export class HeliusMonitor {
     }
   }
 
-  private async checkLiquidityLock(mintAddress: string): Promise<{ isLocked: boolean; lockDuration?: string }> {
+  private async checkLiquidityLock(lpMintAddress: string): Promise<{ isLocked: boolean; lockDuration?: string }> {
     try {
       const body = {
         jsonrpc: "2.0",
         id: 1,
-        method: "getMint",
-        params: [mintAddress],
+        method: "getTokenLargestAccounts",
+        params: [lpMintAddress],
       };
 
       const res = await fetch(HTTP_URL, {
@@ -355,27 +355,22 @@ export class HeliusMonitor {
 
       const data = await res.json();
       const result = data.result;
-      if (!result) return { isLocked: false };
+      
+      if (!result || !result.value || result.value.length === 0) {
+        return { isLocked: false };
+      }
 
-      // freezeAuthority'nin null OLMASI aslında güvenli (kilitli olmayan dondurma yetkisi)
-      // Ancak "kilitli" terimi bazen freezeAuthority'nin devredilmesi (null olması) anlamında kullanılır.
-      // Kullanıcı "Kilitli" rozeti bekliyorsa, genellikle freezeAuthority veya mintAuthority'nin null (revoked) olmasını kastediyor olabilir.
-      // Ama teknik olarak freezeAuthority !== null ise tehlikelidir (dev dondurabilir).
-      // Çoğu monitor freezeAuthority === null ise "Güvenli/Kilitli" der.
+      // En büyük holder adresi kontrolü
+      const topHolder = result.value[0].address;
+      const BURN_ADDRESS = "11111111111111111111111111111111";
       
-      const freezeAuthority = result.freezeAuthority;
-      const mintAuthority = result.mintAuthority;
+      const isLocked = topHolder === BURN_ADDRESS;
+      const lockDuration = isLocked ? "Süresiz (Burned)" : undefined;
       
-      // Eğer her iki yetki de null ise (revoked), bu genellikle "Kilitli/Güvenli" kabul edilir
-      // DİKKAT: Bazı platformlar sadece freezeAuthority'nin null olmasını yeterli görür.
-      // Ancak en güvenli durum her ikisinin de null olmasıdır.
-      const isLocked = freezeAuthority === null;
-      const lockDuration = isLocked ? "Süresiz" : undefined;
-      
-      console.log(`🔒 Token Yetki Durumu ${mintAddress}: Freeze=${freezeAuthority}, Mint=${mintAuthority} -> Kilitli=${isLocked}`);
+      console.log(`🔒 LP Kilit Kontrolü ${lpMintAddress}: Top Holder=${topHolder} -> Kilitli=${isLocked}`);
       return { isLocked, lockDuration };
     } catch (err) {
-      console.error("❌ Kilit durumu kontrol hatası:", err);
+      console.error("❌ LP kilit durumu kontrol hatası:", err);
       return { isLocked: false };
     }
   }
