@@ -363,9 +363,13 @@ export class HeliusMonitor {
       // En büyük holder adresi kontrolü
       const topHolder = result.value[0].address;
       const BURN_ADDRESS = "11111111111111111111111111111111";
+      const LOCKER_PROGRAMS = [
+        "Base58_Locker_Program_Address_1", // Örnek: PinkSale veya benzeri bilinen kilit programları
+        "Base58_Locker_Program_Address_2"
+      ];
       
-      const isLocked = topHolder === BURN_ADDRESS;
-      const lockDuration = isLocked ? "Süresiz (Burned)" : undefined;
+      const isLocked = topHolder === BURN_ADDRESS || LOCKER_PROGRAMS.includes(topHolder);
+      const lockDuration = isLocked ? "Süresiz / Kilitli" : undefined;
       
       console.log(`🔒 LP Kilit Kontrolü ${lpMintAddress}: Top Holder=${topHolder} -> Kilitli=${isLocked}`);
       return { isLocked, lockDuration };
