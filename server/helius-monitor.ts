@@ -364,12 +364,13 @@ export class HeliusMonitor {
       const topHolder = result.value[0].address;
       const BURN_ADDRESS = "11111111111111111111111111111111";
       const LOCKER_PROGRAMS = [
-        "Base58_Locker_Program_Address_1", // Örnek: PinkSale veya benzeri bilinen kilit programları
-        "Base58_Locker_Program_Address_2"
+        "Lock7hkde9SshYpYm6QPY9B8p51T5T21yH5S93p57jS", // Örnek: PinkSale
+        "6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG", // Pump.fun Mint Authority (bilgi amaçlı)
+        "TSLvdd1pWpHViyvS19BneW8S5Wv8V784L596Ym8p1S", // Örnek Team Finance
       ];
       
       const isLocked = topHolder === BURN_ADDRESS || LOCKER_PROGRAMS.includes(topHolder);
-      const lockDuration = isLocked ? "Süresiz / Kilitli" : undefined;
+      const lockDuration = isLocked ? "Kilitli (Burn/Locker)" : undefined;
       
       console.log(`🔒 LP Kilit Kontrolü ${lpMintAddress}: Top Holder=${topHolder} -> Kilitli=${isLocked}`);
       return { isLocked, lockDuration };
