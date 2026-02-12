@@ -362,15 +362,21 @@ export class HeliusMonitor {
 
       // En büyük holder adresi kontrolü
       const topHolder = result.value[0].address;
-      const BURN_ADDRESS = "11111111111111111111111111111111";
+      const BURN_ADDRESSES = [
+        "11111111111111111111111111111111",
+        "dead000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000"
+      ];
       const LOCKER_PROGRAMS = [
-        "Lock7hkde9SshYpYm6QPY9B8p51T5T21yH5S93p57jS", // Örnek: PinkSale
+        "Lock7hkde9SshYpYm6QPY9B8p51T5T21yH5S93p57jS", // PinkSale
+        "TSLvdd1pWpHViyvS19BneW8S5Wv8V784L596Ym8p1S", // Team Finance
+        "strmf8CU6YpT8kY1A9yFh4n3pS8TjR1yG3Z8p51T5T", // Streamflow
+        "HEvSKocYm6QPY9B8p51T5T21yH5S93p57jS", // Hedge
         "6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG", // Pump.fun Mint Authority (bilgi amaçlı)
-        "TSLvdd1pWpHViyvS19BneW8S5Wv8V784L596Ym8p1S", // Örnek Team Finance
       ];
       
-      const isLocked = topHolder === BURN_ADDRESS || LOCKER_PROGRAMS.includes(topHolder);
-      const lockDuration = isLocked ? "Kilitli (Burn/Locker)" : undefined;
+      const isLocked = BURN_ADDRESSES.includes(topHolder) || LOCKER_PROGRAMS.includes(topHolder);
+      const lockDuration = isLocked ? "Kilitli (Burn/Locker)" : "Kilitsiz (EOA)";
       
       console.log(`🔒 LP Kilit Kontrolü ${lpMintAddress}: Top Holder=${topHolder} -> Kilitli=${isLocked}`);
       return { isLocked, lockDuration };
