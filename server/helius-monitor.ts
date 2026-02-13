@@ -426,9 +426,24 @@ export class HeliusMonitor {
             const detectedAt = Date.now();
             const expiresAt = detectedAt + (2 * 60 * 1000);
             
-            // Asenkron olarak verileri çek
+            // Asenkron olarak verileri çek - Gecikmeli kontrol ekle
+            const checkWithRetry = async (retries = 2, delayMs = 5000) => {
+              for (let i = 0; i <= retries; i++) {
+                try {
+                  if (i > 0) await new Promise(resolve => setTimeout(resolve, delayMs * i));
+                  const { isLocked, lockDuration } = await this.checkLiquidityLock(mintAddress);
+                  
+                  if (isLocked) return { isLocked, lockDuration };
+                  if (i === retries) return { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
+                } catch (err) {
+                  console.error(`❌ Kilit kontrolü deneme ${i} hatası:`, err);
+                }
+              }
+              return { isLocked: false };
+            };
+
             Promise.all([
-              this.checkLiquidityLock(mintAddress),
+              checkWithRetry(),
               this.fetchPoolLiquidity(mintAddress)
             ]).then(([{ isLocked, lockDuration }, liquidityAmount]) => {
               const lpData = {
