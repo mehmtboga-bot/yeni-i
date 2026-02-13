@@ -208,9 +208,9 @@ export default function Home() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Droplet className="h-5 w-5 text-chart-4" />
-                    <h2 className="text-lg font-semibold text-foreground">LP Tespitleri</h2>
+                    <h2 className="text-lg font-semibold text-foreground">LP Tespitleri (Kilitli)</h2>
                     <Badge variant="secondary" className="ml-2" data-testid="badge-lp-count">
-                      {lpLogs.length}/{MAX_LP_LOGS}
+                      {lpLogs.filter(l => l.isLocked).length}/{MAX_LP_LOGS}
                     </Badge>
                   </div>
                 </div>
