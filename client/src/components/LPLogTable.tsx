@@ -29,17 +29,19 @@ export function LPLogTable({ logs }: LPLogTableProps) {
     return `${minutes}dk önce`;
   };
 
-  if (logs.length === 0) {
+  const filteredLogs = logs.filter(log => log.isLocked);
+
+  if (filteredLogs.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground" data-testid="text-empty-state">
-        <p className="text-sm">LP tespiti bekleniyor...</p>
+        <p className="text-sm">{logs.length > 0 ? "Kilitli LP tespiti bekleniyor... (Sadece kilitli olanlar gösterilir)" : "LP tespiti bekleniyor..."}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      {logs.map((log, index) => (
+      {filteredLogs.map((log, index) => (
         <div
           key={log.id}
           className={`bg-card border border-card-border rounded-lg p-4 hover-elevate transition-all ${
