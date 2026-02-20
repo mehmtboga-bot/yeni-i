@@ -105,7 +105,7 @@ export class HeliusMonitor {
               "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8", // Raydium
             ] 
           }, 
-          { commitment: "processed" } // Daha hızlı tespit için 'processed'
+          { commitment: "confirmed" } // 'processed' yerine daha stabil olan 'confirmed'
         ],
       };
       this.mainWebSocket?.send(JSON.stringify(sub));
