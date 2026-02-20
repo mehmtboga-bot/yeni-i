@@ -97,16 +97,7 @@ export class HeliusMonitor {
         jsonrpc: "2.0",
         id: 1,
         method: "logsSubscribe",
-        params: [
-          { 
-            mentions: [
-              SPL_TOKEN_PROGRAM_ID,
-              "6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG", // Pump.fun
-              "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8", // Raydium
-            ] 
-          }, 
-          { commitment: "confirmed" } // 'processed' yerine daha stabil olan 'confirmed'
-        ],
+        params: [{ mentions: [SPL_TOKEN_PROGRAM_ID] }, { commitment: "finalized" }],
       };
       this.mainWebSocket?.send(JSON.stringify(sub));
       this.eventEmitter("connection_status", { 
@@ -381,13 +372,10 @@ export class HeliusMonitor {
         "TSLvdd1pWpHViyvS19BneW8S5Wv8V784L596Ym8p1S", // Team Finance
         "strmf8CU6YpT8kY1A9yFh4n3pS8TjR1yG3Z8p51T5T", // Streamflow
         "HEvSKocYm6QPY9B8p51T5T21yH5S93p57jS", // Hedge
-        "6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG", // Pump.fun Mint Authority
-        "A66ba85UM8z682vcY6v4pD7D5D7D5D7D5D7D5D7D5D7", // Solayer
-        "2F9AR76h42mEkkYq7i7Xg1e4R8mXyT6p9Z8p51T5T5T", // Unicrypt
+        "6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG", // Pump.fun Mint Authority (bilgi amaçlı)
       ];
       
-      const isLocked = BURN_ADDRESSES.includes(topHolder) || 
-                       LOCKER_PROGRAMS.some(addr => topHolder.startsWith(addr.slice(0, 8))); // Kısmi eşleşme güvenliği için
+      const isLocked = BURN_ADDRESSES.includes(topHolder) || LOCKER_PROGRAMS.includes(topHolder);
       const lockDuration = isLocked ? "Kilitli (Burn/Locker)" : "Kilitsiz (EOA)";
       
       console.log(`🔒 LP Kilit Kontrolü ${lpMintAddress}: Top Holder=${topHolder} -> Kilitli=${isLocked}`);
@@ -438,24 +426,9 @@ export class HeliusMonitor {
             const detectedAt = Date.now();
             const expiresAt = detectedAt + (2 * 60 * 1000);
             
-            // Asenkron olarak verileri çek - Gecikmeli kontrol ekle
-            const checkWithRetry = async (retries = 3, delayMs = 3000) => {
-              for (let i = 0; i <= retries; i++) {
-                try {
-                  if (i > 0) await new Promise(resolve => setTimeout(resolve, delayMs * (i + 1)));
-                  const { isLocked, lockDuration } = await this.checkLiquidityLock(mintAddress);
-                  
-                  if (isLocked) return { isLocked, lockDuration };
-                  if (i === retries) return { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
-                } catch (err) {
-                  console.error(`❌ Kilit kontrolü deneme ${i} hatası:`, err);
-                }
-              }
-              return { isLocked: false };
-            };
-
+            // Asenkron olarak verileri çek
             Promise.all([
-              checkWithRetry(),
+              this.checkLiquidityLock(mintAddress),
               this.fetchPoolLiquidity(mintAddress)
             ]).then(([{ isLocked, lockDuration }, liquidityAmount]) => {
               const lpData = {
