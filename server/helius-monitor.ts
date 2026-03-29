@@ -5,6 +5,37 @@ const WS_URL = `wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const HTTP_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+async function sendTelegramNotification(message: string): Promise<void> {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.warn("⚠️ Telegram bilgileri eksik, bildirim gönderilemiyor.");
+    return;
+  }
+  try {
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      console.log("📲 Telegram bildirimi gönderildi.");
+    } else {
+      console.error("❌ Telegram bildirimi gönderilemedi:", data.description);
+    }
+  } catch (err) {
+    console.error("❌ Telegram bildirim hatası:", err);
+  }
+}
+
 const MAX_TRACKED = 7;
 const MAX_AGE_MS = 120000;
 
@@ -518,6 +549,21 @@ export class HeliusMonitor {
               };
               console.log("💧 LP emit ediliyor (Verilerle):", lpData);
               this.eventEmitter("lp_detected", lpData);
+
+              // Kilitli LP bulunursa Telegram bildirimi gönder
+              if (isLocked) {
+                const solAmount = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "Bilinmiyor";
+                const msg =
+                  `🔒 <b>KİLİTLİ LP TESPİT EDİLDİ!</b>\n\n` +
+                  `🪙 <b>Token:</b> ${metadata.name} (${metadata.symbol})\n` +
+                  `🏦 <b>Kilit Türü:</b> ${lockDuration}\n` +
+                  `💧 <b>Likidite:</b> ${solAmount}\n` +
+                  `📋 <b>Adres:</b> <code>${mintAddress}</code>\n\n` +
+                  `🔍 <a href="https://dexscreener.com/solana/${mintAddress}">Dexscreener</a> | ` +
+                  `🪐 <a href="https://jup.ag/swap/SOL-${mintAddress}">Jupiter</a> | ` +
+                  `⚡ <a href="https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}">Raydium</a>`;
+                sendTelegramNotification(msg);
+              }
             }).catch(err => {
               console.error("❌ LP veri çekme hatası:", err);
               // Hata olsa bile temel verileri gönder
