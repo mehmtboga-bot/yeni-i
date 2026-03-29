@@ -88,6 +88,7 @@ export class HeliusMonitor {
   private activeMints: Map<string, ActiveMint> = new Map();
   private mainWebSocket: WebSocket | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
   private eventEmitter: (event: string, data: any) => void;
   private isRunning: boolean = false;
 
@@ -104,6 +105,31 @@ export class HeliusMonitor {
     console.log("🚀 Helius Monitor başlatılıyor...");
     this.eventEmitter("monitoring_state", { isMonitoring: true });
     this.connect();
+    this.startHeartbeat();
+  }
+
+  private startHeartbeat() {
+    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+
+    // İlk bildirimi hemen gönder
+    this.sendHeartbeat();
+
+    // Sonra her saat başı gönder
+    this.heartbeatInterval = setInterval(() => {
+      this.sendHeartbeat();
+    }, 60 * 60 * 1000);
+  }
+
+  private sendHeartbeat() {
+    const now = new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
+    const msg =
+      `📡 <b>Sistem Aktif — Taranıyor</b>\n\n` +
+      `🕐 <b>Saat:</b> ${now}\n` +
+      `✅ Helius bağlantısı canlı\n` +
+      `🔍 Yeni tokenlar ve kilitli LP'ler izleniyor\n\n` +
+      `<i>Kilitli LP bulunursa ayrıca bildirim alacaksınız.</i>`;
+    console.log("📡 Saatlik heartbeat bildirimi gönderiliyor...");
+    sendTelegramNotification(msg);
   }
   
   getState() {
@@ -615,6 +641,11 @@ export class HeliusMonitor {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
+    }
+
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
 
     if (this.mainWebSocket) {
