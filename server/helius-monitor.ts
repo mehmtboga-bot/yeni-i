@@ -465,11 +465,12 @@ export class HeliusMonitor {
     const PUMP_FUN_PROGRAM   = "6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG";
     const PUMPSWAP_AMM       = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
 
-    // Eğer bir adresin parent programı bunlardan biriyse kilitli sayılır
+    // Eğer bir adresin parent programı bunlardan biriyse, o adres bir LP/bonding PDA'sıdır
+    // NOT: PUMPSWAP_AMM buraya dahil DEĞİL — çünkü token'ın büyük sahibi
+    // her zaman PumpSwap havuzudur (token listelenmesi = kilit değil)
     const LOCKER_PARENT_PROGRAMS = new Set([
       PUMP_FUN_PROGRAM,
       PUMP_FUN_MIGRATION,
-      PUMPSWAP_AMM,
     ]);
 
     // Doğrudan owner kontrolü (burn + bilinen locker programları)
@@ -539,29 +540,36 @@ export class HeliusMonitor {
         return { isLocked: true, lockDuration: "Kilitli (PumpSwap Graduation - Kalıcı)" };
       }
 
-      // 5. İşlemdeki yeni mintları bul → bunlardan biri LP mint
+      // 5. İşlemdeki yeni mintları bul → bunlardan biri LP token mintidir
       const preMints  = new Set<string>((tx.meta?.preTokenBalances  || []).map((b: any) => b.mint));
       const postMints: string[] = (tx.meta?.postTokenBalances || []).map((b: any) => b.mint);
       const newMints  = [...new Set(postMints)].filter(m => !preMints.has(m) && m !== tokenMint);
 
-      console.log(`🔍 Yeni mintlar (LP adayları): [${newMints.join(", ")}]`);
+      console.log(`🔍 LP mint adayları: [${newMints.join(", ")}]`);
 
-      // 6. Her LP mint adayını tam olarak kontrol et
-      for (const lpMint of newMints) {
-        const owner = await this.getTopTokenOwner(lpMint);
-        console.log(`🔒 LP Mint ${lpMint}: owner=${owner}`);
-        const result = await checkOwnerFull(owner);
-        if (result) {
-          console.log(`✅ KILITLI LP MINT: ${lpMint} → ${result.lockDuration}`);
-          return result;
+      if (newMints.length > 0) {
+        // 6. LP token mint adayları var — kimin elinde olduğunu kontrol et
+        for (const lpMint of newMints) {
+          const owner = await this.getTopTokenOwner(lpMint);
+          console.log(`🔒 LP Mint ${lpMint}: owner=${owner}`);
+          const result = await checkOwnerFull(owner);
+          if (result) {
+            console.log(`✅ KILITLI LP MINT: ${lpMint} → ${result.lockDuration}`);
+            return result;
+          }
         }
+        // LP mint adayları bulundu ama hiçbiri kilitli değil — token mint'e BAKMA
+        // (PumpSwap/Raydium havuzu her zaman büyük token sahibidir, bu kilit değildir)
+        console.log(`🔓 KİLİTSİZ (LP çekilebilir): ${tokenMint}`);
+        return { isLocked: false, lockDuration: "Kilitsiz (LP çekilebilir)" };
       }
 
-      // 7. Fallback: token mintını kontrol et
+      // 7. Hiç LP mint bulunamadı — son çare olarak token mintını yalnızca burn/locker için kontrol et
+      // PDA kontrolü YAPMA — havuz her zaman büyük sahibidir
       const tokenOwner = await this.getTopTokenOwner(tokenMint);
-      console.log(`🔒 Token Mint ${tokenMint}: owner=${tokenOwner}`);
-      const tokenResult = await checkOwnerFull(tokenOwner);
-      if (tokenResult) return tokenResult;
+      console.log(`🔒 Token Mint fallback ${tokenMint}: owner=${tokenOwner}`);
+      const directResult = checkOwnerDirect(tokenOwner);
+      if (directResult) return directResult;
 
       console.log(`🔓 KİLİTSİZ: ${tokenMint}`);
       return { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
