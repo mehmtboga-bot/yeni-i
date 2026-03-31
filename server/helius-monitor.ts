@@ -395,6 +395,25 @@ export class HeliusMonitor {
     }
   }
 
+  // Verilen bir adresin Solana üzerindeki sahibi (owner programı) döner
+  private async getAccountProgram(address: string): Promise<string | null> {
+    try {
+      const res = await fetch(HTTP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: 1,
+          method: "getAccountInfo",
+          params: [address, { encoding: "base64" }],
+        }),
+      });
+      const data = await res.json();
+      return data.result?.value?.owner ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   // Verilen bir mint adresinin en büyük ATA sahibini döner
   private async getTopTokenOwner(mint: string): Promise<string | null> {
     try {
@@ -432,16 +451,29 @@ export class HeliusMonitor {
     txSignature?: string
   ): Promise<{ isLocked: boolean; lockDuration?: string }> {
     const BURN_ADDRESSES = ["11111111111111111111111111111111"];
+
+    // Bilinen LP locker program adresleri (doğrudan eşleşme)
     const LOCKER_PROGRAMS: Record<string, string> = {
       "strmRqUCoQUgGUan5YhzUZa6KqdzwX5L6FpUxfmKg5m": "Streamflow",
       "Lock7hkde9SshYpYm6QPY9B8p51T5T21yH5S93p57jS": "PinkSale",
       "TSLvdd1pWpHViyvS19BneW8S5Wv8V784L596Ym8p1S": "Team Finance",
       "LocktDzaV1W2Bm9DeZeiyz4J9zs4fRqNiYqQyracRXw": "Sol Incinerator",
     };
+
+    // Pump.fun / PumpSwap program adresleri
     const PUMP_FUN_MIGRATION = "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg";
     const PUMP_FUN_PROGRAM   = "6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG";
+    const PUMPSWAP_AMM       = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
 
-    const checkOwner = (owner: string | null): { isLocked: boolean; lockDuration: string } | null => {
+    // Eğer bir adresin parent programı bunlardan biriyse kilitli sayılır
+    const LOCKER_PARENT_PROGRAMS = new Set([
+      PUMP_FUN_PROGRAM,
+      PUMP_FUN_MIGRATION,
+      PUMPSWAP_AMM,
+    ]);
+
+    // Doğrudan owner kontrolü (burn + bilinen locker programları)
+    const checkOwnerDirect = (owner: string | null): { isLocked: boolean; lockDuration: string } | null => {
       if (!owner) return null;
       if (BURN_ADDRESSES.includes(owner))
         return { isLocked: true, lockDuration: "Kilitli (Burned - Kalıcı)" };
@@ -451,12 +483,27 @@ export class HeliusMonitor {
       return null;
     };
 
+    // Tam kilit kontrolü: owner doğrudan değilse, owner'ın programına bak (PDA tespiti)
+    const checkOwnerFull = async (owner: string | null): Promise<{ isLocked: boolean; lockDuration: string } | null> => {
+      if (!owner) return null;
+      const direct = checkOwnerDirect(owner);
+      if (direct) return direct;
+
+      // Owner'ın hangi programa ait olduğunu kontrol et (PDA mi?)
+      const parentProgram = await this.getAccountProgram(owner);
+      console.log(`   ↳ Owner programı: ${owner} → ${parentProgram}`);
+      if (parentProgram && LOCKER_PARENT_PROGRAMS.has(parentProgram)) {
+        const label = parentProgram === PUMPSWAP_AMM ? "PumpSwap" : "Pump.fun";
+        return { isLocked: true, lockDuration: `Kilitli (${label} - Kalıcı)` };
+      }
+      return null;
+    };
+
     try {
       if (!txSignature) {
-        // imza yoksa doğrudan token mintı kontrol et (fallback)
         const owner = await this.getTopTokenOwner(tokenMint);
-        console.log(`🔒 Kilit Kontrol (token mint) ${tokenMint}: owner=${owner}`);
-        return checkOwner(owner) ?? { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
+        console.log(`🔒 Kilit Kontrol (imzasız) ${tokenMint}: owner=${owner}`);
+        return (await checkOwnerFull(owner)) ?? { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
       }
 
       // 1. İşlemi çek
@@ -473,40 +520,47 @@ export class HeliusMonitor {
 
       if (!tx) {
         const owner = await this.getTopTokenOwner(tokenMint);
-        return checkOwner(owner) ?? { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
+        return (await checkOwnerFull(owner)) ?? { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
       }
 
-      // 2. Pump.fun graduation → LP otomatik yakılır
+      // 2. İşlem hesap listesini al
       const accountKeys: string[] = (tx.transaction?.message?.accountKeys || [])
         .map((k: any) => (typeof k === "string" ? k : k.pubkey));
 
-      if (accountKeys.includes(PUMP_FUN_MIGRATION) || accountKeys.includes(PUMP_FUN_PROGRAM)) {
-        console.log(`✅ KILITLI (Pump.fun Graduation): ${tokenMint}`);
+      // 3. Pump.fun migration → LP otomatik yakılır
+      if (accountKeys.includes(PUMP_FUN_MIGRATION)) {
+        console.log(`✅ KILITLI (Pump.fun Migration): ${tokenMint}`);
         return { isLocked: true, lockDuration: "Kilitli (Pump.fun - Otomatik Burn)" };
       }
 
-      // 3. İşlemdeki yeni mintları bul → LP mint bunlardan biri
+      // 4. PumpSwap AMM + Pump.fun program → bonding curve graduation
+      if (accountKeys.includes(PUMPSWAP_AMM) && accountKeys.includes(PUMP_FUN_PROGRAM)) {
+        console.log(`✅ KILITLI (PumpSwap Graduation): ${tokenMint}`);
+        return { isLocked: true, lockDuration: "Kilitli (PumpSwap Graduation - Kalıcı)" };
+      }
+
+      // 5. İşlemdeki yeni mintları bul → bunlardan biri LP mint
       const preMints  = new Set<string>((tx.meta?.preTokenBalances  || []).map((b: any) => b.mint));
       const postMints: string[] = (tx.meta?.postTokenBalances || []).map((b: any) => b.mint);
       const newMints  = [...new Set(postMints)].filter(m => !preMints.has(m) && m !== tokenMint);
 
-      console.log(`🔍 İşlemdeki yeni mintlar (LP adayları): [${newMints.join(", ")}]`);
+      console.log(`🔍 Yeni mintlar (LP adayları): [${newMints.join(", ")}]`);
 
-      // 4. Her yeni minti kontrol et — LP token kilitli mi?
+      // 6. Her LP mint adayını tam olarak kontrol et
       for (const lpMint of newMints) {
         const owner = await this.getTopTokenOwner(lpMint);
-        console.log(`🔒 LP Mint Kilit Kontrol ${lpMint}: owner=${owner}`);
-        const result = checkOwner(owner);
+        console.log(`🔒 LP Mint ${lpMint}: owner=${owner}`);
+        const result = await checkOwnerFull(owner);
         if (result) {
-          console.log(`✅ KILITLI LP MINT: ${lpMint} -> ${result.lockDuration}`);
+          console.log(`✅ KILITLI LP MINT: ${lpMint} → ${result.lockDuration}`);
           return result;
         }
       }
 
-      // 5. Hiçbir LP mint kilitli değilse token mintını da kontrol et
+      // 7. Fallback: token mintını kontrol et
       const tokenOwner = await this.getTopTokenOwner(tokenMint);
-      console.log(`🔒 Token Mint Kilit Kontrol ${tokenMint}: owner=${tokenOwner}`);
-      const tokenResult = checkOwner(tokenOwner);
+      console.log(`🔒 Token Mint ${tokenMint}: owner=${tokenOwner}`);
+      const tokenResult = await checkOwnerFull(tokenOwner);
       if (tokenResult) return tokenResult;
 
       console.log(`🔓 KİLİTSİZ: ${tokenMint}`);
