@@ -541,9 +541,11 @@ export class HeliusMonitor {
       }
 
       // 5. İşlemdeki yeni mintları bul → bunlardan biri LP token mintidir
+      const WSOL = "So11111111111111111111111111111111111111112";
       const preMints  = new Set<string>((tx.meta?.preTokenBalances  || []).map((b: any) => b.mint));
       const postMints: string[] = (tx.meta?.postTokenBalances || []).map((b: any) => b.mint);
-      const newMints  = [...new Set(postMints)].filter(m => !preMints.has(m) && m !== tokenMint);
+      // WSOL ve token mintini LP adaylarından çıkar — bunlar gerçek LP token değil
+      const newMints  = [...new Set(postMints)].filter(m => !preMints.has(m) && m !== tokenMint && m !== WSOL);
 
       console.log(`🔍 LP mint adayları: [${newMints.join(", ")}]`);
 
@@ -552,6 +554,14 @@ export class HeliusMonitor {
         for (const lpMint of newMints) {
           const owner = await this.getTopTokenOwner(lpMint);
           console.log(`🔒 LP Mint ${lpMint}: owner=${owner}`);
+
+          if (owner === null) {
+            // LP token sahibi yok → tüm LP tokenlar yakılmış (burned) → KİLİTLİ
+            // Pump.fun graduation'da LP burn bu şekilde tespit edilir
+            console.log(`✅ KILITLI (LP Burned/Yakılmış): ${lpMint}`);
+            return { isLocked: true, lockDuration: "Kilitli (LP Burned - Kalıcı)" };
+          }
+
           const result = await checkOwnerFull(owner);
           if (result) {
             console.log(`✅ KILITLI LP MINT: ${lpMint} → ${result.lockDuration}`);
