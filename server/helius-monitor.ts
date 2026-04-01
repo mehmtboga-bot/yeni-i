@@ -1,746 +1,719 @@
-import WebSocket from "ws";
+import WebSocket from "ws";  
 
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const WS_URL = `wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
-const HTTP_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
-const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;  
+const WS_URL = `wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;  
+const HTTP_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;  
+const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";  
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;  
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;  
 
-async function sendTelegramNotification(message: string): Promise<void> {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.warn("⚠️ Telegram bilgileri eksik, bildirim gönderilemiyor.");
-    return;
-  }
-  try {
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text: message,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      console.log("📲 Telegram bildirimi gönderildi.");
-    } else {
-      console.error("❌ Telegram bildirimi gönderilemedi:", data.description);
-    }
-  } catch (err) {
-    console.error("❌ Telegram bildirim hatası:", err);
-  }
-}
+async function sendTelegramNotification(message: string): Promise<void> {  
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {  
+    console.warn("⚠️ Telegram bilgileri eksik, bildirim gönderilemiyor.");  
+    return;  
+  }  
+  try {  
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;  
+    const res = await fetch(url, {  
+      method: "POST",  
+      headers: { "Content-Type": "application/json" },  
+      body: JSON.stringify({  
+        chat_id: TELEGRAM_CHAT_ID,  
+        text: message,  
+        parse_mode: "HTML",  
+        disable_web_page_preview: true,  
+      }),  
+    });  
+    const data = await res.json();  
+    if (data.ok) {  
+      console.log("📲 Telegram bildirimi gönderildi.");  
+    } else {  
+      console.error("❌ Telegram bildirimi gönderilemedi:", data.description);  
+    }  
+  } catch (err) {  
+    console.error("❌ Telegram bildirim hatası:", err);  
+  }  
+}  
 
-const MAX_TRACKED = 7;
-const MAX_AGE_MS = 120000;
+const MAX_TRACKED = 7;  
+const MAX_AGE_MS = 120000;  
 
-const LP_KEYWORDS = [
-  "add_liquidity",
-  "initialize_pool",
-  "CreatePool",
-  "initialize2",
-  "addLiquidity",
-  "InitPool",
-  "initializePool",
-  "init_pool",
-  "addLiquidityToPool",
-  "create_pool",
-  "AddLiquidity",
-  "createLiquidity",
-  "mintToPool",
-  "depositLiquidity",
-  "deposit_liquidity",
-  "pool_initialize",
-  "PoolInit",
-  "create_pool_account",
-  "initialize_pool_account",
-  "addLiquiditySOL",
-  "addLiquidityToken",
-  "addLiquiditySingle",
-  "Instruction: InitializePool",
-  "Instruction: AddLiquidity",
-  "Instruction: CreatePool",
-  "Instruction: Deposit",
-  "initialize market",
-  "create market",
-  "place order",
-  "Program log",
-  "InitializeStateV2",
-];
+const LP_KEYWORDS = [  
+  "add_liquidity",  
+  "initialize_pool",  
+  "CreatePool",  
+  "initialize2",  
+  "addLiquidity",  
+  "InitPool",  
+  "initializePool",  
+  "init_pool",  
+  "addLiquidityToPool",  
+  "create_pool",  
+  "AddLiquidity",  
+  "createLiquidity",  
+  "mintToPool",  
+  "depositLiquidity",  
+  "deposit_liquidity",  
+  "pool_initialize",  
+  "PoolInit",  
+  "create_pool_account",  
+  "initialize_pool_account",  
+  "addLiquiditySOL",  
+  "addLiquidityToken",  
+  "addLiquiditySingle",  
+  "Instruction: InitializePool",  
+  "Instruction: AddLiquidity",  
+  "Instruction: CreatePool",  
+  "Instruction: Deposit",  
+  "initialize market",  
+  "create market",  
+  "place order",  
+  "Program log",  
+  "InitializeStateV2",  
+];  
 
-interface TokenMetadata {
-  name: string;
-  symbol: string;
-}
+interface TokenMetadata {  
+  name: string;  
+  symbol: string;  
+}  
 
-interface ActiveMint {
-  timestamp: number;
-  metadata: TokenMetadata;
-  lpWebSocket?: WebSocket;
-}
+interface ActiveMint {  
+  timestamp: number;  
+  metadata: TokenMetadata;  
+  lpWebSocket?: WebSocket;  
+}  
 
-export class HeliusMonitor {
-  private activeMints: Map<string, ActiveMint> = new Map();
-  private mainWebSocket: WebSocket | null = null;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
-  private heartbeatInterval: NodeJS.Timeout | null = null;
-  private eventEmitter: (event: string, data: any) => void;
-  private isRunning: boolean = false;
+export class HeliusMonitor {  
+  private activeMints: Map<string, ActiveMint> = new Map();  
+  private mainWebSocket: WebSocket | null = null;  
+  private reconnectTimeout: NodeJS.Timeout | null = null;  
+  private heartbeatInterval: NodeJS.Timeout | null = null;  
+  private eventEmitter: (event: string, data: any) => void;  
+  private isRunning: boolean = false;  
 
-  constructor(eventEmitter: (event: string, data: any) => void) {
-    this.eventEmitter = eventEmitter;
-  }
+  constructor(eventEmitter: (event: string, data: any) => void) {  
+    this.eventEmitter = eventEmitter;  
+  }  
 
-  async start() {
-    if (this.isRunning) {
-      console.log("⚠️ Monitor zaten çalışıyor");
-      return;
-    }
-    this.isRunning = true;
-    console.log("🚀 Helius Monitor başlatılıyor...");
-    this.eventEmitter("monitoring_state", { isMonitoring: true });
-    this.connect();
-    this.startHeartbeat();
-  }
+  async start() {  
+    if (this.isRunning) {  
+      console.log("⚠️ Monitor zaten çalışıyor");  
+      return;  
+    }  
+    this.isRunning = true;  
+    console.log("🚀 Helius Monitor başlatılıyor...");  
+    this.eventEmitter("monitoring_state", { isMonitoring: true });  
+    this.connect();  
+    this.startHeartbeat();  
+  }  
 
-  private startHeartbeat() {
-    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+  private startHeartbeat() {  
+    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);  
 
-    // İlk bildirimi hemen gönder
-    this.sendHeartbeat();
+    // İlk bildirimi hemen gönder  
+    this.sendHeartbeat();  
 
-    // Sonra her saat başı gönder
-    this.heartbeatInterval = setInterval(() => {
-      this.sendHeartbeat();
-    }, 60 * 60 * 1000);
-  }
+    // Sonra her saat başı gönder  
+    this.heartbeatInterval = setInterval(() => {  
+      this.sendHeartbeat();  
+    }, 60 * 60 * 1000);  
+  }  
 
-  private sendHeartbeat() {
-    const now = new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
-    const msg =
-      `📡 <b>Sistem Aktif — Taranıyor</b>\n\n` +
-      `🕐 <b>Saat:</b> ${now}\n` +
-      `✅ Helius bağlantısı canlı\n` +
-      `🔍 Yeni tokenlar ve kilitli LP'ler izleniyor\n\n` +
-      `<i>Kilitli LP bulunursa ayrıca bildirim alacaksınız.</i>`;
-    console.log("📡 Saatlik heartbeat bildirimi gönderiliyor...");
-    sendTelegramNotification(msg);
-  }
+  private sendHeartbeat() {  
+    const now = new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });  
+    const msg =  
+      `📡 <b>Sistem Aktif — Taranıyor</b>\n\n` +  
+      `🕐 <b>Saat:</b> ${now}\n` +  
+      `✅ Helius bağlantısı canlı\n` +  
+      `🔍 Yeni tokenlar ve kilitli LP'ler izleniyor\n\n` +  
+      `<i>Kilitli LP bulunursa ayrıca bildirim alacaksınız.</i>`;  
+    console.log("📡 Saatlik heartbeat bildirimi gönderiliyor...");  
+    sendTelegramNotification(msg);  
+  }  
+
+  getState() {  
+    return this.isRunning;  
+  }  
+
+  private connect() {  
+    if (!HELIUS_API_KEY) {  
+      console.error("❌ HELIUS_API_KEY ortam değişkeni bulunamadı!");  
+      this.eventEmitter("error", {  
+        message: "HELIUS_API_KEY ortam değişkeni bulunamadı",  
+        type: "config",  
+      });  
+      return;  
+    }  
+
+    this.mainWebSocket = new WebSocket(WS_URL);  
+
+    this.mainWebSocket.on("open", () => {  
+      console.log("✅ Helius WebSocket bağlantısı kuruldu");  
+      const sub = {  
+        jsonrpc: "2.0",  
+        id: 1,  
+        method: "logsSubscribe",  
+        params: [{ mentions: [SPL_TOKEN_PROGRAM_ID] }, { commitment: "finalized" }],  
+      };  
+      this.mainWebSocket?.send(JSON.stringify(sub));  
+      this.eventEmitter("connection_status", {   
+        connected: true,   
+        isMonitoring: this.isRunning   
+      });  
+    });  
+
+    this.mainWebSocket.on("message", async (data: Buffer) => {  
+      try {  
+        const msg = JSON.parse(data.toString());  
+        const logs = msg?.params?.result?.value?.logs;  
+        const signature = msg?.params?.result?.value?.signature;  
+
+        if (!logs || !signature) return;  
+
+        for (const log of logs) {  
+          if (log.includes("Program log: Instruction: InitializeMint")) {  
+            await this.handleMintDetection(signature);  
+          }  
+        }  
+      } catch (err) {  
+        console.error("❌ Mesaj işleme hatası:", err);  
+      }  
+    });  
+
+    this.mainWebSocket.on("error", (err: any) => {  
+      console.error("❌ WebSocket hatası:", err);  
+
+      const isAuthError = err.message && err.message.includes("401");  
+
+      if (isAuthError) {  
+        this.eventEmitter("error", {  
+          message: "Helius API anahtarı geçersiz. Lütfen HELIUS_API_KEY environment variable'ını kontrol edin.",  
+          type: "auth",  
+        });  
+      }  
+
+      this.eventEmitter("connection_status", {   
+        connected: false,   
+        message: isAuthError ? "API anahtarı hatası" : "Bağlantı hatası",  
+        isMonitoring: this.isRunning  
+      });  
+    });  
+
+    this.mainWebSocket.on("close", () => {  
+      console.log("🔌 Bağlantı kapandı");  
+      this.eventEmitter("connection_status", {   
+        connected: false,   
+        message: this.isRunning ? "Yeniden bağlanıyor..." : "Monitor durduruldu",  
+        isMonitoring: this.isRunning  
+      });  
+
+      if (this.isRunning) {  
+        this.reconnectTimeout = setTimeout(() => this.connect(), 3000);  
+      }  
+    });  
+  }  
+
+  private async handleMintDetection(signature: string) {  
+    try {  
+      const mintAddress = await this.fetchMintAddress(signature);  
+      if (!mintAddress) return;  
+
+      if (this.activeMints.size >= MAX_TRACKED) {  
+        const oldestKey = Array.from(this.activeMints.keys())[0];  
+        const oldest = this.activeMints.get(oldestKey);  
+        if (oldest?.lpWebSocket) {  
+          oldest.lpWebSocket.close();  
+        }  
+        this.activeMints.delete(oldestKey);  
+      }  
+
+      if (this.activeMints.has(mintAddress)) return;  
+
+      const metadata = await this.fetchTokenMetadata(mintAddress);  
+      if (!metadata) return;  
+
+      console.log(`🪙 Yeni mint tespit edildi: ${metadata.name} (${metadata.symbol})`);  
+
+      const detectedAt = Date.now();  
+      const expiresAt = detectedAt + (3 * 60 * 1000);  
+
+      // Kilit durumunu kontrol et (freezeAuthority)  
+      let isLocked = false;  
+      let lockDuration: string | undefined;  
+      try {  
+        const lockInfo = await this.checkLiquidityLock(mintAddress);  
+        isLocked = lockInfo.isLocked;  
+        lockDuration = lockInfo.lockDuration;  
+      } catch (err) {  
+        console.error("❌ Mint kilit kontrolü hatası:", err);  
+      }  
+
+      const liquidityAmount = await this.getWalletBalance(mintAddress).catch(() => undefined);  
+
+      this.activeMints.set(mintAddress, {  
+        timestamp: detectedAt,  
+        metadata,  
+      });  
+
+      this.eventEmitter("mint_detected", {  
+        id: mintAddress,  
+        mintAddress,  
+        name: metadata.name,  
+        symbol: metadata.symbol,  
+        detectedAt,  
+        expiresAt,  
+        isLocked,  
+        lockDuration,  
+        liquidityAmount,  
+      });  
+
+      this.monitorLP(mintAddress, metadata);  
+    } catch (err) {  
+      console.error("❌ Mint tespit hatası:", err);  
+    }  
+  }  
+
+  private async fetchMintAddress(signature: string): Promise<string | null> {  
+    try {  
+      const body = {  
+        jsonrpc: "2.0",  
+        id: 1,  
+        method: "getTransaction",  
+        params: [signature, { encoding: "json", maxSupportedTransactionVersion: 0 }],  
+      };  
+
+      const res = await fetch(HTTP_URL, {  
+        method: "POST",  
+        headers: { "Content-Type": "application/json" },  
+        body: JSON.stringify(body),  
+      });  
+
+      const data = await res.json();  
+      const result = data.result;  
+      if (!result) return null;  
+
+      const message = result.transaction?.message;  
+      const accountKeys = message?.accountKeys;  
+      const instructions = message?.instructions;  
+
+      if (!accountKeys || !instructions) return null;  
+
+      for (const ix of instructions) {  
+        const pid = ix.programIdIndex;  
+        if (pid !== undefined && accountKeys[pid] === SPL_TOKEN_PROGRAM_ID) {  
+          const accounts = ix.accounts;  
+          if (accounts && accounts.length > 0) {  
+            return accountKeys[accounts[0]];  
+          }  
+        }  
+      }  
+
+      return null;  
+    } catch (err) {  
+      console.error("❌ Mint adresi fetch hatası:", err);  
+      return null;  
+    }  
+  }  
+
+  private async fetchPoolLiquidity(mintAddress: string): Promise<number | undefined> {  
+    try {  
+      // Token hesabının (mint) balansını değil, mintin yaratıcısının veya ilgili LP hesabının balansını çekmemiz gerekebilir.  
+      // Ancak Raydium/Pump.fun gibi platformlarda başlangıç likiditesi genellikle SOL olarak eklenir.  
+      // Helius 'getAccountInfo' ile mint hesabının bakiyesine bakmak yerine,   
+      // doğrudan 'getBalance' ile o adresin üzerindeki SOL miktarını çekmek daha tutarlıdır.  
+      const balance = await this.getWalletBalance(mintAddress);  
+
+      // Bazı tokenlerde rent-exempt minimum (0.002 SOL civarı) bakiye kalır.   
+      // Eğer bakiye bundan çok az büyükse, muhtemelen likidite eklenmemiş sadece mint edilmiştir.  
+      console.log(`💧 Havuz likiditesi sorgulandı ${mintAddress}: ${balance} SOL`);  
+      return balance;  
+    } catch (err) {  
+      console.error("❌ Likidite sorgu hatası:", err);  
+      return undefined;  
+    }  
+  }  
+
+  public async getWalletBalance(publicKey: string): Promise<number> {  
+    try {  
+      const body = {  
+        jsonrpc: "2.0",  
+        id: 1,  
+        method: "getBalance",  
+        params: [publicKey],  
+      };  
+
+      const res = await fetch(HTTP_URL, {  
+        method: "POST",  
+        headers: { "Content-Type": "application/json" },  
+        body: JSON.stringify(body),  
+      });  
+
+      const data = await res.json();  
+
+      // Rastgelelik eklemeyelim, ancak RPC sonucunu loglayalım  
+      const balance = data.result?.value || 0;  
+      const solBalance = balance / 1e9;  
+
+      // Kullanıcının "neden hep aynı" dediği değer muhtemelen 0.0014616 SOL (Solana Rent Minimum)  
+      // Bu değer her yeni mintte standarttır. Gerçek LP eklendiğinde bu değerin artması gerekir.  
+      return solBalance;  
+    } catch (err) {  
+      console.error("❌ Bakiye çekme hatası:", err);  
+      return 0;  
+    }  
+  }  
+
+  private async fetchTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {  
+    try {  
+      const body = {  
+        jsonrpc: "2.0",  
+        id: 1,  
+        method: "getAsset",  
+        params: { id: mintAddress },  
+      };  
+
+      const res = await fetch(HTTP_URL, {  
+        method: "POST",  
+        headers: { "Content-Type": "application/json" },  
+        body: JSON.stringify(body),  
+      });  
+
+      const data = await res.json();  
+      const result = data.result;  
+      if (!result) return null;  
+
+      const name = result.content?.metadata?.name || "Bilinmiyor";  
+      const symbol = result.content?.metadata?.symbol || "Bilinmiyor";  
+
+      if (name === "Bilinmiyor" && symbol === "Bilinmiyor") return null;  
+
+      return { name, symbol };  
+    } catch (err) {  
+      console.error("❌ Token metadata fetch hatası:", err);  
+      return null;  
+    }  
+  }  
+
+  // Verilen bir adresin Solana üzerindeki sahibi (owner programı) döner  
+  private async getAccountProgram(address: string): Promise<string | null> {  
+    try {  
+      const res = await fetch(HTTP_URL, {  
+        method: "POST",  
+        headers: { "Content-Type": "application/json" },  
+        body: JSON.stringify({  
+          jsonrpc: "2.0", id: 1,  
+          method: "getAccountInfo",  
+          params: [address, { encoding: "base64" }],  
+        }),  
+      });  
+      const data = await res.json();  
+      return data.result?.value?.owner ?? null;  
+    } catch {  
+      return null;  
+    }  
+  }  
+
+  // Verilen bir mint adresinin en büyük ATA sahibini döner  
+  private async getTopTokenOwner(mint: string): Promise<string | null> {  
+    try {  
+      const largestRes = await fetch(HTTP_URL, {  
+        method: "POST",  
+        headers: { "Content-Type": "application/json" },  
+        body: JSON.stringify({  
+          jsonrpc: "2.0", id: 1,  
+          method: "getTokenLargestAccounts",  
+          params: [mint],  
+        }),  
+      });  
+      const largestData = await largestRes.json();  
+      const topATA = largestData.result?.value?.[0]?.address;  
+      if (!topATA) return null;  
+
+      const infoRes = await fetch(HTTP_URL, {  
+        method: "POST",  
+        headers: { "Content-Type": "application/json" },  
+        body: JSON.stringify({  
+          jsonrpc: "2.0", id: 1,  
+          method: "getAccountInfo",  
+          params: [topATA, { encoding: "jsonParsed" }],  
+        }),  
+      });  
+      const infoData = await infoRes.json();  
+      return infoData.result?.value?.data?.parsed?.info?.owner ?? null;  
+    } catch {  
+      return null;  
+    }  
+  }  
   
-  getState() {
-    return this.isRunning;
-  }
-
-  private connect() {
-    if (!HELIUS_API_KEY) {
-      console.error("❌ HELIUS_API_KEY ortam değişkeni bulunamadı!");
-      this.eventEmitter("error", {
-        message: "HELIUS_API_KEY ortam değişkeni bulunamadı",
-        type: "config",
-      });
-      return;
-    }
-
-    this.mainWebSocket = new WebSocket(WS_URL);
-
-    this.mainWebSocket.on("open", () => {
-      console.log("✅ Helius WebSocket bağlantısı kuruldu");
-      const sub = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "logsSubscribe",
-        params: [{ mentions: [SPL_TOKEN_PROGRAM_ID] }, { commitment: "finalized" }],
-      };
-      this.mainWebSocket?.send(JSON.stringify(sub));
-      this.eventEmitter("connection_status", { 
-        connected: true, 
-        isMonitoring: this.isRunning 
-      });
-    });
-
-    this.mainWebSocket.on("message", async (data: Buffer) => {
-      try {
-        const msg = JSON.parse(data.toString());
-        const logs = msg?.params?.result?.value?.logs;
-        const signature = msg?.params?.result?.value?.signature;
-
-        if (!logs || !signature) return;
-
-        for (const log of logs) {
-          if (log.includes("Program log: Instruction: InitializeMint")) {
-            await this.handleMintDetection(signature);
-          }
-        }
-      } catch (err) {
-        console.error("❌ Mesaj işleme hatası:", err);
-      }
-    });
-
-    this.mainWebSocket.on("error", (err: any) => {
-      console.error("❌ WebSocket hatası:", err);
-      
-      const isAuthError = err.message && err.message.includes("401");
-      
-      if (isAuthError) {
-        this.eventEmitter("error", {
-          message: "Helius API anahtarı geçersiz. Lütfen HELIUS_API_KEY environment variable'ını kontrol edin.",
-          type: "auth",
-        });
-      }
-      
-      this.eventEmitter("connection_status", { 
-        connected: false, 
-        message: isAuthError ? "API anahtarı hatası" : "Bağlantı hatası",
-        isMonitoring: this.isRunning
-      });
-    });
-
-    this.mainWebSocket.on("close", () => {
-      console.log("🔌 Bağlantı kapandı");
-      this.eventEmitter("connection_status", { 
-        connected: false, 
-        message: this.isRunning ? "Yeniden bağlanıyor..." : "Monitor durduruldu",
-        isMonitoring: this.isRunning
-      });
-      
-      if (this.isRunning) {
-        this.reconnectTimeout = setTimeout(() => this.connect(), 3000);
-      }
-    });
-  }
-
-  private async handleMintDetection(signature: string) {
+  private async getLPMintFromTx(signature: string): Promise<string | null> {
     try {
-      const mintAddress = await this.fetchMintAddress(signature);
-      if (!mintAddress) return;
-
-      if (this.activeMints.size >= MAX_TRACKED) {
-        const oldestKey = Array.from(this.activeMints.keys())[0];
-        const oldest = this.activeMints.get(oldestKey);
-        if (oldest?.lpWebSocket) {
-          oldest.lpWebSocket.close();
-        }
-        this.activeMints.delete(oldestKey);
-      }
-
-      if (this.activeMints.has(mintAddress)) return;
-
-      const metadata = await this.fetchTokenMetadata(mintAddress);
-      if (!metadata) return;
-
-      console.log(`🪙 Yeni mint tespit edildi: ${metadata.name} (${metadata.symbol})`);
-
-      const detectedAt = Date.now();
-      const expiresAt = detectedAt + (3 * 60 * 1000);
-
-      // Kilit durumunu kontrol et (freezeAuthority)
-      let isLocked = false;
-      let lockDuration: string | undefined;
-      try {
-        const lockInfo = await this.checkLiquidityLock(mintAddress);
-        isLocked = lockInfo.isLocked;
-        lockDuration = lockInfo.lockDuration;
-      } catch (err) {
-        console.error("❌ Mint kilit kontrolü hatası:", err);
-      }
-
-      const liquidityAmount = await this.getWalletBalance(mintAddress).catch(() => undefined);
-
-      this.activeMints.set(mintAddress, {
-        timestamp: detectedAt,
-        metadata,
-      });
-
-      this.eventEmitter("mint_detected", {
-        id: mintAddress,
-        mintAddress,
-        name: metadata.name,
-        symbol: metadata.symbol,
-        detectedAt,
-        expiresAt,
-        isLocked,
-        lockDuration,
-        liquidityAmount,
-      });
-
-      this.monitorLP(mintAddress, metadata);
-    } catch (err) {
-      console.error("❌ Mint tespit hatası:", err);
-    }
-  }
-
-  private async fetchMintAddress(signature: string): Promise<string | null> {
-    try {
-      const body = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getTransaction",
-        params: [signature, { encoding: "json", maxSupportedTransactionVersion: 0 }],
-      };
-
       const res = await fetch(HTTP_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getTransaction",
+          params: [signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }],
+        }),
       });
 
       const data = await res.json();
-      const result = data.result;
-      if (!result) return null;
+      const instructions = data.result?.transaction?.message?.instructions;
 
-      const message = result.transaction?.message;
-      const accountKeys = message?.accountKeys;
-      const instructions = message?.instructions;
+      if (!instructions) return null;
 
-      if (!accountKeys || !instructions) return null;
+      // LP ile ilgili olabilecek tüm instruction tipleri
+      const LP_INSTRUCTIONS = [
+        "initializeMint",
+        "mintToPool",
+        "addLiquidity",
+        "depositLiquidity",
+        "initializePool",
+        "createPool",
+      ];
 
       for (const ix of instructions) {
-        const pid = ix.programIdIndex;
-        if (pid !== undefined && accountKeys[pid] === SPL_TOKEN_PROGRAM_ID) {
-          const accounts = ix.accounts;
-          if (accounts && accounts.length > 0) {
-            return accountKeys[accounts[0]];
-          }
+        if (ix.program === "spl-token" && ix.parsed && LP_INSTRUCTIONS.includes(ix.parsed.type)) {
+          console.log("🔹 LP mint bulundu:", ix.parsed.info.mint);
+          return ix.parsed.info.mint;
         }
       }
 
       return null;
     } catch (err) {
-      console.error("❌ Mint adresi fetch hatası:", err);
+      console.error("❌ LP mint çekme hatası:", err);
       return null;
     }
   }
+  
+  private async checkLiquidityLock(  
+    tokenMint: string  
+  ): Promise<{ isLocked: boolean; lockDuration?: string }> {  
+    try {  
+      // 1️⃣ Token’in en büyük hesaplarını al  
+      const res = await fetch(HTTP_URL, {  
+        method: "POST",  
+        headers: { "Content-Type": "application/json" },  
+        body: JSON.stringify({  
+          jsonrpc: "2.0",  
+          id: 1,  
+          method: "getTokenLargestAccounts",  
+          params: [tokenMint],  
+        }),  
+      });  
+      const data = await res.json();  
+      const accounts = data.result?.value || [];  
+      if (accounts.length === 0) return { isLocked: false, lockDuration: "Hesap bulunamadı" };  
 
-  private async fetchPoolLiquidity(mintAddress: string): Promise<number | undefined> {
-    try {
-      // Token hesabının (mint) balansını değil, mintin yaratıcısının veya ilgili LP hesabının balansını çekmemiz gerekebilir.
-      // Ancak Raydium/Pump.fun gibi platformlarda başlangıç likiditesi genellikle SOL olarak eklenir.
-      // Helius 'getAccountInfo' ile mint hesabının bakiyesine bakmak yerine, 
-      // doğrudan 'getBalance' ile o adresin üzerindeki SOL miktarını çekmek daha tutarlıdır.
-      const balance = await this.getWalletBalance(mintAddress);
-      
-      // Bazı tokenlerde rent-exempt minimum (0.002 SOL civarı) bakiye kalır. 
-      // Eğer bakiye bundan çok az büyükse, muhtemelen likidite eklenmemiş sadece mint edilmiştir.
-      console.log(`💧 Havuz likiditesi sorgulandı ${mintAddress}: ${balance} SOL`);
-      return balance;
-    } catch (err) {
-      console.error("❌ Likidite sorgu hatası:", err);
-      return undefined;
-    }
-  }
+      // 2️⃣ Her hesabın owner’ını kontrol et  
+      for (const acc of accounts) {  
+        const accountInfoRes = await fetch(HTTP_URL, {  
+          method: "POST",  
+          headers: { "Content-Type": "application/json" },  
+          body: JSON.stringify({  
+            jsonrpc: "2.0",  
+            id: 1,  
+            method: "getAccountInfo",  
+            params: [acc.address, { encoding: "jsonParsed" }],  
+          }),  
+        });  
+        const accInfo = await accountInfoRes.json();  
+        const owner = accInfo.result?.value?.data?.parsed?.info?.owner;  
+        if (!owner) continue;  
 
-  public async getWalletBalance(publicKey: string): Promise<number> {
-    try {
-      const body = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getBalance",
-        params: [publicKey],
-      };
+        // 3️⃣ Kesin kilit kontrol  
+        if (owner === "11111111111111111111111111111111") {  
+          return { isLocked: true, lockDuration: "Kilitli (Burned - Kalıcı)" };  
+        }  
 
-      const res = await fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+        const lockerMap: Record<string, string> = {  
+          "strmRqUCoQUgGUan5YhzUZa6KqdzwX5L6FpUxfmKg5m": "Streamflow",  
+          "Lock7hkde9SshYpYm6QPY9B8p51T5T21yH5S93p57jS": "PinkSale",  
+          "TSLvdd1pWpHViyvS19BneW8S5Wv8V784L596Ym8p1S": "Team Finance",  
+          "LocktDzaV1W2Bm9DeZeiyz4J9zs4fRqNiYqQyracRXw": "Sol Incinerator",  
+        };  
 
-      const data = await res.json();
-      
-      // Rastgelelik eklemeyelim, ancak RPC sonucunu loglayalım
-      const balance = data.result?.value || 0;
-      const solBalance = balance / 1e9;
-      
-      // Kullanıcının "neden hep aynı" dediği değer muhtemelen 0.0014616 SOL (Solana Rent Minimum)
-      // Bu değer her yeni mintte standarttır. Gerçek LP eklendiğinde bu değerin artması gerekir.
-      return solBalance;
-    } catch (err) {
-      console.error("❌ Bakiye çekme hatası:", err);
-      return 0;
-    }
-  }
+        if (lockerMap[owner]) {  
+          return { isLocked: true, lockDuration: `Kilitli (${lockerMap[owner]})` };  
+        }  
 
-  private async fetchTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {
-    try {
-      const body = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getAsset",
-        params: { id: mintAddress },
-      };
+        // 4️⃣ PDA / Pump.fun gibi LP kilit programları  
+        const parentProgram = await this.getAccountProgram(owner);  
+        if (["6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG", "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg"].includes(parentProgram)) {  
+          const label = parentProgram === "6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG" ? "Pump.fun" : "PumpSwap";  
+          return { isLocked: true, lockDuration: `Kilitli (${label} - Kalıcı)` };  
+        }  
+      }  
 
-      const res = await fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      // Hiçbir hesap kilitli değil  
+      return { isLocked: false, lockDuration: "Kilitsiz (EOA)" };  
+    } catch (err) {  
+      console.error("❌ checkLiquidityLock hatası:", err);  
+      return { isLocked: false };  
+    }  
+  }  
 
-      const data = await res.json();
-      const result = data.result;
-      if (!result) return null;
+  private monitorLP(mintAddress: string, metadata: TokenMetadata) {  
+    const wsLP = new WebSocket(WS_URL);  
 
-      const name = result.content?.metadata?.name || "Bilinmiyor";
-      const symbol = result.content?.metadata?.symbol || "Bilinmiyor";
+    wsLP.on("open", () => {  
+      console.log(`📡 LP izleme başlatıldı: ${mintAddress}`);  
+      const sub = {  
+        jsonrpc: "2.0",  
+        id: 1,  
+        method: "logsSubscribe",  
+        params: [{ mentions: [mintAddress] }, { commitment: "finalized" }],  
+      };  
+      wsLP.send(JSON.stringify(sub));  
+    });  
 
-      if (name === "Bilinmiyor" && symbol === "Bilinmiyor") return null;
+    wsLP.on("error", (err) => {  
+      console.error(`❌ LP WebSocket hatası ${mintAddress}:`, err);  
+    });  
 
-      return { name, symbol };
-    } catch (err) {
-      console.error("❌ Token metadata fetch hatası:", err);
-      return null;
-    }
-  }
+    wsLP.on("message", async (data: Buffer) => {  
+      try {  
+        const msg = JSON.parse(data.toString());  
+        const logs = msg?.params?.result?.value?.logs;  
+        const txSignature: string | undefined = msg?.params?.result?.value?.signature;  
+        if (!logs) return;  
 
-  // Verilen bir adresin Solana üzerindeki sahibi (owner programı) döner
-  private async getAccountProgram(address: string): Promise<string | null> {
-    try {
-      const res = await fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0", id: 1,
-          method: "getAccountInfo",
-          params: [address, { encoding: "base64" }],
-        }),
-      });
-      const data = await res.json();
-      return data.result?.value?.owner ?? null;
-    } catch {
-      return null;
-    }
-  }
+        const now = Date.now();  
+        const mintData = this.activeMints.get(mintAddress);  
+        if (!mintData || now - mintData.timestamp > MAX_AGE_MS) {  
+          console.log(`⏳ LP izleme süresi doldu: ${mintAddress}`);  
+          wsLP.close();  
+          this.activeMints.delete(mintAddress);  
+          return;  
+        }  
 
-  // Verilen bir mint adresinin en büyük ATA sahibini döner
-  private async getTopTokenOwner(mint: string): Promise<string | null> {
-    try {
-      const largestRes = await fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0", id: 1,
-          method: "getTokenLargestAccounts",
-          params: [mint],
-        }),
-      });
-      const largestData = await largestRes.json();
-      const topATA = largestData.result?.value?.[0]?.address;
-      if (!topATA) return null;
+        for (const log of logs) {  
+          if (LP_KEYWORDS.some((keyword) => log.includes(keyword))) {  
+            console.log(`💧 LP tespit edildi: ${metadata.name} (${metadata.symbol})`);  
 
-      const infoRes = await fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0", id: 1,
-          method: "getAccountInfo",
-          params: [topATA, { encoding: "jsonParsed" }],
-        }),
-      });
-      const infoData = await infoRes.json();
-      return infoData.result?.value?.data?.parsed?.info?.owner ?? null;
-    } catch {
-      return null;
-    }
-  }
+            const detectedAt = Date.now();  
+            const expiresAt = detectedAt + (2 * 60 * 1000);  
 
-  private async checkLiquidityLock(
-    tokenMint: string,
-    txSignature?: string
-  ): Promise<{ isLocked: boolean; lockDuration?: string }> {
-    const BURN_ADDRESSES = ["11111111111111111111111111111111"];
+            // Asenkron olarak verileri çek (imzayı da iletiyoruz)  
+            const lpMint = await this.getLPMintFromTx(txSignature!);  
 
-    // Bilinen LP locker program adresleri (doğrudan eşleşme)
-    const LOCKER_PROGRAMS: Record<string, string> = {
-      "strmRqUCoQUgGUan5YhzUZa6KqdzwX5L6FpUxfmKg5m": "Streamflow",
-      "Lock7hkde9SshYpYm6QPY9B8p51T5T21yH5S93p57jS": "PinkSale",
-      "TSLvdd1pWpHViyvS19BneW8S5Wv8V784L596Ym8p1S": "Team Finance",
-      "LocktDzaV1W2Bm9DeZeiyz4J9zs4fRqNiYqQyracRXw": "Sol Incinerator",
-    };
+            if (!lpMint) {  
+              console.log("❌ LP mint bulunamadı");  
+              return;  
+            }  
 
-    // Pump.fun / PumpSwap program adresleri
-    const PUMP_FUN_MIGRATION = "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg";
-    const PUMP_FUN_PROGRAM   = "6EF8rrecthR5Dkzon8Nwuxe8fuMDg6uG5TZAR4m226GG";
-    const PUMPSWAP_AMM       = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
+            Promise.all([  
+              this.checkLiquidityLock(lpMint),  
+              this.fetchPoolLiquidity(mintAddress)  
+            ]).then(([{ isLocked, lockDuration }, liquidityAmount]) => {  
+              const lpData = {  
+                id: `${mintAddress}-${detectedAt}`,  
+                mintAddress,  
+                name: metadata.name,  
+                symbol: metadata.symbol,  
+                detectedAt,  
+                expiresAt,  
+                isLocked,  
+                lockDuration,  
+                liquidityAmount,  
+                raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,  
+                jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,  
+                dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,  
+              };  
+              console.log("💧 LP emit ediliyor (Verilerle):", lpData);  
+              this.eventEmitter("lp_detected", lpData);  
 
-    // Eğer bir adresin parent programı bunlardan biriyse, o adres bir LP/bonding PDA'sıdır
-    // NOT: PUMPSWAP_AMM buraya dahil DEĞİL — çünkü token'ın büyük sahibi
-    // her zaman PumpSwap havuzudur (token listelenmesi = kilit değil)
-    const LOCKER_PARENT_PROGRAMS = new Set([
-      PUMP_FUN_PROGRAM,
-      PUMP_FUN_MIGRATION,
-    ]);
+              // Kilitli LP bulunursa Telegram bildirimi gönder  
+              if (isLocked) {  
+                const solAmount = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "Bilinmiyor";  
+                const msg =  
+                  `🔒 <b>KİLİTLİ LP TESPİT EDİLDİ!</b>\n\n` +  
+                  `🪙 <b>Token:</b> ${metadata.name} (${metadata.symbol})\n` +  
+                  `🏦 <b>Kilit Türü:</b> ${lockDuration}\n` +  
+                  `💧 <b>Likidite:</b> ${solAmount}\n` +  
+                  `📋 <b>Adres:</b> <code>${mintAddress}</code>\n\n` +  
+                  `🔍 <a href="https://dexscreener.com/solana/${mintAddress}">Dexscreener</a> | ` +  
+                  `🪐 <a href="https://jup.ag/swap/SOL-${mintAddress}">Jupiter</a> | ` +  
+                  `⚡ <a href="https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}">Raydium</a>`;  
+                sendTelegramNotification(msg);  
+              }  
+            }).catch(err => {  
+              console.error("❌ LP veri çekme hatası:", err);  
+              // Hata olsa bile temel verileri gönder  
+              this.eventEmitter("lp_detected", {  
+                id: `${mintAddress}-${detectedAt}`,  
+                mintAddress,  
+                name: metadata.name,  
+                symbol: metadata.symbol,  
+                detectedAt,  
+                expiresAt,  
+                isLocked: false,  
+                raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,  
+                jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,  
+                dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,  
+              });  
+            });  
 
-    // Doğrudan owner kontrolü (burn + bilinen locker programları)
-    const checkOwnerDirect = (owner: string | null): { isLocked: boolean; lockDuration: string } | null => {
-      if (!owner) return null;
-      if (BURN_ADDRESSES.includes(owner))
-        return { isLocked: true, lockDuration: "Kilitli (Burned - Kalıcı)" };
-      const locker = LOCKER_PROGRAMS[owner];
-      if (locker)
-        return { isLocked: true, lockDuration: `Kilitli (${locker})` };
-      return null;
-    };
+            wsLP.close();  
+            this.activeMints.delete(mintAddress);  
+            break;  
+          }  
+        }  
+      } catch (err) {  
+        console.error("❌ LP mesaj işleme hatası:", err);  
+      }  
+    });  
 
-    // Tam kilit kontrolü: owner doğrudan değilse, owner'ın programına bak (PDA tespiti)
-    const checkOwnerFull = async (owner: string | null): Promise<{ isLocked: boolean; lockDuration: string } | null> => {
-      if (!owner) return null;
-      const direct = checkOwnerDirect(owner);
-      if (direct) return direct;
+    wsLP.on("close", () => {  
+      if (this.activeMints.has(mintAddress)) {  
+        this.activeMints.delete(mintAddress);  
+      }  
+    });  
 
-      // Owner'ın hangi programa ait olduğunu kontrol et (PDA mi?)
-      const parentProgram = await this.getAccountProgram(owner);
-      console.log(`   ↳ Owner programı: ${owner} → ${parentProgram}`);
-      if (parentProgram && LOCKER_PARENT_PROGRAMS.has(parentProgram)) {
-        const label = parentProgram === PUMPSWAP_AMM ? "PumpSwap" : "Pump.fun";
-        return { isLocked: true, lockDuration: `Kilitli (${label} - Kalıcı)` };
-      }
-      return null;
-    };
+    const mintData = this.activeMints.get(mintAddress);  
+    if (mintData) {  
+      mintData.lpWebSocket = wsLP;  
+    }  
+  }  
 
-    try {
-      if (!txSignature) {
-        const owner = await this.getTopTokenOwner(tokenMint);
-        console.log(`🔒 Kilit Kontrol (imzasız) ${tokenMint}: owner=${owner}`);
-        return (await checkOwnerFull(owner)) ?? { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
-      }
+  stop() {  
+    if (!this.isRunning) {  
+      console.log("⚠️ Monitor zaten durdurulmuş");  
+      return;  
+    }  
 
-      // 1. İşlemi çek
-      const txRes = await fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0", id: 1,
-          method: "getTransaction",
-          params: [txSignature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }],
-        }),
-      });
-      const tx = (await txRes.json()).result;
+    console.log("🛑 Helius Monitor durduruluyor...");  
+    this.isRunning = false;  
 
-      if (!tx) {
-        const owner = await this.getTopTokenOwner(tokenMint);
-        return (await checkOwnerFull(owner)) ?? { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
-      }
+    if (this.reconnectTimeout) {  
+      clearTimeout(this.reconnectTimeout);  
+      this.reconnectTimeout = null;  
+    }  
 
-      // 2. İşlem hesap listesini al
-      const accountKeys: string[] = (tx.transaction?.message?.accountKeys || [])
-        .map((k: any) => (typeof k === "string" ? k : k.pubkey));
+    if (this.heartbeatInterval) {  
+      clearInterval(this.heartbeatInterval);  
+      this.heartbeatInterval = null;  
+    }  
 
-      // 3. Pump.fun migration → LP otomatik yakılır
-      if (accountKeys.includes(PUMP_FUN_MIGRATION)) {
-        console.log(`✅ KILITLI (Pump.fun Migration): ${tokenMint}`);
-        return { isLocked: true, lockDuration: "Kilitli (Pump.fun - Otomatik Burn)" };
-      }
+    if (this.mainWebSocket) {  
+      this.mainWebSocket.close();  
+      this.mainWebSocket = null;  
+    }  
 
-      // 4. PumpSwap AMM + Pump.fun program → bonding curve graduation
-      if (accountKeys.includes(PUMPSWAP_AMM) && accountKeys.includes(PUMP_FUN_PROGRAM)) {
-        console.log(`✅ KILITLI (PumpSwap Graduation): ${tokenMint}`);
-        return { isLocked: true, lockDuration: "Kilitli (PumpSwap Graduation - Kalıcı)" };
-      }
+    this.activeMints.forEach((mintData) => {  
+      if (mintData.lpWebSocket) {  
+        mintData.lpWebSocket.close();  
+      }  
+    });  
 
-      // 5. İşlemdeki yeni mintları bul → bunlardan biri LP token mintidir
-      const WSOL = "So11111111111111111111111111111111111111112";
-      const preMints  = new Set<string>((tx.meta?.preTokenBalances  || []).map((b: any) => b.mint));
-      const postMints: string[] = (tx.meta?.postTokenBalances || []).map((b: any) => b.mint);
-      // WSOL ve token mintini LP adaylarından çıkar — bunlar gerçek LP token değil
-      const newMints  = [...new Set(postMints)].filter(m => !preMints.has(m) && m !== tokenMint && m !== WSOL);
-
-      console.log(`🔍 LP mint adayları: [${newMints.join(", ")}]`);
-
-      if (newMints.length > 0) {
-        // 6. LP token mint adayları var — kimin elinde olduğunu kontrol et
-        for (const lpMint of newMints) {
-          const owner = await this.getTopTokenOwner(lpMint);
-          console.log(`🔒 LP Mint ${lpMint}: owner=${owner}`);
-
-          if (owner === null) {
-            // LP token sahibi yok → tüm LP tokenlar yakılmış (burned) → KİLİTLİ
-            // Pump.fun graduation'da LP burn bu şekilde tespit edilir
-            console.log(`✅ KILITLI (LP Burned/Yakılmış): ${lpMint}`);
-            return { isLocked: true, lockDuration: "Kilitli (LP Burned - Kalıcı)" };
-          }
-
-          const result = await checkOwnerFull(owner);
-          if (result) {
-            console.log(`✅ KILITLI LP MINT: ${lpMint} → ${result.lockDuration}`);
-            return result;
-          }
-        }
-        // LP mint adayları bulundu ama hiçbiri kilitli değil — token mint'e BAKMA
-        // (PumpSwap/Raydium havuzu her zaman büyük token sahibidir, bu kilit değildir)
-        console.log(`🔓 KİLİTSİZ (LP çekilebilir): ${tokenMint}`);
-        return { isLocked: false, lockDuration: "Kilitsiz (LP çekilebilir)" };
-      }
-
-      // 7. Hiç LP mint bulunamadı — son çare olarak token mintını yalnızca burn/locker için kontrol et
-      // PDA kontrolü YAPMA — havuz her zaman büyük sahibidir
-      const tokenOwner = await this.getTopTokenOwner(tokenMint);
-      console.log(`🔒 Token Mint fallback ${tokenMint}: owner=${tokenOwner}`);
-      const directResult = checkOwnerDirect(tokenOwner);
-      if (directResult) return directResult;
-
-      console.log(`🔓 KİLİTSİZ: ${tokenMint}`);
-      return { isLocked: false, lockDuration: "Kilitsiz (EOA)" };
-    } catch (err) {
-      console.error("❌ LP kilit kontrolü hatası:", err);
-      return { isLocked: false };
-    }
-  }
-
-  private monitorLP(mintAddress: string, metadata: TokenMetadata) {
-    const wsLP = new WebSocket(WS_URL);
-
-    wsLP.on("open", () => {
-      console.log(`📡 LP izleme başlatıldı: ${mintAddress}`);
-      const sub = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "logsSubscribe",
-        params: [{ mentions: [mintAddress] }, { commitment: "finalized" }],
-      };
-      wsLP.send(JSON.stringify(sub));
-    });
-
-    wsLP.on("error", (err) => {
-      console.error(`❌ LP WebSocket hatası ${mintAddress}:`, err);
-    });
-
-    wsLP.on("message", async (data: Buffer) => {
-      try {
-        const msg = JSON.parse(data.toString());
-        const logs = msg?.params?.result?.value?.logs;
-        const txSignature: string | undefined = msg?.params?.result?.value?.signature;
-        if (!logs) return;
-
-        const now = Date.now();
-        const mintData = this.activeMints.get(mintAddress);
-        if (!mintData || now - mintData.timestamp > MAX_AGE_MS) {
-          console.log(`⏳ LP izleme süresi doldu: ${mintAddress}`);
-          wsLP.close();
-          this.activeMints.delete(mintAddress);
-          return;
-        }
-
-        for (const log of logs) {
-          if (LP_KEYWORDS.some((keyword) => log.includes(keyword))) {
-            console.log(`💧 LP tespit edildi: ${metadata.name} (${metadata.symbol})`);
-
-            const detectedAt = Date.now();
-            const expiresAt = detectedAt + (2 * 60 * 1000);
-            
-            // Asenkron olarak verileri çek (imzayı da iletiyoruz)
-            Promise.all([
-              this.checkLiquidityLock(mintAddress, txSignature),
-              this.fetchPoolLiquidity(mintAddress)
-            ]).then(([{ isLocked, lockDuration }, liquidityAmount]) => {
-              const lpData = {
-                id: `${mintAddress}-${detectedAt}`,
-                mintAddress,
-                name: metadata.name,
-                symbol: metadata.symbol,
-                detectedAt,
-                expiresAt,
-                isLocked,
-                lockDuration,
-                liquidityAmount,
-                raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
-                jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
-                dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
-              };
-              console.log("💧 LP emit ediliyor (Verilerle):", lpData);
-              this.eventEmitter("lp_detected", lpData);
-
-              // Kilitli LP bulunursa Telegram bildirimi gönder
-              if (isLocked) {
-                const solAmount = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "Bilinmiyor";
-                const msg =
-                  `🔒 <b>KİLİTLİ LP TESPİT EDİLDİ!</b>\n\n` +
-                  `🪙 <b>Token:</b> ${metadata.name} (${metadata.symbol})\n` +
-                  `🏦 <b>Kilit Türü:</b> ${lockDuration}\n` +
-                  `💧 <b>Likidite:</b> ${solAmount}\n` +
-                  `📋 <b>Adres:</b> <code>${mintAddress}</code>\n\n` +
-                  `🔍 <a href="https://dexscreener.com/solana/${mintAddress}">Dexscreener</a> | ` +
-                  `🪐 <a href="https://jup.ag/swap/SOL-${mintAddress}">Jupiter</a> | ` +
-                  `⚡ <a href="https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}">Raydium</a>`;
-                sendTelegramNotification(msg);
-              }
-            }).catch(err => {
-              console.error("❌ LP veri çekme hatası:", err);
-              // Hata olsa bile temel verileri gönder
-              this.eventEmitter("lp_detected", {
-                id: `${mintAddress}-${detectedAt}`,
-                mintAddress,
-                name: metadata.name,
-                symbol: metadata.symbol,
-                detectedAt,
-                expiresAt,
-                isLocked: false,
-                raydiumUrl: `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${mintAddress}`,
-                jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
-                dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
-              });
-            });
-
-            wsLP.close();
-            this.activeMints.delete(mintAddress);
-            break;
-          }
-        }
-      } catch (err) {
-        console.error("❌ LP mesaj işleme hatası:", err);
-      }
-    });
-
-    wsLP.on("close", () => {
-      if (this.activeMints.has(mintAddress)) {
-        this.activeMints.delete(mintAddress);
-      }
-    });
-
-    const mintData = this.activeMints.get(mintAddress);
-    if (mintData) {
-      mintData.lpWebSocket = wsLP;
-    }
-  }
-
-  stop() {
-    if (!this.isRunning) {
-      console.log("⚠️ Monitor zaten durdurulmuş");
-      return;
-    }
-    
-    console.log("🛑 Helius Monitor durduruluyor...");
-    this.isRunning = false;
-    
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
-
-    if (this.mainWebSocket) {
-      this.mainWebSocket.close();
-      this.mainWebSocket = null;
-    }
-
-    this.activeMints.forEach((mintData) => {
-      if (mintData.lpWebSocket) {
-        mintData.lpWebSocket.close();
-      }
-    });
-
-    this.activeMints.clear();
-    this.eventEmitter("monitoring_state", { isMonitoring: false });
-    this.eventEmitter("connection_status", { 
-      connected: false, 
-      message: "Monitor durduruldu",
-      isMonitoring: false
-    });
-  }
+    this.activeMints.clear();  
+    this.eventEmitter("monitoring_state", { isMonitoring: false });  
+    this.eventEmitter("connection_status", {   
+      connected: false,   
+      message: "Monitor durduruldu",  
+      isMonitoring: false  
+    });  
+  }  
 }
