@@ -321,7 +321,7 @@ export class HeliusMonitor {
         if (!mintData.lpLogged) {
           // Hangi DEX'te LP oluştu?
           const platform = this.detectPlatformFromLogs(logs);
-          console.log(`💧 [WS-1] LP tespit edildi: ${metadata.name} | Platform: ${platform}`);
+          console.log(`${lockResult.isLocked ? "🔒" : "💧"} [WS-1] ${metadata.name} (${metadata.symbol}) | ${platform} | ${liquidityAmount ? liquidityAmount.toFixed(4) + " SOL" : "?"} | ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}`);
           mintData.lpLogged = true;
         }
 
@@ -363,7 +363,6 @@ export class HeliusMonitor {
               `🪐 <a href="https://jup.ag/swap/SOL-${mintAddress}">Jupiter</a>`
             );
           } else {
-            console.log(`ℹ️ [WS-1] ${metadata.name} LP kilitli değil — atlandı.`);
           }
         } catch (err) {
           console.error("❌ LP veri hatası:", err);
@@ -444,7 +443,6 @@ export class HeliusMonitor {
   // DEX'te LP oluştu → token mint + LP mint bul → kilit kontrol et → bildir
   private async handleDexLP(signature: string, platform: string) {
     try {
-      console.log(`\n💧 [WS-2] ${platform} LP tespit edildi: ${signature}`);
 
       // İşlemden token mint, LP mint ve likidite miktarını çıkar (tek RPC çağrısı)
       const { tokenMint, lpMint, liquidityAmount: txLiquidity } = await this.extractMintsFromDexTx(signature);
@@ -459,9 +457,6 @@ export class HeliusMonitor {
       const isPositionBased = !lpMint;
       const checkMint = lpMint || tokenMint;
 
-      console.log(
-        `🪙 [WS-2] ${platform} | Token: ${tokenMint} | LP Mint: ${lpMint ?? "yok (CLMM/DLMM)"} | Likidite: ${txLiquidity ? txLiquidity.toFixed(4) + " SOL" : "?"}`
-      );
 
       const [metadata, lockResult] = await Promise.all([
         this.fetchTokenMetadata(tokenMint),
@@ -479,32 +474,17 @@ export class HeliusMonitor {
       const detectedAt = Date.now();
       const expiresAt = detectedAt + 5 * 60 * 1000;
 
-      if (!lockResult.isLocked) {
-        console.log(`ℹ️ [WS-2] ${name} (${platform}) — LP kilitli değil, atlandı.`);
-        return;
-      }
+      const sol = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "?";
+      console.log(`${lockResult.isLocked ? "🔒" : "💧"} [WS-2] ${name} (${symbol}) | ${platform} | ${sol} | ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}`);
 
-      // Sadece kilitli LP'leri arayüze ve Telegram'a ilet
-      this.eventEmitter("mint_detected", {
-        id: tokenMint,
-        mintAddress: tokenMint,
-        name, symbol,
-        detectedAt, expiresAt,
-        isLocked: true,
-        lockDuration: lockResult.lockDuration,
-        platform,
-        lpMint,
-        jupiterUrl: `https://jup.ag/swap/SOL-${tokenMint}`,
-        dexscreenerUrl: `https://dexscreener.com/solana/${tokenMint}`,
-      });
-
+      // Tüm LP'leri arayüze ilet (kilitli ve kilitsiz)
       const lpData = {
         id: `${tokenMint}-${detectedAt}`,
         mintAddress: tokenMint,
         lpMint,
         name, symbol,
         detectedAt, expiresAt,
-        isLocked: true,
+        isLocked: lockResult.isLocked,
         lockDuration: lockResult.lockDuration,
         liquidityAmount, platform,
         jupiterUrl: `https://jup.ag/swap/SOL-${tokenMint}`,
@@ -514,21 +494,21 @@ export class HeliusMonitor {
 
       this.eventEmitter("lp_detected", lpData);
 
-      const sol = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "Bilinmiyor";
-      sendTelegramNotification(
-        `🔒 <b>KİLİTLİ LP TESPİT EDİLDİ!</b>\n\n` +
-        `🏊 <b>Platform:</b> ${platform}\n` +
-        `🪙 <b>Token:</b> ${name} (${symbol})\n` +
-        `🏦 <b>Kilit Türü:</b> ${lockResult.lockDuration}\n` +
-        `💧 <b>Likidite:</b> ${sol}\n` +
-        `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
-        `🔗 <b>LP Mint:</b> <code>${lpMint ?? "Yok (CLMM/DLMM)"}</code>\n\n` +
-        `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a> | ` +
-        `🪐 <a href="https://jup.ag/swap/SOL-${tokenMint}">Jupiter</a>` +
-        (platform === "PumpSwap"
-          ? ` | 🌊 <a href="https://pump.fun/${tokenMint}">Pump.fun</a>`
-          : "")
-      );
+      // Telegram'a sadece kilitli olanları bildir
+      if (lockResult.isLocked) {
+        sendTelegramNotification(
+          `🔒 <b>KİLİTLİ LP TESPİT EDİLDİ!</b>\n\n` +
+          `🏊 <b>Platform:</b> ${platform}\n` +
+          `🪙 <b>Token:</b> ${name} (${symbol})\n` +
+          `🏦 <b>Kilit Türü:</b> ${lockResult.lockDuration}\n` +
+          `💧 <b>Likidite:</b> ${sol}\n` +
+          `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
+          `🔗 <b>LP Mint:</b> <code>${lpMint ?? "Yok (CLMM/DLMM)"}</code>\n\n` +
+          `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a> | ` +
+          `🪐 <a href="https://jup.ag/swap/SOL-${tokenMint}">Jupiter</a>` +
+          (platform === "PumpSwap" ? ` | 🌊 <a href="https://pump.fun/${tokenMint}">Pump.fun</a>` : "")
+        );
+      }
     } catch (err) {
       console.error("❌ [WS-2] DEX LP hatası:", err);
     }
@@ -572,7 +552,6 @@ export class HeliusMonitor {
         meta = data.result?.meta;
         if (meta) break;
         if (attempt < 3) {
-          console.warn(`⏳ [WS-2] TX henüz hazır değil, ${attempt}. deneme: ${signature.slice(0, 8)}...`);
           await new Promise((r) => setTimeout(r, 1500));
         }
       }
@@ -954,7 +933,6 @@ export class HeliusMonitor {
         }
 
         const lockerName = this.detectLockerFromLogs(logs);
-        console.log(`\n🔒 [WS-3] ${lockerName} kilit işlemi tespit edildi: ${signature.slice(0, 8)}...`);
         await this.handleLockerEvent(signature, lockerName);
       } catch (err) {
         console.error("❌ [WS-3] Mesaj hatası:", err);
@@ -978,7 +956,6 @@ export class HeliusMonitor {
     try {
       const lockedMint = await this.extractLockedMintFromTx(signature);
       if (!lockedMint) {
-        console.warn(`⚠️ [WS-3] ${lockerName} — kilitlenen mint bulunamadı.`);
         return;
       }
 
@@ -1131,7 +1108,6 @@ export class HeliusMonitor {
         const data = await res.json();
         result = data.result;
         if (result?.meta) break;
-        console.log(`⏳ [WS-3] TX bekleniyor... (deneme ${attempt}/5): ${signature.slice(0, 8)}...`);
         await new Promise((r) => setTimeout(r, 2000));
       }
 
@@ -1145,15 +1121,13 @@ export class HeliusMonitor {
       if (txTime) {
         const ageSec = Math.floor(Date.now() / 1000) - txTime;
         if (ageSec > 30) {
-          console.log(`⏭️ [WS-3] ${ageSec}sn önce kilitlenmiş → eski TX, atlanıyor: ${signature.slice(0, 8)}...`);
-          return null;
+            return null;
         }
       }
 
       const meta = result.meta;
       const post: any[] = meta.postTokenBalances || [];
       const pre: any[]  = meta.preTokenBalances  || [];
-      console.log(`🔍 [WS-3] TX analiz: pre=${pre.length} post=${post.length} hesap`);
 
       // Kilitlenen escrow hesapları: token miktarı ARTAN non-WSOL hesaplar
       // Azalan hesaplar (withdrawal/release) ve yeni recipient hesaplar → elenir
@@ -1243,13 +1217,11 @@ export class HeliusMonitor {
               return mint;
             }
 
-            console.log(`⏭️ [WS-3] Adım2 — initializeAccount ama owner locker değil (${initOwner.slice(0, 8)}...), atlandı.`);
           }
         }
       }
 
       // Adım 1 ve 2 eşleşmedi = yeni kilit değil (withdrawal/claim/vesting release)
-      console.log(`⏭️ [WS-3] Yeni kilit tespit edilemedi — withdrawal/release olabilir. Atlanıyor.`);
       return null;
     } catch (err) {
       console.error("❌ extractLockedMintFromTx hatası:", err);
