@@ -56,11 +56,11 @@ export function LogPanel({ open, logs, onClose }: LogPanelProps) {
         aria-hidden="true"
       />
 
-      {/* Panel — ekranın yatay ortası, %50 genişlik */}
+      {/* Panel — üstten, yarı yükseklik, geniş */}
       <div
-        className={`fixed top-0 bottom-0 z-50 flex flex-col
-          left-[25%] w-1/2
-          bg-zinc-950 border-x border-zinc-800
+        className={`fixed top-0 z-50 flex flex-col
+          left-[4%] w-[92%] h-[50vh]
+          bg-zinc-950 border border-zinc-800 rounded-b-xl shadow-2xl
           transition-transform duration-300 ease-in-out
           ${open ? "translate-y-0" : "-translate-y-full"}
         `}

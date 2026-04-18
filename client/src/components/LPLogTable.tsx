@@ -8,10 +8,11 @@ import type { LPDetection } from "@shared/schema";
 interface LPLogTableProps {
   logs: LPDetection[];
   filter?: "all" | "locked";
+  solPrice?: number;
   emptyMessage?: string;
 }
 
-export function LPLogTable({ logs, filter = "all", emptyMessage }: LPLogTableProps) {
+export function LPLogTable({ logs, filter = "all", solPrice, emptyMessage }: LPLogTableProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copyAddress = async (address: string, id: string) => {
@@ -47,7 +48,7 @@ export function LPLogTable({ logs, filter = "all", emptyMessage }: LPLogTablePro
           key={log.id}
           className={`bg-card border rounded-lg p-3 hover-elevate transition-all ${
             index === 0 ? "animate-in slide-in-from-top-1" : ""
-          } ${log.isLocked ? "border-chart-2/50" : "border-card-border"}`}
+          } ${log.isLocked ? "border-emerald-500/40 bg-emerald-950/10" : "border-card-border"}`}
           data-testid={`row-lp-${log.id}`}
         >
           <div className="flex flex-col sm:flex-row sm:items-start gap-2">
@@ -62,12 +63,12 @@ export function LPLogTable({ logs, filter = "all", emptyMessage }: LPLogTablePro
                 </span>
 
                 {log.isLocked ? (
-                  <Badge variant="outline" className="gap-1 border-chart-2 text-chart-2 bg-chart-2/10 text-xs" data-testid="badge-lp-locked">
+                  <Badge className="gap-1 bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 text-xs font-semibold" data-testid="badge-lp-locked">
                     <Lock className="h-3 w-3" />
                     Kilitli {log.lockDuration && `· ${log.lockDuration}`}
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="gap-1 border-muted-foreground/40 text-muted-foreground text-xs" data-testid="badge-lp-unlocked">
+                  <Badge variant="outline" className="gap-1 border-muted-foreground/30 text-muted-foreground/60 text-xs" data-testid="badge-lp-unlocked">
                     <Unlock className="h-3 w-3" />
                     Kilitsiz
                   </Badge>
@@ -82,7 +83,10 @@ export function LPLogTable({ logs, filter = "all", emptyMessage }: LPLogTablePro
                 {log.liquidityAmount !== undefined && log.liquidityAmount > 0 && (
                   <Badge className="gap-1 bg-chart-4/15 text-chart-4 border border-chart-4/30 text-xs" data-testid="badge-lp-liquidity">
                     <Droplet className="h-3 w-3" />
-                    {log.liquidityAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL
+                    {solPrice != null
+                      ? `$${(log.liquidityAmount * solPrice).toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+                      : `${log.liquidityAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL`
+                    }
                   </Badge>
                 )}
 

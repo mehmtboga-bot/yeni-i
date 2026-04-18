@@ -26,7 +26,25 @@ export default function Home() {
   const [lastPublicKey, setLastPublicKey] = useState<string | null>(null);
   const [logPanelOpen, setLogPanelOpen] = useState(false);
   const [serverLogs, setServerLogs] = useState<ServerLog[]>([]);
+  const [solPrice, setSolPrice] = useState<number | null>(null);
   const logIdRef = useRef(0);
+
+  // SOL/USD fiyatını çek — başlangıçta ve her 60sn'de bir
+  useEffect(() => {
+    const fetchPrice = async () => {
+      try {
+        // Binance anlık fiyat — gecikme yok
+        const res = await fetch(
+          "https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT"
+        );
+        const json = await res.json();
+        if (json?.price) setSolPrice(Number(json.price));
+      } catch { /* ağ hatası */ }
+    };
+    fetchPrice();
+    const t = setInterval(fetchPrice, 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const toggleMonitoring = () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -128,6 +146,8 @@ export default function Home() {
   }, []);
 
   const lockedLogs = lpLogs.filter((l) => l.isLocked);
+  const totalSol = lpLogs.reduce((s, l) => s + (l.liquidityAmount ?? 0), 0);
+  const totalUsd = solPrice != null ? totalSol * solPrice : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -195,7 +215,11 @@ export default function Home() {
           <StatCard label="Kilitli LP" value={lockedLogs.length} color="text-chart-2" icon={<Lock className="h-4 w-4" />} />
           <StatCard
             label="Toplam Likidite"
-            value={`${lpLogs.reduce((s, l) => s + (l.liquidityAmount ?? 0), 0).toLocaleString("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} SOL`}
+            value={
+              totalUsd != null
+                ? `$${totalUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+                : `${totalSol.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} SOL`
+            }
             color="text-chart-3"
             icon={<Wallet className="h-4 w-4" />}
           />
@@ -204,38 +228,32 @@ export default function Home() {
         {/* Ana grid: sol 2/3, sağ 1/3 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Sol kolon: Tüm LP + Kilitli LP */}
-          <div className="lg:col-span-2 space-y-6">
-
-            {/* Tüm LP Tespitleri */}
+          {/* Sol kolon: LP Tespitleri */}
+          <div className="lg:col-span-2 space-y-4">
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <Droplet className="h-5 w-5 text-chart-4" />
-                <h2 className="text-base font-semibold text-foreground">Tüm LP Tespitleri</h2>
+                <h2 className="text-base font-semibold text-foreground">LP Tespitleri</h2>
                 <Badge variant="secondary" data-testid="badge-lp-all-count">
                   {lpLogs.length}
                 </Badge>
+                {lockedLogs.length > 0 && (
+                  <Badge className="bg-chart-2/15 text-chart-2 border border-chart-2/30 text-xs" data-testid="badge-lp-locked-count">
+                    <Lock className="h-3 w-3 mr-1" />
+                    {lockedLogs.length} kilitli
+                  </Badge>
+                )}
+                {solPrice && (
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    1 SOL = ${solPrice.toLocaleString("en-US")}
+                  </span>
+                )}
               </div>
               <LPLogTable
                 logs={lpLogs}
                 filter="all"
+                solPrice={solPrice ?? undefined}
                 emptyMessage="LP tespiti bekleniyor..."
-              />
-            </section>
-
-            {/* Kilitli LP'ler */}
-            <section>
-              <div className="flex items-center gap-2 mb-3">
-                <Lock className="h-5 w-5 text-chart-2" />
-                <h2 className="text-base font-semibold text-foreground">Kilitli LP'ler</h2>
-                <Badge variant="secondary" className="bg-chart-2/10 text-chart-2 border-chart-2/20" data-testid="badge-lp-locked-count">
-                  {lockedLogs.length}
-                </Badge>
-              </div>
-              <LPLogTable
-                logs={lpLogs}
-                filter="locked"
-                emptyMessage="Henüz kilitli LP tespit edilmedi..."
               />
             </section>
           </div>
