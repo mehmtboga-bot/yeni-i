@@ -33,10 +33,8 @@ export default function Home() {
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        // Binance anlık fiyat — gecikme yok
-        const res = await fetch(
-          "https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT"
-        );
+        // Sunucu üzerinden Binance anlık fiyatı (CORS yok, gecikme yok)
+        const res = await fetch("/api/sol-price");
         const json = await res.json();
         if (json?.price) setSolPrice(Number(json.price));
       } catch { /* ağ hatası */ }

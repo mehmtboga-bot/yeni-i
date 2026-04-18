@@ -56,6 +56,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
+  // SOL/USD fiyatı — sunucu tarafında Binance'den çeker (CORS yok)
+  app.get("/api/sol-price", async (_req, res) => {
+    try {
+      const r = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT");
+      const json = await r.json() as { price?: string };
+      res.json({ price: json.price ? Number(json.price) : null });
+    } catch {
+      res.status(502).json({ price: null });
+    }
+  });
+
   const monitor = new HeliusMonitor((event: string, data: any) => {
     if (event === "mint_detected") {
       broadcastToClients({ type: "mint_detected", data });
