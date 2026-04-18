@@ -325,14 +325,12 @@ export class HeliusMonitor {
           mintData.lpLogged = true;
         }
 
-        const lpMint = await this.getLPMintFromTx(txSignature, mintAddress);
+        const { lpMint, liquidityAmount: txLiquidity } = await this.getLPMintFromTx(txSignature, mintAddress);
         const checkMint = lpMint || mintAddress;
 
         try {
-          const [lockResult, liquidityAmount] = await Promise.all([
-            this.checkLiquidityLock(checkMint),
-            this.fetchPoolLiquidity(checkMint),
-          ]);
+          const lockResult = await this.checkLiquidityLock(checkMint);
+          const liquidityAmount = txLiquidity;
 
           const platform = this.detectPlatformFromLogs(logs);
 
@@ -448,8 +446,8 @@ export class HeliusMonitor {
     try {
       console.log(`\n💧 [WS-2] ${platform} LP tespit edildi: ${signature}`);
 
-      // İşlemden token mint ve LP mint adreslerini çıkar
-      const { tokenMint, lpMint } = await this.extractMintsFromDexTx(signature);
+      // İşlemden token mint, LP mint ve likidite miktarını çıkar (tek RPC çağrısı)
+      const { tokenMint, lpMint, liquidityAmount: txLiquidity } = await this.extractMintsFromDexTx(signature);
 
       // tokenMint yoksa 3 retry sonrası da bulunamadı — swap işlemi olabilir, atla
       if (!tokenMint) {
@@ -462,16 +460,18 @@ export class HeliusMonitor {
       const checkMint = lpMint || tokenMint;
 
       console.log(
-        `🪙 [WS-2] ${platform} | Token: ${tokenMint} | LP Mint: ${lpMint ?? "yok (CLMM/DLMM)"}`
+        `🪙 [WS-2] ${platform} | Token: ${tokenMint} | LP Mint: ${lpMint ?? "yok (CLMM/DLMM)"} | Likidite: ${txLiquidity ? txLiquidity.toFixed(4) + " SOL" : "?"}`
       );
 
-      const [metadata, lockResult, liquidityAmount] = await Promise.all([
+      const [metadata, lockResult] = await Promise.all([
         this.fetchTokenMetadata(tokenMint),
         isPositionBased
           ? Promise.resolve({ isLocked: false, lockDuration: "CLMM/DLMM — LP mint yok" })
           : this.checkLiquidityLock(lpMint!),
-        this.fetchPoolLiquidity(checkMint),
       ]);
+
+      // TX'ten alınan likidite değeri (sıfır gecikme, doğru değer)
+      const liquidityAmount = txLiquidity;
 
       // Metadata gelmese bile eventi yayınla — isim "Bilinmiyor" olarak gösterilir
       const name = metadata?.name || "Bilinmiyor";
@@ -547,13 +547,14 @@ export class HeliusMonitor {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // TX'den token mint ve LP mint adreslerini çıkar
-  // - tokenMint: WSOL olmayan, önceden var olan token (pool'un trade token'ı)
-  // - lpMint:    WSOL ve token mint olmayan, YENİ oluşturulan mint (LP token)
+  // TX'den token mint, LP mint ve likidite miktarını çıkar
+  // - tokenMint:      WSOL olmayan, önceden var olan token (pool'un trade token'ı)
+  // - lpMint:         WSOL ve token mint olmayan, YENİ oluşturulan mint (LP token)
+  // - liquidityAmount: TX'teki net WSOL girişi → pool'a yatırılan SOL (gerçek likidite)
   // ═══════════════════════════════════════════════════════════════════════════
   private async extractMintsFromDexTx(
     signature: string
-  ): Promise<{ tokenMint: string | null; lpMint: string | null }> {
+  ): Promise<{ tokenMint: string | null; lpMint: string | null; liquidityAmount?: number }> {
     try {
       // İşlem henüz indexlenmemiş olabilir — 3 deneme, 1.5s ara ile
       let meta: any = null;
@@ -605,7 +606,23 @@ export class HeliusMonitor {
         ? existingMints[0].mint
         : (newMints.length > 1 ? newMints[1].mint : lpMint);
 
-      return { tokenMint, lpMint };
+      // ── Likidite: TX'teki net WSOL girişi = pool'a yatırılan SOL ─────────────
+      // Bu değer ekstra RPC çağrısı gerektirmez ve LP oluşturma anındaki
+      // gerçek SOL miktarıdır. Pool hesabında artan WSOL = kullanıcının yatırdığı SOL.
+      let liquidityAmount: number | undefined;
+      let totalWsolIn = BigInt(0);
+      for (const wp of post.filter((p: any) => p.mint === WSOL)) {
+        const prevEntry = pre.find((x: any) => x.accountIndex === wp.accountIndex);
+        const postAmt = BigInt(wp.uiTokenAmount?.amount || "0");
+        const preAmt  = BigInt(prevEntry?.uiTokenAmount?.amount || "0");
+        const net = postAmt - preAmt;
+        if (net > BigInt(0)) totalWsolIn += net;
+      }
+      if (totalWsolIn > BigInt(0)) {
+        liquidityAmount = Number(totalWsolIn) / 1e9;
+      }
+
+      return { tokenMint, lpMint, liquidityAmount };
     } catch (err) {
       console.error("❌ extractMintsFromDexTx hatası:", err);
       return { tokenMint: null, lpMint: null };
@@ -613,9 +630,12 @@ export class HeliusMonitor {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // WS-1 per-token LP izleme için: LP mint'ini bul
+  // WS-1 per-token LP izleme için: LP mint ve likidite miktarını bul
   // ═══════════════════════════════════════════════════════════════════════════
-  private async getLPMintFromTx(signature: string, originalMint: string): Promise<string | null> {
+  private async getLPMintFromTx(
+    signature: string,
+    originalMint: string
+  ): Promise<{ lpMint: string | null; liquidityAmount?: number }> {
     try {
       const res = await fetch(HTTP_URL, {
         method: "POST",
@@ -628,13 +648,14 @@ export class HeliusMonitor {
       });
       const data = await res.json();
       const meta = data.result?.meta;
-      if (!meta) return null;
+      if (!meta) return { lpMint: null };
 
       const post: any[] = meta.postTokenBalances || [];
       const pre: any[] = meta.preTokenBalances || [];
       const preMints = new Set(pre.map((p: any) => p.mint));
 
       // Yeni oluşturulan, WSOL olmayan, orijinal token olmayan → LP mint
+      let lpMint: string | null = null;
       for (const p of post) {
         if (
           !preMints.has(p.mint) &&
@@ -642,25 +663,40 @@ export class HeliusMonitor {
           p.mint !== originalMint &&
           p.uiTokenAmount?.amount !== "0"
         ) {
-          return p.mint;
+          lpMint = p.mint;
+          break;
         }
       }
 
       // Fallback: miktarı artan
-      for (const p of post) {
-        const prev = pre.find((x: any) => x.accountIndex === p.accountIndex);
-        if (
-          p.mint !== WSOL && p.mint !== originalMint && prev &&
-          BigInt(p.uiTokenAmount?.amount || "0") > BigInt(prev.uiTokenAmount?.amount || "0")
-        ) {
-          return p.mint;
+      if (!lpMint) {
+        for (const p of post) {
+          const prev = pre.find((x: any) => x.accountIndex === p.accountIndex);
+          if (
+            p.mint !== WSOL && p.mint !== originalMint && prev &&
+            BigInt(p.uiTokenAmount?.amount || "0") > BigInt(prev.uiTokenAmount?.amount || "0")
+          ) {
+            lpMint = p.mint;
+            break;
+          }
         }
       }
 
-      return null;
+      // TX'teki net WSOL girişi = pool'a yatırılan gerçek SOL miktarı
+      let totalWsolIn = BigInt(0);
+      for (const wp of post.filter((p: any) => p.mint === WSOL)) {
+        const prevEntry = pre.find((x: any) => x.accountIndex === wp.accountIndex);
+        const postAmt = BigInt(wp.uiTokenAmount?.amount || "0");
+        const preAmt  = BigInt(prevEntry?.uiTokenAmount?.amount || "0");
+        const net = postAmt - preAmt;
+        if (net > BigInt(0)) totalWsolIn += net;
+      }
+      const liquidityAmount = totalWsolIn > BigInt(0) ? Number(totalWsolIn) / 1e9 : undefined;
+
+      return { lpMint, liquidityAmount };
     } catch (err) {
       console.error("❌ getLPMintFromTx hatası:", err);
-      return null;
+      return { lpMint: null };
     }
   }
 
@@ -788,9 +824,12 @@ export class HeliusMonitor {
     } catch { return null; }
   }
 
+  // Pool'un gerçek WSOL likiditesini çek (WS-3 locker eventi için)
+  // LP mint → en büyük LP token sahibi (pool hesabı) → o hesabın WSOL token bakiyesi
   private async fetchPoolLiquidity(lpMint: string): Promise<number | undefined> {
     try {
-      const res = await fetch(HTTP_URL, {
+      // LP token'ın en büyük sahiplerini al
+      const largestRes = await fetch(HTTP_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -799,22 +838,45 @@ export class HeliusMonitor {
           params: [lpMint],
         }),
       });
-      const data = await res.json();
-      const topHolder = data.result?.value?.[0]?.address;
-      if (!topHolder) return undefined;
+      const largestData = await largestRes.json();
+      const holders: any[] = largestData.result?.value || [];
 
-      const balRes = await fetch(HTTP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0", id: 1,
-          method: "getBalance",
-          params: [topHolder],
-        }),
-      });
-      const balData = await balRes.json();
-      const sol = (balData.result?.value || 0) / 1e9;
-      return sol > 0 ? sol : undefined;
+      for (const holder of holders.slice(0, 3)) {
+        // Hesabın ham sahibini (DEX programı mı?) kontrol et
+        const infoRes = await fetch(HTTP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0", id: 1,
+            method: "getAccountInfo",
+            params: [holder.address, { encoding: "base64" }],
+          }),
+        });
+        const infoData = await infoRes.json();
+        const rawOwner: string | undefined = infoData.result?.value?.owner;
+        if (!rawOwner || !Object.keys(DEX_PROGRAMS).includes(rawOwner)) continue;
+
+        // Pool hesabının sahip olduğu WSOL token hesaplarını getir
+        const wsolRes = await fetch(HTTP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0", id: 1,
+            method: "getTokenAccountsByOwner",
+            params: [holder.address, { mint: WSOL }, { encoding: "jsonParsed" }],
+          }),
+        });
+        const wsolData = await wsolRes.json();
+        const accounts: any[] = wsolData.result?.value || [];
+
+        let totalSol = 0;
+        for (const acc of accounts) {
+          const amount: number = acc.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0;
+          totalSol += amount;
+        }
+        if (totalSol > 0) return totalSol;
+      }
+      return undefined;
     } catch { return undefined; }
   }
 
