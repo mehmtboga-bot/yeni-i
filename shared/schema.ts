@@ -21,12 +21,15 @@ export const lpDetectionSchema = z.object({
   symbol: z.string(),
   detectedAt: z.number(),
   expiresAt: z.number(),
-  raydiumUrl: z.string(),
-  jupiterUrl: z.string(),
-  dexscreenerUrl: z.string(),
+  raydiumUrl: z.string().optional(),
+  jupiterUrl: z.string().optional(),
+  dexscreenerUrl: z.string().optional(),
+  pumpfunUrl: z.string().optional(),
   isLocked: z.boolean().optional(),
   lockDuration: z.string().optional(),
   liquidityAmount: z.number().optional(),
+  platform: z.string().optional(),
+  lpMint: z.string().optional(),
 });
 
 export type LPDetection = z.infer<typeof lpDetectionSchema>;
