@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Coins, Droplet, Wallet } from "lucide-react";
+import { Coins, Droplet, Lock, Wallet } from "lucide-react";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { MintedTokenCard } from "@/components/MintedTokenCard";
 import { LPLogTable } from "@/components/LPLogTable";
@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import type { MintedToken, LPDetection, WSMessage } from "@shared/schema";
 
 const MAX_MINTED_TOKENS = 7;
-const MAX_LP_LOGS = 10;
+const MAX_LP_LOGS = 30;
 const MINT_DISPLAY_DURATION = 3 * 60 * 1000;
-const LP_LOG_DURATION = 2 * 60 * 1000;
+const LP_LOG_DURATION = 5 * 60 * 1000;
 
 export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
@@ -25,22 +25,13 @@ export default function Home() {
 
   const toggleMonitoring = () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ 
-        type: "toggle_monitoring", 
-        data: { enabled: !isMonitoring } 
-      }));
+      ws.send(JSON.stringify({ type: "toggle_monitoring", data: { enabled: !isMonitoring } }));
     }
   };
 
   const handleGetBalance = (publicKey: string) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      console.log("📤 Bakiye sorgusu gönderiliyor (WS):", publicKey);
-      ws.send(JSON.stringify({
-        type: "get_balance",
-        data: { publicKey }
-      }));
-    } else {
-      console.warn("⚠️ WebSocket hazır değil, bakiye sorgusu gönderilemedi");
+      ws.send(JSON.stringify({ type: "get_balance", data: { publicKey } }));
     }
   };
 
@@ -48,7 +39,6 @@ export default function Home() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host || "localhost:5000";
     const wsUrl = `${protocol}//${host}/ws`;
-    console.log("🔗 WebSocket URL:", wsUrl);
     let wsInstance: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout;
 
@@ -57,7 +47,6 @@ export default function Home() {
       setWs(wsInstance);
 
       wsInstance.onopen = () => {
-        console.log("✅ Uygulama WebSocket bağlandı");
         setIsConnected(true);
         setConnectionMessage("");
       };
@@ -65,25 +54,20 @@ export default function Home() {
       wsInstance.onmessage = (event) => {
         try {
           const message: WSMessage = JSON.parse(event.data);
-          console.log("📨 WebSocket mesaj alındı:", message.type);
 
           if (message.type === "mint_detected") {
             const token = message.data;
             setMintedTokens((prev) => {
               const filtered = prev.filter((t) => t.id !== token.id);
-              const updated = [token, ...filtered].slice(0, MAX_MINTED_TOKENS);
-              return updated;
+              return [token, ...filtered].slice(0, MAX_MINTED_TOKENS);
             });
             setNewTokenId(token.id);
             setTimeout(() => setNewTokenId(null), 1000);
           } else if (message.type === "lp_detected") {
             const lpLog = message.data;
-            console.log("📋 LP alındı:", lpLog);
             setLpLogs((prev) => {
               const filtered = prev.filter((l) => l.id !== lpLog.id);
-              const updated = [lpLog, ...filtered].slice(0, MAX_LP_LOGS);
-              console.log("📋 LP listesi güncellendi, toplam:", updated.length);
-              return updated;
+              return [lpLog, ...filtered].slice(0, MAX_LP_LOGS);
             });
           } else if (message.type === "connection_status") {
             setIsConnected(message.data.connected);
@@ -94,16 +78,12 @@ export default function Home() {
           } else if (message.type === "monitoring_state") {
             setIsMonitoring(message.data.isMonitoring);
           } else if (message.type === "balance_update") {
-            console.log("💰 Bakiye güncellendi (WebSocket):", message.data.balance, message.data.publicKey);
             setWalletBalance(message.data.balance);
             setLastPublicKey(message.data.publicKey);
           } else if (message.type === "error") {
-            console.error("Server hatası:", message.data.message);
             setConnectionMessage(message.data.message);
           }
-        } catch (error) {
-          console.error("WebSocket mesaj hatası:", error);
-        }
+        } catch { /* ignore parse errors */ }
       };
 
       wsInstance.onerror = () => {
@@ -130,23 +110,26 @@ export default function Home() {
     return () => {
       clearInterval(cleanupInterval);
       clearTimeout(reconnectTimeout);
-      if (wsInstance) {
-        wsInstance.close();
-      }
+      if (wsInstance) wsInstance.close();
     };
   }, []);
+
+  const lockedLogs = lpLogs.filter((l) => l.isLocked);
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-card border-b border-card-border backdrop-blur-sm bg-card/95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-chart-2 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-chart-2 flex items-center justify-center shrink-0">
                 <Coins className="h-6 w-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent" data-testid="text-title">
+                <h1
+                  className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent"
+                  data-testid="text-title"
+                >
                   Solana Token Monitor
                 </h1>
                 <p className="text-xs text-muted-foreground hidden sm:block">
@@ -154,8 +137,8 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <ConnectionStatus 
-              isConnected={isConnected} 
+            <ConnectionStatus
+              isConnected={isConnected}
               message={connectionMessage}
               isMonitoring={isMonitoring}
               onToggleMonitoring={toggleMonitoring}
@@ -164,82 +147,120 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-        <div className="flex flex-col gap-6">
-          <WalletBalance 
-            onGetBalance={handleGetBalance}
-            balance={walletBalance}
-            lastPublicKey={lastPublicKey}
-            setWalletBalance={setWalletBalance}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Cüzdan */}
+        <WalletBalance
+          onGetBalance={handleGetBalance}
+          balance={walletBalance}
+          lastPublicKey={lastPublicKey}
+          setWalletBalance={setWalletBalance}
+        />
+
+        {/* İstatistik kartları */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard label="Aktif Mint" value={mintedTokens.length} color="text-primary" icon={<Coins className="h-4 w-4" />} />
+          <StatCard label="Tüm LP" value={lpLogs.length} color="text-chart-4" icon={<Droplet className="h-4 w-4" />} />
+          <StatCard label="Kilitli LP" value={lockedLogs.length} color="text-chart-2" icon={<Lock className="h-4 w-4" />} />
+          <StatCard
+            label="Toplam Likidite"
+            value={`${lpLogs.reduce((s, l) => s + (l.liquidityAmount ?? 0), 0).toLocaleString("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} SOL`}
+            color="text-chart-3"
+            icon={<Wallet className="h-4 w-4" />}
           />
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-3 space-y-8">
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Coins className="h-5 w-5 text-primary" />
-                    <h2 className="text-lg font-semibold text-foreground">Mintlenen Tokenler</h2>
-                    <Badge variant="secondary" className="ml-2" data-testid="badge-mint-count">
-                      {mintedTokens.length}/{MAX_MINTED_TOKENS}
-                    </Badge>
-                  </div>
-                </div>
+        {/* Ana grid: sol 2/3, sağ 1/3 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {mintedTokens.length === 0 ? (
-                  <div className="text-center py-16 text-muted-foreground" data-testid="text-mint-empty">
-                    <Coins className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p className="text-sm">Yeni token mint'leri bekleniyor...</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {mintedTokens.map((token) => (
-                      <MintedTokenCard
-                        key={token.id}
-                        token={token}
-                        isNew={token.id === newTokenId}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
+          {/* Sol kolon: Tüm LP + Kilitli LP */}
+          <div className="lg:col-span-2 space-y-6">
 
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Droplet className="h-5 w-5 text-chart-4" />
-                    <h2 className="text-lg font-semibold text-foreground">LP Tespitleri (Kilitli)</h2>
-                    <Badge variant="secondary" className="ml-2" data-testid="badge-lp-count">
-                      {lpLogs.filter(l => l.isLocked).length}/{MAX_LP_LOGS}
-                    </Badge>
-                  </div>
-                </div>
-
-                <LPLogTable logs={lpLogs} />
-              </section>
-            </div>
-
-            <aside className="space-y-6">
-              <div className="bg-card border border-card-border rounded-xl p-6 space-y-4">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <Coins className="h-4 w-4 text-primary" />
-                  İstatistikler
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="p-3 rounded-lg bg-background/50 border border-card-border/50">
-                    <p className="text-xs text-muted-foreground">Aktif Mintler</p>
-                    <p className="text-xl font-bold text-primary">{mintedTokens.length}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-background/50 border border-card-border/50">
-                    <p className="text-xs text-muted-foreground">Tespit Edilen LP</p>
-                    <p className="text-xl font-bold text-chart-4">{lpLogs.length}</p>
-                  </div>
-                </div>
+            {/* Tüm LP Tespitleri */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Droplet className="h-5 w-5 text-chart-4" />
+                <h2 className="text-base font-semibold text-foreground">Tüm LP Tespitleri</h2>
+                <Badge variant="secondary" data-testid="badge-lp-all-count">
+                  {lpLogs.length}
+                </Badge>
               </div>
-            </aside>
+              <LPLogTable
+                logs={lpLogs}
+                filter="all"
+                emptyMessage="LP tespiti bekleniyor..."
+              />
+            </section>
+
+            {/* Kilitli LP'ler */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Lock className="h-5 w-5 text-chart-2" />
+                <h2 className="text-base font-semibold text-foreground">Kilitli LP'ler</h2>
+                <Badge variant="secondary" className="bg-chart-2/10 text-chart-2 border-chart-2/20" data-testid="badge-lp-locked-count">
+                  {lockedLogs.length}
+                </Badge>
+              </div>
+              <LPLogTable
+                logs={lpLogs}
+                filter="locked"
+                emptyMessage="Henüz kilitli LP tespit edilmedi..."
+              />
+            </section>
+          </div>
+
+          {/* Sağ kolon: Mintlenen Tokenler */}
+          <div className="space-y-6">
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Coins className="h-5 w-5 text-primary" />
+                <h2 className="text-base font-semibold text-foreground">Yeni Mintler</h2>
+                <Badge variant="secondary" data-testid="badge-mint-count">
+                  {mintedTokens.length}/{MAX_MINTED_TOKENS}
+                </Badge>
+              </div>
+
+              {mintedTokens.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground" data-testid="text-mint-empty">
+                  <Coins className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">Yeni mint bekleniyor...</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {mintedTokens.map((token) => (
+                    <MintedTokenCard
+                      key={token.id}
+                      token={token}
+                      isNew={token.id === newTokenId}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  color,
+  icon,
+}: {
+  label: string;
+  value: string | number;
+  color: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="bg-card border border-card-border rounded-lg p-3 space-y-1">
+      <div className={`flex items-center gap-1.5 text-xs text-muted-foreground ${color}`}>
+        {icon}
+        <span>{label}</span>
+      </div>
+      <p className={`text-xl font-bold ${color}`}>{value}</p>
     </div>
   );
 }

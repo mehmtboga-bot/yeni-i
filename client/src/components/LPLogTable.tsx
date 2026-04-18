@@ -7,9 +7,11 @@ import type { LPDetection } from "@shared/schema";
 
 interface LPLogTableProps {
   logs: LPDetection[];
+  filter?: "all" | "locked";
+  emptyMessage?: string;
 }
 
-export function LPLogTable({ logs }: LPLogTableProps) {
+export function LPLogTable({ logs, filter = "all", emptyMessage }: LPLogTableProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copyAddress = async (address: string, id: string) => {
@@ -18,9 +20,7 @@ export function LPLogTable({ logs }: LPLogTableProps) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const truncateAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-6)}`;
-  };
+  const truncateAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-6)}`;
 
   const getRelativeTime = (timestamp: number) => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -29,12 +29,13 @@ export function LPLogTable({ logs }: LPLogTableProps) {
     return `${minutes}dk önce`;
   };
 
-  const filteredLogs = logs.filter(log => log.isLocked);
+  const filteredLogs = filter === "locked" ? logs.filter((l) => l.isLocked) : logs;
 
   if (filteredLogs.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground" data-testid="text-empty-state">
-        <p className="text-sm">{logs.length > 0 ? "Kilitli LP tespiti bekleniyor... (Sadece kilitli olanlar gösterilir)" : "LP tespiti bekleniyor..."}</p>
+      <div className="text-center py-10 text-muted-foreground" data-testid="text-empty-state">
+        <Droplet className="h-8 w-8 mx-auto mb-2 opacity-40" />
+        <p className="text-sm">{emptyMessage ?? "LP tespiti bekleniyor..."}</p>
       </div>
     );
   }
@@ -44,45 +45,56 @@ export function LPLogTable({ logs }: LPLogTableProps) {
       {filteredLogs.map((log, index) => (
         <div
           key={log.id}
-          className={`bg-card border border-card-border rounded-lg p-4 hover-elevate transition-all ${
-            index === 0 ? "animate-in slide-in-from-top-1 border-chart-4" : ""
-          }`}
+          className={`bg-card border rounded-lg p-3 hover-elevate transition-all ${
+            index === 0 ? "animate-in slide-in-from-top-1" : ""
+          } ${log.isLocked ? "border-chart-2/50" : "border-card-border"}`}
           data-testid={`row-lp-${log.id}`}
         >
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+            <div className="flex-1 min-w-0 space-y-1.5">
+              {/* Token adı + kilit durumu + platform + likidite */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-foreground" data-testid="text-lp-name">
+                <span className="font-semibold text-foreground text-sm" data-testid="text-lp-name">
                   {log.name}
                 </span>
-                <span className="text-sm font-medium text-primary" data-testid="text-lp-symbol">
-                  ({log.symbol})
+                <span className="text-sm font-medium text-muted-foreground" data-testid="text-lp-symbol">
+                  {log.symbol}
                 </span>
+
                 {log.isLocked ? (
-                  <Badge variant="outline" className="gap-1 border-chart-2 text-chart-2 bg-chart-2/10" data-testid="badge-lp-locked">
+                  <Badge variant="outline" className="gap-1 border-chart-2 text-chart-2 bg-chart-2/10 text-xs" data-testid="badge-lp-locked">
                     <Lock className="h-3 w-3" />
-                    Kilitli {log.lockDuration && `(${log.lockDuration})`}
+                    Kilitli {log.lockDuration && `· ${log.lockDuration}`}
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="gap-1 border-destructive text-destructive bg-destructive/10" data-testid="badge-lp-unlocked">
+                  <Badge variant="outline" className="gap-1 border-muted-foreground/40 text-muted-foreground text-xs" data-testid="badge-lp-unlocked">
                     <Unlock className="h-3 w-3" />
-                    Kilit Açık
+                    Kilitsiz
                   </Badge>
                 )}
-                {log.liquidityAmount !== undefined && (
-                  <Badge variant="secondary" className="bg-chart-4/10 text-chart-4 border-chart-4/20" data-testid="badge-lp-liquidity">
-                    <Droplet className="h-3 w-3 mr-1" />
-                    {log.liquidityAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} SOL
+
+                {log.platform && (
+                  <Badge variant="secondary" className="text-xs" data-testid="badge-lp-platform">
+                    {log.platform}
                   </Badge>
                 )}
-                <span className="text-xs text-muted-foreground" data-testid="text-lp-time">
+
+                {log.liquidityAmount !== undefined && log.liquidityAmount > 0 && (
+                  <Badge className="gap-1 bg-chart-4/15 text-chart-4 border border-chart-4/30 text-xs" data-testid="badge-lp-liquidity">
+                    <Droplet className="h-3 w-3" />
+                    {log.liquidityAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL
+                  </Badge>
+                )}
+
+                <span className="text-xs text-muted-foreground ml-auto" data-testid="text-lp-time">
                   {getRelativeTime(log.detectedAt)}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Adres + kopyala */}
+              <div className="flex items-center gap-1.5">
                 <code
-                  className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded"
+                  className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded"
                   data-testid="text-lp-address"
                 >
                   {truncateAddress(log.mintAddress)}
@@ -91,7 +103,7 @@ export function LPLogTable({ logs }: LPLogTableProps) {
                   size="icon"
                   variant="ghost"
                   onClick={() => copyAddress(log.mintAddress, log.id)}
-                  className="h-7 w-7"
+                  className="h-6 w-6"
                   data-testid="button-copy-lp-address"
                 >
                   {copiedId === log.id ? (
@@ -100,49 +112,38 @@ export function LPLogTable({ logs }: LPLogTableProps) {
                     <Copy className="h-3 w-3" />
                   )}
                 </Button>
-              </div>
 
-              <div className="flex flex-wrap gap-1.5">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  asChild
-                  className="h-7 px-2 text-xs"
-                  data-testid="button-lp-raydium"
-                >
-                  <a href={log.raydiumUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    Raydium
-                  </a>
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  asChild
-                  className="h-7 px-2 text-xs"
-                  data-testid="button-lp-jupiter"
-                >
-                  <a href={log.jupiterUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    Jupiter
-                  </a>
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  asChild
-                  className="h-7 px-2 text-xs"
-                  data-testid="button-lp-dexscreener"
-                >
-                  <a href={log.dexscreenerUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    Dexscreener
-                  </a>
-                </Button>
+                {/* Bağlantılar */}
+                <div className="flex gap-1 ml-1">
+                  {log.pumpfunUrl && (
+                    <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs" data-testid="button-lp-pumpfun">
+                      <a href={log.pumpfunUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Pump
+                      </a>
+                    </Button>
+                  )}
+                  {log.jupiterUrl && (
+                    <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs" data-testid="button-lp-jupiter">
+                      <a href={log.jupiterUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Jupiter
+                      </a>
+                    </Button>
+                  )}
+                  {log.dexscreenerUrl && (
+                    <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs" data-testid="button-lp-dex">
+                      <a href={log.dexscreenerUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Dex
+                      </a>
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="sm:ml-auto">
+            <div className="shrink-0">
               <CountdownTimer detectedAt={log.detectedAt} />
             </div>
           </div>
