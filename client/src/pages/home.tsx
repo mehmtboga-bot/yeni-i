@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
-import { Coins, Droplet, Lock, Wallet } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Coins, Droplet, Lock, Menu, Wallet } from "lucide-react";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { MintedTokenCard } from "@/components/MintedTokenCard";
 import { LPLogTable } from "@/components/LPLogTable";
 import { WalletBalance } from "@/components/WalletBalance";
+import { LogPanel, type ServerLog } from "@/components/LogPanel";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { MintedToken, LPDetection, WSMessage } from "@shared/schema";
 
 const MAX_MINTED_TOKENS = 7;
@@ -22,6 +24,9 @@ export default function Home() {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [lastPublicKey, setLastPublicKey] = useState<string | null>(null);
+  const [logPanelOpen, setLogPanelOpen] = useState(false);
+  const [serverLogs, setServerLogs] = useState<ServerLog[]>([]);
+  const logIdRef = useRef(0);
 
   const toggleMonitoring = () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -82,6 +87,14 @@ export default function Home() {
             setLastPublicKey(message.data.publicKey);
           } else if (message.type === "error") {
             setConnectionMessage(message.data.message);
+          } else if (message.type === "server_log") {
+            const entry: ServerLog = {
+              id: ++logIdRef.current,
+              level: message.data.level,
+              message: message.data.message,
+              timestamp: message.data.timestamp,
+            };
+            setServerLogs((prev) => [...prev, entry].slice(-300));
           }
         } catch { /* ignore parse errors */ }
       };
@@ -118,10 +131,29 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Log paneli */}
+      <LogPanel
+        open={logPanelOpen}
+        logs={serverLogs}
+        onClose={() => setLogPanelOpen(false)}
+      />
+
       <header className="sticky top-0 z-50 bg-card border-b border-card-border backdrop-blur-sm bg-card/95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
+              {/* Hamburger — log paneli aç/kapat */}
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setLogPanelOpen((v) => !v)}
+                className="shrink-0"
+                data-testid="button-toggle-log-panel"
+                aria-label="Sunucu loglarını göster"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+
               <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-chart-2 flex items-center justify-center shrink-0">
                 <Coins className="h-6 w-6 text-primary-foreground" />
               </div>

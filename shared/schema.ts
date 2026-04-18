@@ -71,6 +71,14 @@ export const wsMessageSchema = z.discriminatedUnion("type", [
       publicKey: z.string(),
     }),
   }),
+  z.object({
+    type: z.literal("server_log"),
+    data: z.object({
+      level: z.enum(["info", "warn", "error"]),
+      message: z.string(),
+      timestamp: z.number(),
+    }),
+  }),
 ]);
 
 export type WSMessage = z.infer<typeof wsMessageSchema>;
