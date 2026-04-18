@@ -1112,7 +1112,8 @@ export class HeliusMonitor {
       // SPL token hesabının value.owner = TokenkegQ... (her zaman Token Program)
       // Gerçek kontrolcü = data.parsed.info.owner → locker program mı kontrol et.
       // Withdrawal'da alıcı hesabın kontrolcüsü kullanıcı wallet'ıdır (locker değil).
-      // Yeni kilit escrow'unda kontrolcü Streamflow/Unicrypt/vb. locker programıdır.
+      // Yeni kilit escrow'unda kontrolcü bir PDA olabilir (Streamflow vb.).
+      // PDA ise: PDA'nın kendi parent programı = locker program ID'si olacaktır.
       const accountKeys: string[] = (result.transaction?.message?.accountKeys || [])
         .map((k: any) => (typeof k === "string" ? k : k.pubkey))
         .filter(Boolean);
@@ -1130,11 +1131,22 @@ export class HeliusMonitor {
           }),
         });
         const ownerData = await ownerRes.json();
-        // parsed.info.owner = token hesabını kontrol eden program/cüzdan
+        // parsed.info.owner = token hesabını kontrol eden program/cüzdan (veya PDA)
         const tokenAccountOwner: string | undefined =
           ownerData.result?.value?.data?.parsed?.info?.owner;
-        if (tokenAccountOwner && LOCKER_MAP[tokenAccountOwner]) {
+        if (!tokenAccountOwner) continue;
+
+        // Doğrudan eşleşme: owner kendisi locker program mı?
+        if (LOCKER_MAP[tokenAccountOwner]) {
           console.log(`✅ [WS-3] Adım1 — Locker escrow'a token girişi | locker: ${LOCKER_MAP[tokenAccountOwner]} | mint: ${inflow.mint}`);
+          return inflow.mint;
+        }
+
+        // PDA kontrolü: owner bir PDA ise, PDA'nın parent programı locker mı?
+        // Streamflow, Unicrypt gibi programlar escrow için PDA kullanır.
+        const parentProgram = await this.getAccountOwner(tokenAccountOwner);
+        if (parentProgram && LOCKER_MAP[parentProgram]) {
+          console.log(`✅ [WS-3] Adım1(PDA) — PDA escrow'a token girişi | locker: ${LOCKER_MAP[parentProgram]} | mint: ${inflow.mint}`);
           return inflow.mint;
         }
       }
@@ -1153,14 +1165,23 @@ export class HeliusMonitor {
             mint && mint !== WSOL &&
             (type === "initializeAccount" || type === "initializeAccount3")
           ) {
-            // initializeAccount'ın owner'ı da locker programı mı?
             const initOwner: string | undefined = parsed.info?.owner;
-            if (initOwner && !LOCKER_MAP[initOwner]) {
-              console.log(`⏭️ [WS-3] Adım2 — initializeAccount ama owner locker değil (${initOwner.slice(0, 8)}...), atlandı.`);
-              continue;
+            if (!initOwner) continue;
+
+            // Doğrudan eşleşme
+            if (LOCKER_MAP[initOwner]) {
+              console.log(`✅ [WS-3] Adım2 — initializeAccount locker escrow | mint: ${mint}`);
+              return mint;
             }
-            console.log(`✅ [WS-3] Adım2 — initializeAccount locker escrow | mint: ${mint}`);
-            return mint;
+
+            // PDA kontrolü: initOwner bir PDA ise, parent programı locker mı?
+            const parentProgram = await this.getAccountOwner(initOwner);
+            if (parentProgram && LOCKER_MAP[parentProgram]) {
+              console.log(`✅ [WS-3] Adım2(PDA) — initializeAccount PDA escrow | locker: ${LOCKER_MAP[parentProgram]} | mint: ${mint}`);
+              return mint;
+            }
+
+            console.log(`⏭️ [WS-3] Adım2 — initializeAccount ama owner locker değil (${initOwner.slice(0, 8)}...), atlandı.`);
           }
         }
       }
