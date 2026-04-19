@@ -26,23 +26,10 @@ export default function Home() {
   const [lastPublicKey, setLastPublicKey] = useState<string | null>(null);
   const [logPanelOpen, setLogPanelOpen] = useState(false);
   const [serverLogs, setServerLogs] = useState<ServerLog[]>([]);
-  const [solPrice, setSolPrice] = useState<number | null>(null);
   const logIdRef = useRef(0);
 
-  // SOL/USD fiyatını çek — başlangıçta ve her 60sn'de bir
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        // Sunucu üzerinden Binance anlık fiyatı (CORS yok, gecikme yok)
-        const res = await fetch("/api/sol-price");
-        const json = await res.json();
-        if (json?.price) setSolPrice(Number(json.price));
-      } catch { /* ağ hatası */ }
-    };
-    fetchPrice();
-    const t = setInterval(fetchPrice, 60_000);
-    return () => clearInterval(t);
-  }, []);
+  // Sabit SOL fiyatı — 1 SOL = $87
+  const SOL_PRICE = 87;
 
   const toggleMonitoring = () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -145,7 +132,7 @@ export default function Home() {
 
   const lockedLogs = lpLogs.filter((l) => l.isLocked);
   const totalSol = lpLogs.reduce((s, l) => s + (l.liquidityAmount ?? 0), 0);
-  const totalUsd = solPrice != null ? totalSol * solPrice : null;
+  const totalUsd = totalSol * SOL_PRICE;
 
   return (
     <div className="min-h-screen bg-background">
@@ -212,12 +199,8 @@ export default function Home() {
           <StatCard label="Tüm LP" value={lpLogs.length} color="text-chart-4" icon={<Droplet className="h-4 w-4" />} />
           <StatCard label="Kilitli LP" value={lockedLogs.length} color="text-chart-2" icon={<Lock className="h-4 w-4" />} />
           <StatCard
-            label="Toplam Likidite"
-            value={
-              totalUsd != null
-                ? `$${totalUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
-                : `${totalSol.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} SOL`
-            }
+            label="Toplam TVL"
+            value={`$${(2 * totalUsd).toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
             color="text-chart-3"
             icon={<Wallet className="h-4 w-4" />}
           />
@@ -241,16 +224,14 @@ export default function Home() {
                     {lockedLogs.length} kilitli
                   </Badge>
                 )}
-                {solPrice && (
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    1 SOL = ${solPrice.toLocaleString("en-US")}
-                  </span>
-                )}
+                <span className="text-xs text-muted-foreground ml-auto">
+                  1 SOL = ${SOL_PRICE} · TVL = 2×SOL×$87
+                </span>
               </div>
               <LPLogTable
                 logs={lpLogs}
                 filter="all"
-                solPrice={solPrice ?? undefined}
+                solPrice={SOL_PRICE}
                 emptyMessage="LP tespiti bekleniyor..."
               />
             </section>

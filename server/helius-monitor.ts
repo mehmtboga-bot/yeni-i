@@ -318,38 +318,37 @@ export class HeliusMonitor {
         const hasLPKeyword = logs.some((log) => LP_KEYWORDS.some((kw) => log.includes(kw)));
         if (!hasLPKeyword) return;
 
-        if (!mintData.lpLogged) {
-          // Hangi DEX'te LP oluştu?
-          const platform = this.detectPlatformFromLogs(logs);
-          console.log(`${lockResult.isLocked ? "🔒" : "💧"} [WS-1] ${metadata.name} (${metadata.symbol}) | ${platform} | ${liquidityAmount ? liquidityAmount.toFixed(4) + " SOL" : "?"} | ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}`);
-          mintData.lpLogged = true;
-        }
-
         const { lpMint, liquidityAmount: txLiquidity } = await this.getLPMintFromTx(txSignature, mintAddress);
         const checkMint = lpMint || mintAddress;
 
         try {
           const lockResult = await this.checkLiquidityLock(checkMint);
           const liquidityAmount = txLiquidity;
-
           const platform = this.detectPlatformFromLogs(logs);
 
-          if (lockResult.isLocked) {
-            const lpData = {
-              id: `${mintAddress}-${Date.now()}`,
-              mintAddress,
-              lpMint: lpMint || "Bulunamadı",
-              name: metadata.name, symbol: metadata.symbol,
-              detectedAt: Date.now(),
-              expiresAt: Date.now() + 2 * 60 * 1000,
-              isLocked: true,
-              lockDuration: lockResult.lockDuration,
-              liquidityAmount, platform,
-              jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
-              dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
-            };
-            this.eventEmitter("lp_detected", lpData);
+          if (!mintData.lpLogged) {
+            console.log(`${lockResult.isLocked ? "🔒" : "💧"} [WS-1] ${metadata.name} (${metadata.symbol}) | ${platform} | ${liquidityAmount ? liquidityAmount.toFixed(4) + " SOL" : "?"} | ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}`);
+            mintData.lpLogged = true;
+          }
 
+          // Tüm LP'leri (kilitli + kilitsiz) arayüze ilet
+          const lpData = {
+            id: `${mintAddress}-${Date.now()}`,
+            mintAddress,
+            lpMint: lpMint ?? undefined,
+            name: metadata.name, symbol: metadata.symbol,
+            detectedAt: Date.now(),
+            expiresAt: Date.now() + 5 * 60 * 1000,
+            isLocked: lockResult.isLocked,
+            lockDuration: lockResult.lockDuration,
+            liquidityAmount, platform,
+            jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
+            dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
+          };
+          this.eventEmitter("lp_detected", lpData);
+
+          // Telegram'a sadece kilitli olanları gönder
+          if (lockResult.isLocked) {
             const sol = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "Bilinmiyor";
             sendTelegramNotification(
               `🔒 <b>KİLİTLİ LP!</b>\n\n` +
@@ -362,7 +361,6 @@ export class HeliusMonitor {
               `🔍 <a href="https://dexscreener.com/solana/${mintAddress}">Dexscreener</a> | ` +
               `🪐 <a href="https://jup.ag/swap/SOL-${mintAddress}">Jupiter</a>`
             );
-          } else {
           }
         } catch (err) {
           console.error("❌ LP veri hatası:", err);
