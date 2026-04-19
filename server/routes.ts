@@ -2,6 +2,26 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { HeliusMonitor } from "./helius-monitor";
+import fs from "fs";
+import path from "path";
+
+const ROOT = process.cwd();
+
+const ALLOWED_FILES = [
+  "server/helius-monitor.ts",
+  "server/routes.ts",
+  "server/index.ts",
+  "server/storage.ts",
+  "shared/schema.ts",
+];
+
+function safeResolvePath(filePath: string): string | null {
+  const resolved = path.resolve(ROOT, filePath);
+  if (!resolved.startsWith(ROOT)) return null;
+  const rel = path.relative(ROOT, resolved).replace(/\\/g, "/");
+  if (!ALLOWED_FILES.includes(rel)) return null;
+  return resolved;
+}
 
 
 // ---- Console log yakalayıcı ----
@@ -56,16 +76,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
-  // SOL/USD fiyatı — sunucu tarafında Binance'den çeker (CORS yok)
-  app.get("/api/sol-price", async (_req, res) => {
+  // ---- Dosya Editörü API ----
+  app.get("/api/files/list", (_req, res) => {
+    res.json({ files: ALLOWED_FILES });
+  });
+
+  app.get("/api/files/read", (req, res) => {
+    const filePath = req.query.path as string;
+    if (!filePath) return res.status(400).json({ error: "path gerekli" });
+    const resolved = safeResolvePath(filePath);
+    if (!resolved) return res.status(403).json({ error: "İzin verilmeyen dosya" });
     try {
-      const r = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT");
-      const json = await r.json() as { price?: string };
-      res.json({ price: json.price ? Number(json.price) : null });
+      const content = fs.readFileSync(resolved, "utf-8");
+      res.json({ content });
     } catch {
-      res.status(502).json({ price: null });
+      res.status(404).json({ error: "Dosya bulunamadı" });
     }
   });
+
+  app.post("/api/files/write", (req, res) => {
+    const { path: filePath, content } = req.body as { path: string; content: string };
+    if (!filePath || content === undefined) return res.status(400).json({ error: "path ve content gerekli" });
+    const resolved = safeResolvePath(filePath);
+    if (!resolved) return res.status(403).json({ error: "İzin verilmeyen dosya" });
+    try {
+      fs.writeFileSync(resolved, content, "utf-8");
+      _origLog(`📝 Dosya güncellendi: ${filePath}`);
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  // --------------------------
 
   const monitor = new HeliusMonitor((event: string, data: any) => {
     if (event === "mint_detected") {
