@@ -84,7 +84,7 @@ export function LPLogTable({ logs, filter = "all", solPrice, emptyMessage }: LPL
                   <Badge className="gap-1 bg-chart-4/15 text-chart-4 border border-chart-4/30 text-xs" data-testid="badge-lp-liquidity">
                     <Droplet className="h-3 w-3" />
                     {solPrice != null
-                      ? `$${(log.liquidityAmount * solPrice).toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+                      ? `$${(2 * log.liquidityAmount * solPrice).toLocaleString("en-US", { maximumFractionDigits: 0 })}`
                       : `${log.liquidityAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL`
                     }
                   </Badge>
