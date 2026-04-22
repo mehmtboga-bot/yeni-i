@@ -47,9 +47,9 @@ const METEORA_DLMM    = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo";
 const METEORA_DYNAMIC = "Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EkAW7vA"; // DY2
 
 // WS-2'nin dinleyeceği DEX programları
+// Pump.fun burada YOK: graduation'lar zaten PumpSwap üzerinden yakalanıyor
 const DEX_PROGRAMS: Record<string, string> = {
   [PUMPSWAP]:        "PumpSwap",
-  [PUMPFUN]:         "Pump.fun",
   [RAYDIUM_AMM]:     "Raydium AMM",
   [RAYDIUM_CLMM]:    "Raydium CLMM",
   [METEORA_DLMM]:    "Meteora DLMM",
@@ -74,28 +74,48 @@ const WSOL         = "So11111111111111111111111111111111111111112";
 const MAX_AGE_MS = 120000;
 const MAX_TRACKED = 7;
 
-// Pool OLUŞTURMA keyword'leri — swap keyword'leri dahil değil
-// "Instruction: Create" ve "Instruction: Initialize" gibi genel olanlar çıkarıldı
-// çünkü bunlar swap işlemlerinde de geçiyor ve spam'e neden oluyor
-const LP_KEYWORDS = [
-  "initialize_pool",
-  "InitializePool",
-  "initializePool",
-  "init_pool",
-  "CreatePool",
-  "create_pool",
-  "create_pool_account",
-  "initialize_pool_account",
-  "pool_initialize",
-  "PoolInit",
-  "InitPool",
-  "initialize market",
-  "create market",
-  "InitializeStateV2",
-  "Instruction: InitializePool",
-  "Instruction: CreatePool",
-  "Instruction: InitializeLiquidity",
-];
+// Telegram bildirimi için minimum LP likidite eşiği (USD)
+const MIN_LIQUIDITY_USD = 50000;
+
+// SOL/USD fiyatı — 60 sn cache (CoinGecko)
+let cachedSolPrice = 0;
+let cachedSolPriceAt = 0;
+async function getSolPriceUsd(): Promise<number> {
+  if (cachedSolPrice && Date.now() - cachedSolPriceAt < 60_000) return cachedSolPrice;
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+    const data = await res.json();
+    const price = data?.solana?.usd;
+    if (typeof price === "number" && price > 0) {
+      cachedSolPrice = price;
+      cachedSolPriceAt = Date.now();
+    }
+  } catch (err) {
+    console.error("❌ SOL fiyat hatası:", err);
+  }
+  return cachedSolPrice;
+}
+
+// liquidityAmount (SOL) → USD değerini hesaplar ve $50K eşiğini geçiyor mu söyler
+async function shouldNotifyTelegram(liquidityAmount: number | undefined): Promise<{ ok: boolean; usd: number }> {
+  if (!liquidityAmount || liquidityAmount <= 0) return { ok: false, usd: 0 };
+  const price = await getSolPriceUsd();
+  const usd = liquidityAmount * price;
+  return { ok: usd >= MIN_LIQUIDITY_USD, usd };
+}
+
+// WS-2: Her DEX programına özel pool OLUŞTURMA keyword'leri
+// Program bağlamına göre filtreleme → swap işlemleri elenir, false positive azalır
+const DEX_LP_KEYWORDS: Record<string, string[]> = {
+  [PUMPSWAP]:        ["Instruction: CreatePool"],
+  [RAYDIUM_AMM]:     ["Instruction: Initialize2"],
+  [RAYDIUM_CLMM]:    ["Instruction: CreatePool"],
+  [METEORA_DLMM]:    ["Instruction: InitializeLbPair", "Instruction: InitializePermissionlessLbPair"],
+  [METEORA_DYNAMIC]: ["Instruction: InitializePermissionlessConstantProductPool", "Instruction: InitializePermissionlessPool"],
+};
+
+// WS-1 per-token izleme için birleşik liste (token mint subscription bağlamında false positive riski düşük)
+const LP_KEYWORDS = [...new Set(Object.values(DEX_LP_KEYWORDS).flat())];
 
 interface TokenMetadata {
   name: string;
@@ -347,20 +367,22 @@ export class HeliusMonitor {
           };
           this.eventEmitter("lp_detected", lpData);
 
-          // Telegram'a sadece kilitli olanları gönder
-          if (lockResult.isLocked) {
-            const sol = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "Bilinmiyor";
-            sendTelegramNotification(
-              `🔒 <b>KİLİTLİ LP!</b>\n\n` +
-              `🏊 <b>Platform:</b> ${platform}\n` +
-              `🪙 <b>Token:</b> ${metadata.name} (${metadata.symbol})\n` +
-              `🏦 <b>Kilit:</b> ${lockResult.lockDuration}\n` +
-              `💧 <b>Likidite:</b> ${sol}\n` +
-              `📋 <b>Mint:</b> <code>${mintAddress}</code>\n` +
-              `🔗 <b>LP Mint:</b> <code>${checkMint}</code>\n\n` +
-              `🔍 <a href="https://dexscreener.com/solana/${mintAddress}">Dexscreener</a> | ` +
-              `🪐 <a href="https://jup.ag/swap/SOL-${mintAddress}">Jupiter</a>`
-            );
+          // Telegram'a sadece likiditesi $50K üstü olanları gönder (kilit durumu önemli değil)
+          {
+            const { ok, usd } = await shouldNotifyTelegram(liquidityAmount);
+            if (ok) {
+              const sol = `${liquidityAmount!.toFixed(4)} SOL (~$${usd.toFixed(0)})`;
+              sendTelegramNotification(
+                `💧 <b>YENİ LP — $50K+</b>\n\n` +
+                `🏊 <b>Platform:</b> ${platform}\n` +
+                `🪙 <b>Token:</b> ${metadata.name} (${metadata.symbol})\n` +
+                `🏦 <b>Kilit:</b> ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}\n` +
+                `💧 <b>Likidite:</b> ${sol}\n` +
+                `📋 <b>Mint:</b> <code>${mintAddress}</code>\n` +
+                `🔗 <b>LP Mint:</b> <code>${checkMint}</code>\n\n` +
+                `🔍 <a href="https://dexscreener.com/solana/${mintAddress}">Dexscreener</a>`
+              );
+            }
           }
         } catch (err) {
           console.error("❌ LP veri hatası:", err);
@@ -410,7 +432,13 @@ export class HeliusMonitor {
         if (!logs || !signature) return;
         if (this.processedDexSignatures.has(signature)) return;
 
-        const isLPEvent = logs.some((log) => LP_KEYWORDS.some((kw) => log.includes(kw)));
+        // Önce hangi DEX programı olduğunu tespit et
+        const programId = this.detectProgramIdFromLogs(logs);
+        if (!programId) return;
+
+        // O programa özgü keyword listesiyle LP oluşturma olayı mı kontrol et
+        const dexKeywords = DEX_LP_KEYWORDS[programId] || [];
+        const isLPEvent = logs.some((log) => dexKeywords.some((kw) => log.includes(kw)));
         if (!isLPEvent) return;
 
         this.processedDexSignatures.add(signature);
@@ -419,7 +447,7 @@ export class HeliusMonitor {
           if (first) this.processedDexSignatures.delete(first);
         }
 
-        const platform = this.detectPlatformFromLogs(logs);
+        const platform = DEX_PROGRAMS[programId] || "Bilinmeyen DEX";
         await this.handleDexLP(signature, platform);
       } catch (err) {
         console.error("❌ [WS-2] Mesaj hatası:", err);
@@ -492,24 +520,40 @@ export class HeliusMonitor {
 
       this.eventEmitter("lp_detected", lpData);
 
-      // Telegram'a sadece kilitli olanları bildir
-      if (lockResult.isLocked) {
-        sendTelegramNotification(
-          `🔒 <b>KİLİTLİ LP TESPİT EDİLDİ!</b>\n\n` +
-          `🏊 <b>Platform:</b> ${platform}\n` +
-          `🪙 <b>Token:</b> ${name} (${symbol})\n` +
-          `🏦 <b>Kilit Türü:</b> ${lockResult.lockDuration}\n` +
-          `💧 <b>Likidite:</b> ${sol}\n` +
-          `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
-          `🔗 <b>LP Mint:</b> <code>${lpMint ?? "Yok (CLMM/DLMM)"}</code>\n\n` +
-          `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a> | ` +
-          `🪐 <a href="https://jup.ag/swap/SOL-${tokenMint}">Jupiter</a>` +
-          (platform === "PumpSwap" ? ` | 🌊 <a href="https://pump.fun/${tokenMint}">Pump.fun</a>` : "")
-        );
+      // Telegram'a sadece likiditesi $50K üstü olanları bildir (kilit durumu önemli değil)
+      {
+        const { ok, usd } = await shouldNotifyTelegram(liquidityAmount);
+        if (ok) {
+          const solUsd = `${liquidityAmount!.toFixed(4)} SOL (~$${usd.toFixed(0)})`;
+          sendTelegramNotification(
+            `💧 <b>YENİ LP TESPİT EDİLDİ — $50K+</b>\n\n` +
+            `🏊 <b>Platform:</b> ${platform}\n` +
+            `🪙 <b>Token:</b> ${name} (${symbol})\n` +
+            `🏦 <b>Kilit:</b> ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}\n` +
+            `💧 <b>Likidite:</b> ${solUsd}\n` +
+            `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
+            `🔗 <b>LP Mint:</b> <code>${lpMint ?? "Yok (CLMM/DLMM)"}</code>\n\n` +
+            `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a>` +
+            (platform === "PumpSwap" ? ` | 🌊 <a href="https://pump.fun/${tokenMint}">Pump.fun</a>` : "")
+          );
+        }
       }
     } catch (err) {
       console.error("❌ [WS-2] DEX LP hatası:", err);
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Yardımcı: Log'lardan hangi DEX program ID'si geçtiğini döndür
+  // WS-2 handler'da per-DEX keyword eşleşmesi için kullanılır
+  // ═══════════════════════════════════════════════════════════════════════════
+  private detectProgramIdFromLogs(logs: string[]): string | null {
+    for (const log of logs) {
+      for (const programId of Object.keys(DEX_PROGRAMS)) {
+        if (log.includes(programId)) return programId;
+      }
+    }
+    return null;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -584,8 +628,7 @@ export class HeliusMonitor {
         : (newMints.length > 1 ? newMints[1].mint : lpMint);
 
       // ── Likidite: TX'teki net WSOL girişi = pool'a yatırılan SOL ─────────────
-      // Bu değer ekstra RPC çağrısı gerektirmez ve LP oluşturma anındaki
-      // gerçek SOL miktarıdır. Pool hesabında artan WSOL = kullanıcının yatırdığı SOL.
+      // Önce WSOL token hesaplarındaki net artışa bak (PumpSwap, bazı Meteora havuzları)
       let liquidityAmount: number | undefined;
       let totalWsolIn = BigInt(0);
       for (const wp of post.filter((p: any) => p.mint === WSOL)) {
@@ -597,6 +640,22 @@ export class HeliusMonitor {
       }
       if (totalWsolIn > BigInt(0)) {
         liquidityAmount = Number(totalWsolIn) / 1e9;
+      }
+
+      // Fallback: native SOL bakiye değişimleri (Raydium AMM, Meteora DLMM/DY2)
+      // WSOL vault yerine native SOL kullanan havuzlar için bu gerekli
+      if (!liquidityAmount) {
+        const preBalances: number[] = meta.preBalances || [];
+        const postBalances: number[] = meta.postBalances || [];
+        let maxNativeSolIn = 0;
+        for (let i = 0; i < postBalances.length; i++) {
+          const diff = (postBalances[i] || 0) - (preBalances[i] || 0);
+          // Sadece 0.01 SOL üzerindeki artışlar (fee/rent hesapları elensin)
+          if (diff > 10_000_000) {
+            maxNativeSolIn = Math.max(maxNativeSolIn, diff);
+          }
+        }
+        if (maxNativeSolIn > 0) liquidityAmount = maxNativeSolIn / 1e9;
       }
 
       return { tokenMint, lpMint, liquidityAmount };
@@ -659,7 +718,7 @@ export class HeliusMonitor {
         }
       }
 
-      // TX'teki net WSOL girişi = pool'a yatırılan gerçek SOL miktarı
+      // Önce WSOL token hesaplarındaki net artışa bak
       let totalWsolIn = BigInt(0);
       for (const wp of post.filter((p: any) => p.mint === WSOL)) {
         const prevEntry = pre.find((x: any) => x.accountIndex === wp.accountIndex);
@@ -668,7 +727,22 @@ export class HeliusMonitor {
         const net = postAmt - preAmt;
         if (net > BigInt(0)) totalWsolIn += net;
       }
-      const liquidityAmount = totalWsolIn > BigInt(0) ? Number(totalWsolIn) / 1e9 : undefined;
+      let liquidityAmount: number | undefined =
+        totalWsolIn > BigInt(0) ? Number(totalWsolIn) / 1e9 : undefined;
+
+      // Fallback: native SOL bakiye değişimleri (Raydium AMM, Meteora DLMM/DY2)
+      if (!liquidityAmount) {
+        const preBalances: number[] = meta.preBalances || [];
+        const postBalances: number[] = meta.postBalances || [];
+        let maxNativeSolIn = 0;
+        for (let i = 0; i < postBalances.length; i++) {
+          const diff = (postBalances[i] || 0) - (preBalances[i] || 0);
+          if (diff > 10_000_000) {
+            maxNativeSolIn = Math.max(maxNativeSolIn, diff);
+          }
+        }
+        if (maxNativeSolIn > 0) liquidityAmount = maxNativeSolIn / 1e9;
+      }
 
       return { lpMint, liquidityAmount };
     } catch (err) {
@@ -723,6 +797,7 @@ export class HeliusMonitor {
         return { isLocked: false, lockDuration: "Kilitsiz" };
       }
 
+      // Tüm holder bilgileri paralel çekilir
       const holderInfos = await Promise.all(
         holders.map((h: any) =>
           fetch(HTTP_URL, {
@@ -737,8 +812,22 @@ export class HeliusMonitor {
         )
       );
 
-      for (const info of holderInfos) {
+      // Owner'lar çıkarılır; parent program sorguları da paralel yapılır
+      const ownerList = holderInfos.map((info) => {
         const owner: string | undefined = info.result?.value?.data?.parsed?.info?.owner;
+        return owner ?? null;
+      });
+
+      const parentPrograms = await Promise.all(
+        ownerList.map((owner) =>
+          owner && owner !== BURN_ADDRESS && !LOCKER_MAP[owner]
+            ? this.getAccountOwner(owner)
+            : Promise.resolve(null)
+        )
+      );
+
+      for (let i = 0; i < ownerList.length; i++) {
+        const owner = ownerList[i];
         if (!owner) continue;
 
         if (owner === BURN_ADDRESS) {
@@ -748,8 +837,7 @@ export class HeliusMonitor {
           return { isLocked: true, lockDuration: `🔒 ${LOCKER_MAP[owner]}` };
         }
 
-        // Owner'ın parent programı locker mı?
-        const parentProgram = await this.getAccountOwner(owner);
+        const parentProgram = parentPrograms[i];
         if (parentProgram && LOCKER_MAP[parentProgram]) {
           return { isLocked: true, lockDuration: `🔒 ${LOCKER_MAP[parentProgram]}` };
         }
@@ -1011,17 +1099,21 @@ export class HeliusMonitor {
         dexscreenerUrl: `https://dexscreener.com/solana/${tokenMint}`,
       });
 
-      const sol = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "Bilinmiyor";
-      sendTelegramNotification(
-        `🔒 <b>LP KİLİTLENDİ!</b>\n\n` +
-        `🏦 <b>Locker:</b> ${lockerName}\n` +
-        `🪙 <b>Token:</b> ${name} (${symbol})\n` +
-        `💧 <b>Likidite:</b> ${sol}\n` +
-        `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
-        `🔗 <b>LP Mint:</b> <code>${lockedMint}</code>\n\n` +
-        `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a> | ` +
-        `🪐 <a href="https://jup.ag/swap/SOL-${tokenMint}">Jupiter</a>`
-      );
+      // Telegram'a sadece likiditesi $50K üstü olanları bildir
+      const { ok, usd } = await shouldNotifyTelegram(liquidityAmount);
+      if (ok) {
+        const sol = `${liquidityAmount!.toFixed(4)} SOL (~$${usd.toFixed(0)})`;
+        sendTelegramNotification(
+          `🔒 <b>LP KİLİTLENDİ!</b>\n\n` +
+          `🏦 <b>Locker:</b> ${lockerName}\n` +
+          `🪙 <b>Token:</b> ${name} (${symbol})\n` +
+          `💧 <b>Likidite:</b> ${sol}\n` +
+          `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
+          `🔗 <b>LP Mint:</b> <code>${lockedMint}</code>\n\n` +
+          `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a> | ` +
+          `🪐 <a href="https://jup.ag/swap/SOL-${tokenMint}">Jupiter</a>`
+        );
+      }
     } catch (err) {
       console.error("❌ [WS-3] Locker event hatası:", err);
     }
