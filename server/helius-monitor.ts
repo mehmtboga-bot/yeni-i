@@ -74,35 +74,15 @@ const WSOL         = "So11111111111111111111111111111111111111112";
 const MAX_AGE_MS = 120000;
 const MAX_TRACKED = 7;
 
-// Telegram bildirimi için minimum LP likidite eşiği (USD)
-const MIN_LIQUIDITY_USD = 50000;
+// Telegram bildirimi için minimum TVL eşiği (USD)
+// TVL = 2 × SOL × fiyat (havuzun toplam değeri)
+const MIN_TVL_USD_NOTIFY = 40000;
 
-// SOL/USD fiyatı — 60 sn cache (CoinGecko)
-let cachedSolPrice = 0;
-let cachedSolPriceAt = 0;
-async function getSolPriceUsd(): Promise<number> {
-  if (cachedSolPrice && Date.now() - cachedSolPriceAt < 60_000) return cachedSolPrice;
-  try {
-    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
-    const data = await res.json();
-    const price = data?.solana?.usd;
-    if (typeof price === "number" && price > 0) {
-      cachedSolPrice = price;
-      cachedSolPriceAt = Date.now();
-    }
-  } catch (err) {
-    console.error("❌ SOL fiyat hatası:", err);
-  }
-  return cachedSolPrice;
-}
-
-// liquidityAmount (SOL) → USD değerini hesaplar ve $50K eşiğini geçiyor mu söyler
-async function shouldNotifyTelegram(liquidityAmount: number | undefined): Promise<{ ok: boolean; usd: number }> {
-  if (!liquidityAmount || liquidityAmount <= 0) return { ok: false, usd: 0 };
-  const price = await getSolPriceUsd();
-  const usd = liquidityAmount * price;
-  return { ok: usd >= MIN_LIQUIDITY_USD, usd };
-}
+// Trojan Solana Bot deeplink üreticisi (tıklayınca Trojan'da o token açılır)
+// Format: r-REFKODU-MINT  → hem token sayfası açılır hem referans kazandırır
+const TROJAN_BOT = "solana_trojanbot";
+const TROJAN_REF = "mehmtbga";
+const trojanUrl = (mint: string) => `https://t.me/${TROJAN_BOT}?start=r-${TROJAN_REF}-${mint}`;
 
 // WS-2: Her DEX programına özel pool OLUŞTURMA keyword'leri
 // Program bağlamına göre filtreleme → swap işlemleri elenir, false positive azalır
@@ -154,6 +134,9 @@ export class HeliusMonitor {
   private eventEmitter: (event: string, data: any) => void;
   private isRunning = false;
 
+  // Bot açılışında bir kere çekilen SOL/USD fiyatı — tüm USD/TVL hesapları bunu kullanır
+  private solPriceUsd: number = 0;
+
   constructor(eventEmitter: (event: string, data: any) => void) {
     this.eventEmitter = eventEmitter;
   }
@@ -163,10 +146,63 @@ export class HeliusMonitor {
     this.isRunning = true;
     console.log("🚀 Helius Monitor başlatılıyor (Üçlü WebSocket)...");
     this.eventEmitter("monitoring_state", { isMonitoring: true });
+
+    // SOL fiyatını sadece bir kez çek; pipeline boyunca aynı değer kullanılacak
+    await this.fetchSolPriceOnce();
+
     this.connectMain();
     this.connectDex();
     this.connectLocker();
     this.startHeartbeat();
+  }
+
+  // Bot başlatılırken bir kere SOL/USD fiyatını çek
+  // Başarısız olursa fallback olarak $87 kullan → USD/TVL alanları HER ZAMAN dolu döner
+  private async fetchSolPriceOnce(): Promise<void> {
+    const FALLBACK_SOL_PRICE = 87;
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+
+    // 1. Jupiter Lite API (yeni, public endpoint)
+    try {
+      const res = await fetch(`https://lite-api.jup.ag/price/v3?ids=${SOL_MINT}`);
+      const data = await res.json();
+      const price = data?.[SOL_MINT]?.usdPrice;
+      if (typeof price === "number" && price > 0) {
+        this.solPriceUsd = price;
+        console.log(`💵 SOL/USD fiyatı alındı (Jupiter): $${price.toFixed(2)} (oturum boyunca sabit)`);
+        return;
+      }
+    } catch (err) {
+      console.warn("⚠️ Jupiter fiyat API'si başarısız, CoinGecko deneniyor...", (err as Error).message);
+    }
+
+    // 2. CoinGecko fallback
+    try {
+      const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+      const data = await res.json();
+      const price = data?.solana?.usd;
+      if (typeof price === "number" && price > 0) {
+        this.solPriceUsd = price;
+        console.log(`💵 SOL/USD fiyatı alındı (CoinGecko): $${price.toFixed(2)} (oturum boyunca sabit)`);
+        return;
+      }
+    } catch (err) {
+      console.error(`❌ CoinGecko da başarısız:`, (err as Error).message);
+    }
+
+    // 3. Sabit fallback
+    this.solPriceUsd = FALLBACK_SOL_PRICE;
+    console.warn(`⚠️ Hiçbir fiyat API'si çalışmadı, sabit $${FALLBACK_SOL_PRICE} kullanılıyor.`);
+  }
+
+  // SOL → USD ve TVL hesabı
+  // SOL = pool'un WSOL tarafı (havuzun yarısı)
+  // USD = SOL × fiyat (bir tarafın dolar değeri)
+  // TVL = 2 × SOL × fiyat = 2 × USD (havuzun toplam değeri = iki taraf)
+  private toUsd(sol: number | undefined): { usd?: number; tvlUsd?: number } {
+    if (!sol || !this.solPriceUsd) return {};
+    const usd = sol * this.solPriceUsd;
+    return { usd, tvlUsd: usd * 2 };
   }
 
   getState() { return this.isRunning; }
@@ -343,11 +379,25 @@ export class HeliusMonitor {
 
         try {
           const lockResult = await this.checkLiquidityLock(checkMint);
-          const liquidityAmount = txLiquidity;
+          // TX'ten likidite çıkamadıysa pool'un gerçek TVL'sini zincirden çek
+          // (Raydium CLMM / Meteora DLMM gibi pool önce boş kurulan tipler için kritik)
+          let liquidityAmount = txLiquidity;
+          if (!liquidityAmount && lpMint) {
+            const poolLiq = await this.fetchPoolLiquidity(lpMint);
+            if (poolLiq && poolLiq > 0) {
+              liquidityAmount = poolLiq;
+              console.log(`💧 [WS-1] TX'ten likidite çıkmadı, pool'dan alındı: ${poolLiq.toFixed(4)} SOL`);
+            }
+          }
           const platform = this.detectPlatformFromLogs(logs);
 
+          const { usd: liquidityUsd, tvlUsd } = this.toUsd(liquidityAmount);
+
           if (!mintData.lpLogged) {
-            console.log(`${lockResult.isLocked ? "🔒" : "💧"} [WS-1] ${metadata.name} (${metadata.symbol}) | ${platform} | ${liquidityAmount ? liquidityAmount.toFixed(4) + " SOL" : "?"} | ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}`);
+            const solStr = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "?";
+            const usdStr = liquidityUsd ? ` ($${liquidityUsd.toFixed(0)})` : "";
+            const tvlStr = tvlUsd ? ` | TVL ~$${tvlUsd.toFixed(0)}` : "";
+            console.log(`${lockResult.isLocked ? "🔒" : "💧"} [WS-1] ${metadata.name} (${metadata.symbol}) | ${platform} | ${solStr}${usdStr}${tvlStr} | ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}`);
             mintData.lpLogged = true;
           }
 
@@ -361,28 +411,42 @@ export class HeliusMonitor {
             expiresAt: Date.now() + 5 * 60 * 1000,
             isLocked: lockResult.isLocked,
             lockDuration: lockResult.lockDuration,
-            liquidityAmount, platform,
+            liquidityAmount, liquidityUsd, tvlUsd, platform,
             jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
             dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
           };
           this.eventEmitter("lp_detected", lpData);
 
-          // Telegram'a sadece likiditesi $50K üstü olanları gönder (kilit durumu önemli değil)
-          {
-            const { ok, usd } = await shouldNotifyTelegram(liquidityAmount);
-            if (ok) {
-              const sol = `${liquidityAmount!.toFixed(4)} SOL (~$${usd.toFixed(0)})`;
-              sendTelegramNotification(
-                `💧 <b>YENİ LP — $50K+</b>\n\n` +
-                `🏊 <b>Platform:</b> ${platform}\n` +
-                `🪙 <b>Token:</b> ${metadata.name} (${metadata.symbol})\n` +
-                `🏦 <b>Kilit:</b> ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}\n` +
-                `💧 <b>Likidite:</b> ${sol}\n` +
-                `📋 <b>Mint:</b> <code>${mintAddress}</code>\n` +
-                `🔗 <b>LP Mint:</b> <code>${checkMint}</code>\n\n` +
-                `🔍 <a href="https://dexscreener.com/solana/${mintAddress}">Dexscreener</a>`
-              );
-            }
+          // Telegram'a gönderim:
+          //  • Kilitli LP'ler her zaman gönderilir
+          //  • Kilitsiz olsa bile TVL ≥ $40.000 ise gönderilir
+          //  TVL = 2 × SOL × fiyat (havuzun toplam değeri)
+          const meetsUsdThreshold = (tvlUsd ?? 0) >= MIN_TVL_USD_NOTIFY;
+          if (!lockResult.isLocked && !meetsUsdThreshold) {
+            console.log(`🚫 [WS-1] Telegram atlandı | ${metadata.symbol} | likidite=${liquidityAmount?.toFixed(4) ?? "yok"} SOL | USD(tek taraf)=$${liquidityUsd?.toFixed(0) ?? "?"} | TVL=$${tvlUsd?.toFixed(0) ?? "?"} | eşik=$${MIN_TVL_USD_NOTIFY}`);
+          }
+          if (lockResult.isLocked || meetsUsdThreshold) {
+            const sol = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "Bilinmiyor";
+            const usdLine = liquidityUsd ? `\n💵 <b>USD:</b> $${liquidityUsd.toFixed(2)}` : "";
+            const tvlLine = tvlUsd ? `\n📊 <b>TVL (~×2):</b> $${tvlUsd.toFixed(2)}` : "";
+            const header = lockResult.isLocked
+              ? `🔒 <b>KİLİTLİ LP!</b>`
+              : `💰 <b>YÜKSEK LİKİDİTE LP! TVL: $${(tvlUsd ?? 0).toFixed(0)}</b>`;
+            const lockLine = lockResult.isLocked
+              ? `\n🏦 <b>Kilit:</b> ${lockResult.lockDuration}`
+              : `\n🔓 <b>Kilit:</b> Yok (eşik üstü)`;
+            sendTelegramNotification(
+              `${header}\n\n` +
+              `🏊 <b>Platform:</b> ${platform}\n` +
+              `🪙 <b>Token:</b> ${metadata.name} (${metadata.symbol})` +
+              `${lockLine}\n` +
+              `💧 <b>Likidite:</b> ${sol}${usdLine}${tvlLine}\n` +
+              `📋 <b>Mint:</b> <code>${mintAddress}</code>\n` +
+              `🔗 <b>LP Mint:</b> <code>${checkMint}</code>\n\n` +
+              `🔍 <a href="https://dexscreener.com/solana/${mintAddress}">Dexscreener</a> | ` +
+              `🪐 <a href="https://jup.ag/swap/SOL-${mintAddress}">Jupiter</a> | ` +
+              `🤖 <a href="${trojanUrl(mintAddress)}">Trojan ile Aç</a>`
+            );
           }
         } catch (err) {
           console.error("❌ LP veri hatası:", err);
@@ -492,7 +556,16 @@ export class HeliusMonitor {
       ]);
 
       // TX'ten alınan likidite değeri (sıfır gecikme, doğru değer)
-      const liquidityAmount = txLiquidity;
+      // TX'ten çıkmadıysa pool'un gerçek TVL'sini zincirden çek
+      // (Raydium CLMM / Meteora DLMM / PumpSwap graduation için kritik)
+      let liquidityAmount = txLiquidity;
+      if (!liquidityAmount && lpMint) {
+        const poolLiq = await this.fetchPoolLiquidity(lpMint);
+        if (poolLiq && poolLiq > 0) {
+          liquidityAmount = poolLiq;
+          console.log(`💧 [WS-2] TX'ten likidite çıkmadı, pool'dan alındı: ${poolLiq.toFixed(4)} SOL`);
+        }
+      }
 
       // Metadata gelmese bile eventi yayınla — isim "Bilinmiyor" olarak gösterilir
       const name = metadata?.name || "Bilinmiyor";
@@ -500,8 +573,11 @@ export class HeliusMonitor {
       const detectedAt = Date.now();
       const expiresAt = detectedAt + 5 * 60 * 1000;
 
+      const { usd: liquidityUsd, tvlUsd } = this.toUsd(liquidityAmount);
       const sol = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "?";
-      console.log(`${lockResult.isLocked ? "🔒" : "💧"} [WS-2] ${name} (${symbol}) | ${platform} | ${sol} | ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}`);
+      const usdStr = liquidityUsd ? ` ($${liquidityUsd.toFixed(0)})` : "";
+      const tvlStr = tvlUsd ? ` | TVL ~$${tvlUsd.toFixed(0)}` : "";
+      console.log(`${lockResult.isLocked ? "🔒" : "💧"} [WS-2] ${name} (${symbol}) | ${platform} | ${sol}${usdStr}${tvlStr} | ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}`);
 
       // Tüm LP'leri arayüze ilet (kilitli ve kilitsiz)
       const lpData = {
@@ -512,7 +588,7 @@ export class HeliusMonitor {
         detectedAt, expiresAt,
         isLocked: lockResult.isLocked,
         lockDuration: lockResult.lockDuration,
-        liquidityAmount, platform,
+        liquidityAmount, liquidityUsd, tvlUsd, platform,
         jupiterUrl: `https://jup.ag/swap/SOL-${tokenMint}`,
         dexscreenerUrl: `https://dexscreener.com/solana/${tokenMint}`,
         pumpfunUrl: platform === "PumpSwap" ? `https://pump.fun/${tokenMint}` : undefined,
@@ -520,23 +596,36 @@ export class HeliusMonitor {
 
       this.eventEmitter("lp_detected", lpData);
 
-      // Telegram'a sadece likiditesi $50K üstü olanları bildir (kilit durumu önemli değil)
-      {
-        const { ok, usd } = await shouldNotifyTelegram(liquidityAmount);
-        if (ok) {
-          const solUsd = `${liquidityAmount!.toFixed(4)} SOL (~$${usd.toFixed(0)})`;
-          sendTelegramNotification(
-            `💧 <b>YENİ LP TESPİT EDİLDİ — $50K+</b>\n\n` +
-            `🏊 <b>Platform:</b> ${platform}\n` +
-            `🪙 <b>Token:</b> ${name} (${symbol})\n` +
-            `🏦 <b>Kilit:</b> ${lockResult.isLocked ? lockResult.lockDuration : "Kilitsiz"}\n` +
-            `💧 <b>Likidite:</b> ${solUsd}\n` +
-            `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
-            `🔗 <b>LP Mint:</b> <code>${lpMint ?? "Yok (CLMM/DLMM)"}</code>\n\n` +
-            `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a>` +
-            (platform === "PumpSwap" ? ` | 🌊 <a href="https://pump.fun/${tokenMint}">Pump.fun</a>` : "")
-          );
-        }
+      // Telegram'a gönderim:
+      //  • Kilitli LP'ler her zaman gönderilir
+      //  • Kilitsiz olsa bile TVL ≥ $40.000 ise gönderilir
+      //  TVL = 2 × SOL × fiyat (havuzun toplam değeri)
+      const meetsUsdThreshold = (tvlUsd ?? 0) >= MIN_TVL_USD_NOTIFY;
+      if (!lockResult.isLocked && !meetsUsdThreshold) {
+        console.log(`🚫 [WS-2] Telegram atlandı | ${symbol} | ${platform} | likidite=${liquidityAmount?.toFixed(4) ?? "yok"} SOL | USD(tek taraf)=$${liquidityUsd?.toFixed(0) ?? "?"} | TVL=$${tvlUsd?.toFixed(0) ?? "?"} | eşik=$${MIN_TVL_USD_NOTIFY}`);
+      }
+      if (lockResult.isLocked || meetsUsdThreshold) {
+        const usdLine = liquidityUsd ? `\n💵 <b>USD:</b> $${liquidityUsd.toFixed(2)}` : "";
+        const tvlLine = tvlUsd ? `\n📊 <b>TVL (~×2):</b> $${tvlUsd.toFixed(2)}` : "";
+        const header = lockResult.isLocked
+          ? `🔒 <b>KİLİTLİ LP TESPİT EDİLDİ!</b>`
+          : `💰 <b>YÜKSEK LİKİDİTE LP! TVL: $${(tvlUsd ?? 0).toFixed(0)}</b>`;
+        const lockLine = lockResult.isLocked
+          ? `\n🏦 <b>Kilit Türü:</b> ${lockResult.lockDuration}`
+          : `\n🔓 <b>Kilit:</b> Yok (eşik üstü)`;
+        sendTelegramNotification(
+          `${header}\n\n` +
+          `🏊 <b>Platform:</b> ${platform}\n` +
+          `🪙 <b>Token:</b> ${name} (${symbol})` +
+          `${lockLine}\n` +
+          `💧 <b>Likidite:</b> ${sol}${usdLine}${tvlLine}\n` +
+          `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
+          `🔗 <b>LP Mint:</b> <code>${lpMint ?? "Yok (CLMM/DLMM)"}</code>\n\n` +
+          `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a> | ` +
+          `🪐 <a href="https://jup.ag/swap/SOL-${tokenMint}">Jupiter</a> | ` +
+          `🤖 <a href="${trojanUrl(tokenMint)}">Trojan ile Aç</a>` +
+          (platform === "PumpSwap" ? ` | 🌊 <a href="https://pump.fun/${tokenMint}">Pump.fun</a>` : "")
+        );
       }
     } catch (err) {
       console.error("❌ [WS-2] DEX LP hatası:", err);
@@ -1071,6 +1160,8 @@ export class HeliusMonitor {
         this.fetchPoolLiquidity(lockedMint),
       ]);
 
+      const { usd: liquidityUsd, tvlUsd } = this.toUsd(liquidityAmount);
+
       const lpData = {
         id: `${lockedMint}-${detectedAt}`,
         mintAddress: tokenMint,
@@ -1079,7 +1170,7 @@ export class HeliusMonitor {
         detectedAt, expiresAt,
         isLocked: true,
         lockDuration: `🔒 ${lockerName}`,
-        liquidityAmount,
+        liquidityAmount, liquidityUsd, tvlUsd,
         platform: lockerName,
         jupiterUrl: `https://jup.ag/swap/SOL-${tokenMint}`,
         dexscreenerUrl: `https://dexscreener.com/solana/${tokenMint}`,
@@ -1099,21 +1190,20 @@ export class HeliusMonitor {
         dexscreenerUrl: `https://dexscreener.com/solana/${tokenMint}`,
       });
 
-      // Telegram'a sadece likiditesi $50K üstü olanları bildir
-      const { ok, usd } = await shouldNotifyTelegram(liquidityAmount);
-      if (ok) {
-        const sol = `${liquidityAmount!.toFixed(4)} SOL (~$${usd.toFixed(0)})`;
-        sendTelegramNotification(
-          `🔒 <b>LP KİLİTLENDİ!</b>\n\n` +
-          `🏦 <b>Locker:</b> ${lockerName}\n` +
-          `🪙 <b>Token:</b> ${name} (${symbol})\n` +
-          `💧 <b>Likidite:</b> ${sol}\n` +
-          `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
-          `🔗 <b>LP Mint:</b> <code>${lockedMint}</code>\n\n` +
-          `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a> | ` +
-          `🪐 <a href="https://jup.ag/swap/SOL-${tokenMint}">Jupiter</a>`
-        );
-      }
+      const sol = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "Bilinmiyor";
+      const usdLine = liquidityUsd ? `\n💵 <b>USD:</b> $${liquidityUsd.toFixed(2)}` : "";
+      const tvlLine = tvlUsd ? `\n📊 <b>TVL (~×2):</b> $${tvlUsd.toFixed(2)}` : "";
+      sendTelegramNotification(
+        `🔒 <b>LP KİLİTLENDİ!</b>\n\n` +
+        `🏦 <b>Locker:</b> ${lockerName}\n` +
+        `🪙 <b>Token:</b> ${name} (${symbol})\n` +
+        `💧 <b>Likidite:</b> ${sol}${usdLine}${tvlLine}\n` +
+        `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
+        `🔗 <b>LP Mint:</b> <code>${lockedMint}</code>\n\n` +
+        `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a> | ` +
+        `🪐 <a href="https://jup.ag/swap/SOL-${tokenMint}">Jupiter</a> | ` +
+        `🤖 <a href="${trojanUrl(tokenMint)}">Trojan ile Aç</a>`
+      );
     } catch (err) {
       console.error("❌ [WS-3] Locker event hatası:", err);
     }
