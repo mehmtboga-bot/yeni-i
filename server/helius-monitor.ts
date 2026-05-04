@@ -1,7 +1,8 @@
 import WebSocket from "ws";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const WS_URL = `wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+const WS_URL = `wss://mainnet.helius-
+rpc.com/?api-key=${HELIUS_API_KEY}`;
 const HTTP_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
