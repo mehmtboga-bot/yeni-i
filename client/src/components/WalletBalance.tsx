@@ -43,6 +43,16 @@ export function WalletBalance({ onGetBalance, balance, lastPublicKey, setWalletB
     }
   }, [balance, lastPublicKey]);
 
+  // Watchdog: cevap 12 sn içinde gelmezse yükleme durumunu temizle
+  useEffect(() => {
+    if (!loading) return;
+    const watchdog = setTimeout(() => {
+      console.warn("⏱️ Bakiye sorgusu zaman aşımı, yükleme durumu temizleniyor");
+      setLoading(false);
+    }, 12000);
+    return () => clearTimeout(watchdog);
+  }, [loading]);
+
   // Otomatik güncelleme için interval
   useEffect(() => {
     if (!address.trim() || loading) return;

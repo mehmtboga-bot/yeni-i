@@ -1,6 +1,21 @@
-# Solana Token Monitor
+# Solana Token Monitor + Otomatik Trader
 
-Solana blockchain üzerinde gerçek zamanlı token mint ve likidite pool (LP) tespiti yapan web uygulaması.
+Solana blockchain üzerinde gerçek zamanlı token mint ve likidite pool (LP) tespiti yapan ve Jupiter v6 üzerinden otomatik alım/satım yapabilen web uygulaması.
+
+## Otomatik Trading (Trade sekmesi)
+
+- Üst menüde **+** ikonlu **Trade** sekmesi (Dashboard'ın yanında).
+- Her tokenin yanında **Al** butonu (Mintlenen Tokenler kartlarında ve LP listesinde).
+- Trade panelinde her açık pozisyon için **Sat** butonu, alış fiyatı, alış miktarı ve durum.
+- Cüzdan: `TRADER_PRIVATE_KEY` secret'ından bs58 olarak yüklenir.
+- Konfigürasyon: işlem başına SOL miktarı, slippage (bps), priority fee (µLamports). `data/trades.json` içinde kalıcı.
+- Pozisyonlar yeniden başlatmalar arasında korunur (`data/trades.json`).
+- Jupiter v6: taze quote, yüksek slippage (varsayılan %50), `skipPreflight=true`, `veryHigh` priority, dinamik compute units.
+
+### Trade için ek environment variables
+```
+TRADER_PRIVATE_KEY=base58_encoded_private_key
+```
 
 ## Özellikler
 

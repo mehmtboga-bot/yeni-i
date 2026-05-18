@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check, Lock, Unlock, Droplet } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock, Unlock, Droplet, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CountdownTimer } from "./CountdownTimer";
@@ -10,9 +10,20 @@ interface LPLogTableProps {
   filter?: "all" | "locked";
   solPrice?: number;
   emptyMessage?: string;
+  traderReady?: boolean;
+  activeBuyMints?: Set<string>;
+  onBuy?: (mintAddress: string, name: string, symbol: string) => void;
 }
 
-export function LPLogTable({ logs, filter = "all", solPrice, emptyMessage }: LPLogTableProps) {
+export function LPLogTable({
+  logs,
+  filter = "all",
+  solPrice,
+  emptyMessage,
+  traderReady = false,
+  activeBuyMints,
+  onBuy,
+}: LPLogTableProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copyAddress = async (address: string, id: string) => {
@@ -147,7 +158,21 @@ export function LPLogTable({ logs, filter = "all", solPrice, emptyMessage }: LPL
               </div>
             </div>
 
-            <div className="shrink-0">
+            <div className="shrink-0 flex items-center gap-2">
+              {onBuy && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-7 px-2.5 text-xs"
+                  disabled={!traderReady || activeBuyMints?.has(log.mintAddress)}
+                  onClick={() => onBuy(log.mintAddress, log.name, log.symbol)}
+                  data-testid={`button-lp-buy-${log.id}`}
+                  title={!traderReady ? "Trader cüzdanı tanımlı değil" : activeBuyMints?.has(log.mintAddress) ? "Bu token zaten portföyde" : "Otomatik alım yap"}
+                >
+                  <Zap className="h-3 w-3 mr-1" />
+                  {activeBuyMints?.has(log.mintAddress) ? "Var" : "Al"}
+                </Button>
+              )}
               <CountdownTimer detectedAt={log.detectedAt} />
             </div>
           </div>
