@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check, Lock, Unlock, Droplet } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock, Unlock, Droplet, Zap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,9 +9,18 @@ import type { MintedToken } from "@shared/schema";
 interface MintedTokenCardProps {
   token: MintedToken;
   isNew?: boolean;
+  traderReady?: boolean;
+  hasOpenPosition?: boolean;
+  onBuy?: (mintAddress: string, name: string, symbol: string) => void;
 }
 
-export function MintedTokenCard({ token, isNew = false }: MintedTokenCardProps) {
+export function MintedTokenCard({
+  token,
+  isNew = false,
+  traderReady = false,
+  hasOpenPosition = false,
+  onBuy,
+}: MintedTokenCardProps) {
   const [copied, setCopied] = useState(false);
 
   const copyAddress = async () => {
@@ -93,23 +102,25 @@ export function MintedTokenCard({ token, isNew = false }: MintedTokenCardProps) 
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {onBuy && (
+            <Button
+              size="sm"
+              variant="default"
+              disabled={!traderReady || hasOpenPosition}
+              onClick={() => onBuy(token.mintAddress, token.name, token.symbol)}
+              className="flex-1 min-w-[80px]"
+              data-testid="button-buy-token"
+              title={!traderReady ? "Trader cüzdanı tanımlı değil" : hasOpenPosition ? "Bu token zaten portföyde" : "Otomatik alım yap"}
+            >
+              <Zap className="h-3.5 w-3.5 mr-1.5" />
+              {hasOpenPosition ? "Portföyde" : "Al"}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
             asChild
-            className="flex-1 min-w-[90px]"
-            data-testid="button-raydium"
-          >
-            <a href={raydiumUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-              Raydium
-            </a>
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            asChild
-            className="flex-1 min-w-[90px]"
+            className="flex-1 min-w-[80px]"
             data-testid="button-jupiter"
           >
             <a href={jupiterUrl} target="_blank" rel="noopener noreferrer">
@@ -121,12 +132,12 @@ export function MintedTokenCard({ token, isNew = false }: MintedTokenCardProps) 
             size="sm"
             variant="outline"
             asChild
-            className="flex-1 min-w-[90px]"
+            className="flex-1 min-w-[80px]"
             data-testid="button-dexscreener"
           >
             <a href={dexscreenerUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-              Dexscreener
+              Dex
             </a>
           </Button>
         </div>
