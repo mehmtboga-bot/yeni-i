@@ -1,279 +1,261 @@
 {
-  "lastId": 209,
+  "lastId": 255,
   "events": [
     {
-      "id": 190,
+      "id": 236,
       "type": "lp_detected",
       "data": {
-        "id": "HNA7Xv1cgyos49B1nJFKMYWQiR9b5v42AkxUEzBNbWy5-1779213898275",
-        "mintAddress": "HNA7Xv1cgyos49B1nJFKMYWQiR9b5v42AkxUEzBNbWy5",
-        "lpMint": "bcciLT7BMMH3XjK5Xf7fJDkVZaZ8EnPZmWoHquXZbgt",
-        "name": "Tether",
-        "symbol": "USDT",
-        "detectedAt": 1779213898275,
-        "expiresAt": 1779214198275,
+        "id": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m-1779214678261",
+        "mintAddress": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
+        "lpMint": "22ti4844J6FcKbTMpCZTkfHy4ZMsTX2QVrEq6YREDguP",
+        "name": "United Global Oil Supply",
+        "symbol": "UGOS",
+        "detectedAt": 1779214678261,
+        "expiresAt": 1779214978261,
+        "liquidityAmount": 200,
+        "liquidityUsd": 16907.58072050927,
+        "tvlUsd": 33815.16144101854,
         "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-HNA7Xv1cgyos49B1nJFKMYWQiR9b5v42AkxUEzBNbWy5",
-        "dexscreenerUrl": "https://dexscreener.com/solana/HNA7Xv1cgyos49B1nJFKMYWQiR9b5v42AkxUEzBNbWy5",
-        "pumpfunUrl": "https://pump.fun/HNA7Xv1cgyos49B1nJFKMYWQiR9b5v42AkxUEzBNbWy5"
+        "jupiterUrl": "https://jup.ag/swap/SOL-Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
+        "dexscreenerUrl": "https://dexscreener.com/solana/Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
+        "pumpfunUrl": "https://pump.fun/Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m"
       },
-      "timestamp": 1779213898276
+      "timestamp": 1779214678261
     },
     {
-      "id": 191,
+      "id": 237,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | USDT | TVL=$? | eşik=$40000",
-        "timestamp": 1779213898286
+        "message": "🚫 [LP] Telegram atlandı | UGOS | TVL=$33815 | eşik=$40000",
+        "timestamp": 1779214678262
       },
-      "timestamp": 1779213898286
+      "timestamp": 1779214678262
     },
     {
-      "id": 192,
+      "id": 238,
+      "type": "trade_config_update",
+      "data": {
+        "solAmount": 0.015,
+        "slippageBps": 50000,
+        "priorityFeeMicroLamports": 2000000,
+        "takeProfitPct": 30
+      },
+      "timestamp": 1779214684098
+    },
+    {
+      "id": 239,
+      "type": "position_update",
+      "data": {
+        "id": "pos-Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m-1779214690639",
+        "mintAddress": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
+        "name": "United Global Oil Supply",
+        "symbol": "UGOS",
+        "dex": "jupiter",
+        "status": "pending_buy",
+        "buyTimestamp": 1779214690639,
+        "buySolAmount": 0.015
+      },
+      "timestamp": 1779214690639
+    },
+    {
+      "id": 240,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "💧 [LP] Madrid Heat Bull (Mhdmbl) | PumpSwap | 196.0472 SOL ($16573) | TVL ~$33147",
-        "timestamp": 1779213910954
+        "message": "🛒 [Jupiter] ALIM: UGOS — 0.015 SOL",
+        "timestamp": 1779214690640
       },
-      "timestamp": 1779213910954
+      "timestamp": 1779214690640
     },
     {
-      "id": 193,
+      "id": 241,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "⏳ [Jupiter Buy UGOS] Deneme 1/5 başarısız — 1000ms bekleniyor...",
+        "timestamp": 1779214690748
+      },
+      "timestamp": 1779214690748
+    },
+    {
+      "id": 242,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "⏳ [Jupiter Buy UGOS] Deneme 2/5 başarısız — 1000ms bekleniyor...",
+        "timestamp": 1779214691807
+      },
+      "timestamp": 1779214691807
+    },
+    {
+      "id": 243,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "⏳ [Jupiter Buy UGOS] Deneme 3/5 başarısız — 1000ms bekleniyor...",
+        "timestamp": 1779214692868
+      },
+      "timestamp": 1779214692868
+    },
+    {
+      "id": 244,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "⏳ [Jupiter Buy UGOS] Deneme 4/5 başarısız — 1000ms bekleniyor...",
+        "timestamp": 1779214693929
+      },
+      "timestamp": 1779214693929
+    },
+    {
+      "id": 245,
+      "type": "position_update",
+      "data": {
+        "id": "pos-Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m-1779214690639",
+        "mintAddress": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
+        "name": "United Global Oil Supply",
+        "symbol": "UGOS",
+        "dex": "jupiter",
+        "status": "failed",
+        "buyTimestamp": 1779214690639,
+        "buySolAmount": 0.015,
+        "error": "Jupiter quote 400: {\"error\":\"Cannot compute other amount threshold, with amount 6406 and slippageBps 50000\",\"errorCode\":\"CANNOT_COMPUTE_OTHER_AMOUNT_THRESHOLD\"}"
+      },
+      "timestamp": 1779214694989
+    },
+    {
+      "id": 246,
+      "type": "server_log",
+      "data": {
+        "level": "error",
+        "message": "❌ [Jupiter] ALIM hatası UGOS: Jupiter quote 400: {\"error\":\"Cannot compute other amount threshold, with amount 6406 and slippageBps 50000\",\"errorCode\":\"CANNOT_COMPUTE_OTHER_AMOUNT_THRESHOLD\"}",
+        "timestamp": 1779214694990
+      },
+      "timestamp": 1779214694990
+    },
+    {
+      "id": 247,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] AMAZON FIRE MAP LIZARD (Amfliz) | PumpSwap | 193.5281 SOL ($16360) | TVL ~$32721",
+        "timestamp": 1779214735836
+      },
+      "timestamp": 1779214735836
+    },
+    {
+      "id": 248,
       "type": "lp_detected",
       "data": {
-        "id": "FvHHdx6prL1S6Hz6eQaNTxv66zRFd5bpevxkPEGMpump-1779213910953",
-        "mintAddress": "FvHHdx6prL1S6Hz6eQaNTxv66zRFd5bpevxkPEGMpump",
-        "lpMint": "AzMcz7PCPKuAeYWrC5gGip66NybLuTFYMP4W4fDeuwMm",
-        "name": "Madrid Heat Bull",
-        "symbol": "Mhdmbl",
-        "detectedAt": 1779213910953,
-        "expiresAt": 1779214210953,
-        "liquidityAmount": 196.047205492,
-        "liquidityUsd": 16573.41975943129,
-        "tvlUsd": 33146.83951886258,
+        "id": "AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump-1779214735833",
+        "mintAddress": "AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump",
+        "lpMint": "7KEAxmKjQKjESiCqqkHDmWF8iNyCEZRtNmwZ5PTSz7CC",
+        "name": "AMAZON FIRE MAP LIZARD",
+        "symbol": "Amfliz",
+        "detectedAt": 1779214735833,
+        "expiresAt": 1779215035833,
+        "liquidityAmount": 193.528086895,
+        "liquidityUsd": 16360.458754314725,
+        "tvlUsd": 32720.91750862945,
         "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-FvHHdx6prL1S6Hz6eQaNTxv66zRFd5bpevxkPEGMpump",
-        "dexscreenerUrl": "https://dexscreener.com/solana/FvHHdx6prL1S6Hz6eQaNTxv66zRFd5bpevxkPEGMpump",
-        "pumpfunUrl": "https://pump.fun/FvHHdx6prL1S6Hz6eQaNTxv66zRFd5bpevxkPEGMpump"
+        "jupiterUrl": "https://jup.ag/swap/SOL-AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump",
+        "dexscreenerUrl": "https://dexscreener.com/solana/AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump",
+        "pumpfunUrl": "https://pump.fun/AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump"
       },
-      "timestamp": 1779213910954
+      "timestamp": 1779214735836
     },
     {
-      "id": 194,
+      "id": 249,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | Mhdmbl | TVL=$33147 | eşik=$40000",
-        "timestamp": 1779213910965
+        "message": "🚫 [LP] Telegram atlandı | Amfliz | TVL=$32721 | eşik=$40000",
+        "timestamp": 1779214735846
       },
-      "timestamp": 1779213910965
+      "timestamp": 1779214735846
     },
     {
-      "id": 195,
+      "id": 250,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "💧 [LP] Chinese Oil Asset Reserve (COAR) | PumpSwap | 700.0000 SOL ($59177) | TVL ~$118353",
-        "timestamp": 1779213938713
+        "message": "💧 [LP] United Global Oil Supply (UGOS) | PumpSwap | 200.0000 SOL ($16908) | TVL ~$33815",
+        "timestamp": 1779214783852
       },
-      "timestamp": 1779213938713
+      "timestamp": 1779214783852
     },
     {
-      "id": 196,
+      "id": 251,
       "type": "lp_detected",
       "data": {
-        "id": "2LiGzyAtrbBsYZEfZjNNdDAuPHm9W4kRzZd8HN68X2gq-1779213938713",
-        "mintAddress": "2LiGzyAtrbBsYZEfZjNNdDAuPHm9W4kRzZd8HN68X2gq",
-        "lpMint": "GYq9bedLPnzeU6qLoXjq3hqmVg9J5x6NeYfUeoKN4RFf",
-        "name": "Chinese Oil Asset Reserve",
-        "symbol": "COAR",
-        "detectedAt": 1779213938713,
-        "expiresAt": 1779214238713,
-        "liquidityAmount": 700,
-        "liquidityUsd": 59176.53252178244,
-        "tvlUsd": 118353.06504356489,
+        "id": "EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d-1779214783852",
+        "mintAddress": "EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d",
+        "lpMint": "FwmrqVPUvMCXL1xKqfahfeizEn6Hg8jNYbTvMdRNMpLn",
+        "name": "United Global Oil Supply",
+        "symbol": "UGOS",
+        "detectedAt": 1779214783852,
+        "expiresAt": 1779215083852,
+        "liquidityAmount": 200,
+        "liquidityUsd": 16907.58072050927,
+        "tvlUsd": 33815.16144101854,
         "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-2LiGzyAtrbBsYZEfZjNNdDAuPHm9W4kRzZd8HN68X2gq",
-        "dexscreenerUrl": "https://dexscreener.com/solana/2LiGzyAtrbBsYZEfZjNNdDAuPHm9W4kRzZd8HN68X2gq",
-        "pumpfunUrl": "https://pump.fun/2LiGzyAtrbBsYZEfZjNNdDAuPHm9W4kRzZd8HN68X2gq"
+        "jupiterUrl": "https://jup.ag/swap/SOL-EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d",
+        "dexscreenerUrl": "https://dexscreener.com/solana/EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d",
+        "pumpfunUrl": "https://pump.fun/EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d"
       },
-      "timestamp": 1779213938714
+      "timestamp": 1779214783853
     },
     {
-      "id": 197,
+      "id": 252,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779213939299
+        "message": "🚫 [LP] Telegram atlandı | UGOS | TVL=$33815 | eşik=$40000",
+        "timestamp": 1779214783863
       },
-      "timestamp": 1779213939299
+      "timestamp": 1779214783863
     },
     {
-      "id": 198,
+      "id": 253,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "💧 [LP] Memeries (MEMERIES) | PumpSwap | 84.9904 SOL ($7185) | TVL ~$14370",
-        "timestamp": 1779213969155
+        "message": "💧 [LP] SCANDICCOINECO (SNC) | PumpSwap | 85.0000 SOL ($7186) | TVL ~$14371",
+        "timestamp": 1779214784122
       },
-      "timestamp": 1779213969155
+      "timestamp": 1779214784122
     },
     {
-      "id": 199,
+      "id": 254,
       "type": "lp_detected",
       "data": {
-        "id": "73n6Zk8fJBfUaVmWq9Csor6tHLtPJGy4z9nvGQbaSJjK-1779213969155",
-        "mintAddress": "73n6Zk8fJBfUaVmWq9Csor6tHLtPJGy4z9nvGQbaSJjK",
-        "lpMint": "Gxrw2cJYDfAemSLVUU439T2D9Nj21uSqpDPvuPq4wToD",
-        "name": "Memeries",
-        "symbol": "MEMERIES",
-        "detectedAt": 1779213969155,
-        "expiresAt": 1779214269155,
-        "liquidityAmount": 84.990359551,
-        "liquidityUsd": 7184.906822868193,
-        "tvlUsd": 14369.813645736385,
+        "id": "2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj-1779214784122",
+        "mintAddress": "2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj",
+        "lpMint": "9mXc4qVvMHmjVQc9xk4gwZLzxf1opTiQk5Xc4fw25Hbi",
+        "name": "SCANDICCOINECO",
+        "symbol": "SNC",
+        "detectedAt": 1779214784122,
+        "expiresAt": 1779215084122,
+        "liquidityAmount": 85,
+        "liquidityUsd": 7185.72180621644,
+        "tvlUsd": 14371.44361243288,
         "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-73n6Zk8fJBfUaVmWq9Csor6tHLtPJGy4z9nvGQbaSJjK",
-        "dexscreenerUrl": "https://dexscreener.com/solana/73n6Zk8fJBfUaVmWq9Csor6tHLtPJGy4z9nvGQbaSJjK",
-        "pumpfunUrl": "https://pump.fun/73n6Zk8fJBfUaVmWq9Csor6tHLtPJGy4z9nvGQbaSJjK"
+        "jupiterUrl": "https://jup.ag/swap/SOL-2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj",
+        "dexscreenerUrl": "https://dexscreener.com/solana/2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj",
+        "pumpfunUrl": "https://pump.fun/2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj"
       },
-      "timestamp": 1779213969156
+      "timestamp": 1779214784122
     },
     {
-      "id": 200,
+      "id": 255,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | MEMERIES | TVL=$14370 | eşik=$40000",
-        "timestamp": 1779213969165
+        "message": "🚫 [LP] Telegram atlandı | SNC | TVL=$14371 | eşik=$40000",
+        "timestamp": 1779214784123
       },
-      "timestamp": 1779213969165
-    },
-    {
-      "id": 201,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] MrBeast (MrBeast) | PumpSwap | 50.0000 SOL ($4227) | TVL ~$8454",
-        "timestamp": 1779214013637
-      },
-      "timestamp": 1779214013637
-    },
-    {
-      "id": 202,
-      "type": "lp_detected",
-      "data": {
-        "id": "EMGt2dxVzm7Tbb7GgH1nVkbukNFJG839gpYCHZrNQCc4-1779214013636",
-        "mintAddress": "EMGt2dxVzm7Tbb7GgH1nVkbukNFJG839gpYCHZrNQCc4",
-        "lpMint": "GwWo8X39Zuj1gWTBMXyGA8Le2bkbUfJ51DGdugfNnjYX",
-        "name": "MrBeast",
-        "symbol": "MrBeast",
-        "detectedAt": 1779214013636,
-        "expiresAt": 1779214313636,
-        "liquidityAmount": 50,
-        "liquidityUsd": 4226.895180127318,
-        "tvlUsd": 8453.790360254636,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-EMGt2dxVzm7Tbb7GgH1nVkbukNFJG839gpYCHZrNQCc4",
-        "dexscreenerUrl": "https://dexscreener.com/solana/EMGt2dxVzm7Tbb7GgH1nVkbukNFJG839gpYCHZrNQCc4",
-        "pumpfunUrl": "https://pump.fun/EMGt2dxVzm7Tbb7GgH1nVkbukNFJG839gpYCHZrNQCc4"
-      },
-      "timestamp": 1779214013637
-    },
-    {
-      "id": 203,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | MrBeast | TVL=$8454 | eşik=$40000",
-        "timestamp": 1779214013647
-      },
-      "timestamp": 1779214013647
-    },
-    {
-      "id": 204,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] slowly then all at once (slowly) | PumpSwap | 50.0000 SOL ($4227) | TVL ~$8454",
-        "timestamp": 1779214016671
-      },
-      "timestamp": 1779214016671
-    },
-    {
-      "id": 205,
-      "type": "lp_detected",
-      "data": {
-        "id": "9CfxeVg3HsJN6JXVMJ7q1kvGAKPuU1cdqMV5smiEf3Pb-1779214016671",
-        "mintAddress": "9CfxeVg3HsJN6JXVMJ7q1kvGAKPuU1cdqMV5smiEf3Pb",
-        "lpMint": "AseB2gGNQKpfwzuKzNuaq3j7vcWoVUHYMup2FMqmPmiF",
-        "name": "slowly then all at once",
-        "symbol": "slowly",
-        "detectedAt": 1779214016671,
-        "expiresAt": 1779214316671,
-        "liquidityAmount": 50,
-        "liquidityUsd": 4226.895180127318,
-        "tvlUsd": 8453.790360254636,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-9CfxeVg3HsJN6JXVMJ7q1kvGAKPuU1cdqMV5smiEf3Pb",
-        "dexscreenerUrl": "https://dexscreener.com/solana/9CfxeVg3HsJN6JXVMJ7q1kvGAKPuU1cdqMV5smiEf3Pb",
-        "pumpfunUrl": "https://pump.fun/9CfxeVg3HsJN6JXVMJ7q1kvGAKPuU1cdqMV5smiEf3Pb"
-      },
-      "timestamp": 1779214016672
-    },
-    {
-      "id": 206,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | slowly | TVL=$8454 | eşik=$40000",
-        "timestamp": 1779214016682
-      },
-      "timestamp": 1779214016682
-    },
-    {
-      "id": 207,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Tung Tung Tung Sahur (TripleT) | PumpSwap | 22.9900 SOL ($1944) | TVL ~$3887",
-        "timestamp": 1779214076102
-      },
-      "timestamp": 1779214076102
-    },
-    {
-      "id": 208,
-      "type": "lp_detected",
-      "data": {
-        "id": "8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP-1779214076102",
-        "mintAddress": "8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP",
-        "lpMint": "2th2nJXt7T1iZZ3h8Dar4RMZMnWHTKZKgGBjtXTWnhP1",
-        "name": "Tung Tung Tung Sahur",
-        "symbol": "TripleT",
-        "detectedAt": 1779214076102,
-        "expiresAt": 1779214376102,
-        "liquidityAmount": 22.99,
-        "liquidityUsd": 1943.5264038225405,
-        "tvlUsd": 3887.052807645081,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP",
-        "dexscreenerUrl": "https://dexscreener.com/solana/8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP",
-        "pumpfunUrl": "https://pump.fun/8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP"
-      },
-      "timestamp": 1779214076102
-    },
-    {
-      "id": 209,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | TripleT | TVL=$3887 | eşik=$40000",
-        "timestamp": 1779214076111
-      },
-      "timestamp": 1779214076111
+      "timestamp": 1779214784123
     }
   ]
 }

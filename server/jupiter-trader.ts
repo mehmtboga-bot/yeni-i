@@ -131,7 +131,9 @@ export class JupiterTrader {
     url.searchParams.set("inputMint", params.inputMint);
     url.searchParams.set("outputMint", params.outputMint);
     url.searchParams.set("amount", params.amount);
-    url.searchParams.set("slippageBps", String(params.slippageBps));
+    // Jupiter max %99 slippage kabul eder (10000 bps üzeri negatif threshold üretir → hata)
+    const clampedSlippage = Math.min(params.slippageBps, 9900);
+    url.searchParams.set("slippageBps", String(clampedSlippage));
     url.searchParams.set("onlyDirectRoutes", "false");
     url.searchParams.set("asLegacyTransaction", "false");
     url.searchParams.set("restrictIntermediateTokens", "true");
