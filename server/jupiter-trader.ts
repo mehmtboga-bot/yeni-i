@@ -297,7 +297,18 @@ export class JupiterTrader {
         `PumpSwap Buy ${symbol}`,
       );
 
-      position = { ...position, status: "open", buyTxSignature: sig };
+      // TX sonrası token bakiyesini çek (take-profit hesabı için gerekli)
+      let buyTokenAmount: number | undefined;
+      try {
+        await new Promise((r) => setTimeout(r, 2000)); // indexer bekle
+        const bal = await this.getTokenBalance(mintAddress);
+        if (bal && bal.uiAmount > 0) {
+          buyTokenAmount = bal.uiAmount;
+          console.log(`🪙 [PumpSwap] Alınan token: ${buyTokenAmount.toLocaleString()} ${symbol}`);
+        }
+      } catch { /* bakiye çekilemezse devam et */ }
+
+      position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount };
       this.updateAndEmit(position);
       console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | tx ${sig.slice(0, 16)}...`);
       return position;
