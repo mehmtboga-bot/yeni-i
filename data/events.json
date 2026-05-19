@@ -1,73 +1,6 @@
 {
-  "lastId": 255,
+  "lastId": 260,
   "events": [
-    {
-      "id": 236,
-      "type": "lp_detected",
-      "data": {
-        "id": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m-1779214678261",
-        "mintAddress": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
-        "lpMint": "22ti4844J6FcKbTMpCZTkfHy4ZMsTX2QVrEq6YREDguP",
-        "name": "United Global Oil Supply",
-        "symbol": "UGOS",
-        "detectedAt": 1779214678261,
-        "expiresAt": 1779214978261,
-        "liquidityAmount": 200,
-        "liquidityUsd": 16907.58072050927,
-        "tvlUsd": 33815.16144101854,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
-        "dexscreenerUrl": "https://dexscreener.com/solana/Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
-        "pumpfunUrl": "https://pump.fun/Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m"
-      },
-      "timestamp": 1779214678261
-    },
-    {
-      "id": 237,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | UGOS | TVL=$33815 | eşik=$40000",
-        "timestamp": 1779214678262
-      },
-      "timestamp": 1779214678262
-    },
-    {
-      "id": 238,
-      "type": "trade_config_update",
-      "data": {
-        "solAmount": 0.015,
-        "slippageBps": 50000,
-        "priorityFeeMicroLamports": 2000000,
-        "takeProfitPct": 30
-      },
-      "timestamp": 1779214684098
-    },
-    {
-      "id": 239,
-      "type": "position_update",
-      "data": {
-        "id": "pos-Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m-1779214690639",
-        "mintAddress": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
-        "name": "United Global Oil Supply",
-        "symbol": "UGOS",
-        "dex": "jupiter",
-        "status": "pending_buy",
-        "buyTimestamp": 1779214690639,
-        "buySolAmount": 0.015
-      },
-      "timestamp": 1779214690639
-    },
-    {
-      "id": 240,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🛒 [Jupiter] ALIM: UGOS — 0.015 SOL",
-        "timestamp": 1779214690640
-      },
-      "timestamp": 1779214690640
-    },
     {
       "id": 241,
       "type": "server_log",
@@ -256,6 +189,56 @@
         "timestamp": 1779214784123
       },
       "timestamp": 1779214784123
+    },
+    {
+      "id": 256,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "6:20:31 PM [express] GET /api/events 200 in 1ms :: {\"events\":[]}",
+        "timestamp": 1779214831567
+      },
+      "timestamp": 1779214831567
+    },
+    {
+      "id": 257,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "6:20:31 PM [express] GET /api/files/list 200 in 0ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
+        "timestamp": 1779214831569
+      },
+      "timestamp": 1779214831569
+    },
+    {
+      "id": 258,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "6:20:31 PM [express] GET /api/files/read 200 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
+        "timestamp": 1779214831809
+      },
+      "timestamp": 1779214831809
+    },
+    {
+      "id": 259,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "timestamp": 1779214935202
+      },
+      "timestamp": 1779214935202
+    },
+    {
+      "id": 260,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "\u001b[2m6:22:15 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/components/TradePanel.tsx, /src/index.css?v=ZhlN9nViHjHZBtEtsPf9\u001b[22m",
+        "timestamp": 1779214935204
+      },
+      "timestamp": 1779214935204
     }
   ]
 }
