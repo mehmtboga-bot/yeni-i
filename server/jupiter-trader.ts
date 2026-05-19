@@ -174,23 +174,26 @@ export class JupiterTrader {
   }
 
   // PumpSwap (pumpportal.fun) TX oluştur ve gönder
-  private async pumpSwapTx(
-    action: "buy" | "sell",
-    mint: string,
-    amountSol: number,
-    slippagePct: number,
-    priorityFeeSol: number,
-  ): Promise<string> {
+  // denominatedInSol=true → amount SOL cinsindendir (alım için)
+  // denominatedInSol=false → amount token cinsindendir (satım için)
+  private async pumpSwapTx(opts: {
+    action: "buy" | "sell";
+    mint: string;
+    amount: number;
+    denominatedInSol: boolean;
+    slippagePct: number;
+    priorityFeeSol: number;
+  }): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
 
     const body = {
       publicKey: this.keypair.publicKey.toBase58(),
-      action,
-      mint,
-      denominatedInSol: "true",
-      amount: amountSol,
-      slippage: slippagePct,
-      priorityFee: priorityFeeSol,
+      action: opts.action,
+      mint: opts.mint,
+      denominatedInSol: opts.denominatedInSol ? "true" : "false",
+      amount: opts.amount,
+      slippage: opts.slippagePct,
+      priorityFee: opts.priorityFeeSol,
       pool: "pump",
     };
 
@@ -290,7 +293,7 @@ export class JupiterTrader {
 
     try {
       const sig = await this.withRetry(
-        () => this.pumpSwapTx("buy", mintAddress, config.solAmount, slippagePct, priorityFeeSol),
+        () => this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: config.solAmount, denominatedInSol: true, slippagePct, priorityFeeSol }),
         `PumpSwap Buy ${symbol}`,
       );
 
@@ -326,18 +329,28 @@ export class JupiterTrader {
 
     try {
       if (pos.dex === "pumpswap") {
-        // PumpSwap satışı — % olarak mevcut token miktarını sat
+        // PumpSwap satışı — token bakiyesini çek, token cinsinden sat
         const slippagePct = Math.floor(config.slippageBps / 100);
         const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
-        const sig = await this.withRetry(
-          () => this.pumpSwapTx("sell", pos.mintAddress, 100, slippagePct, priorityFeeSol),
-          `PumpSwap Sell ${pos.symbol}`,
-        );
+        const result = await this.withRetry(async () => {
+          const balance = await this.getTokenBalance(pos.mintAddress);
+          if (!balance || balance.uiAmount <= 0) throw new Error("Cüzdanda PumpSwap token bakiyesi yok");
+          console.log(`🔍 [PumpSwap] Satılacak token: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
+          const sig = await this.pumpSwapTx({
+            action: "sell",
+            mint: pos.mintAddress,
+            amount: balance.uiAmount,
+            denominatedInSol: false,   // token cinsinden miktar
+            slippagePct,
+            priorityFeeSol,
+          });
+          return { sig, tokenAmount: balance.uiAmount };
+        }, `PumpSwap Sell ${pos.symbol}`);
 
-        updated = { ...updated, status: "closed", sellTimestamp: Date.now(), sellTxSignature: sig };
+        updated = { ...updated, status: "closed", sellTimestamp: Date.now(), sellTxSignature: result.sig };
         this.updateAndEmit(updated);
-        console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | tx ${sig.slice(0, 16)}...`);
+        console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | ${result.tokenAmount.toLocaleString()} token | tx ${result.sig.slice(0, 16)}...`);
       } else {
         // Jupiter satışı
         const result = await this.withRetry(async () => {
