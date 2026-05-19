@@ -40,32 +40,43 @@ export class PositionPricer {
 
   private async updatePrices() {
     const positions = this.store.getAll();
-    const openPositions = positions.filter((p) => p.status === "open" && p.buyPriceSol);
+    const openPositions = positions.filter((p) => p.status === "open");
     if (openPositions.length === 0) return;
 
     const mints = openPositions.map((p) => p.mintAddress).join(",");
     try {
       const res = await fetch(`${JUP_PRICE_API}?ids=${mints}`);
       if (!res.ok) return;
-      const data = (await res.json()) as Record<string, { price: number }>;
+      // Jupiter v3 API: her mint için { usdPrice: number } döner
+      const data = (await res.json()) as Record<string, { usdPrice?: number; price?: number }>;
 
       const config = this.store.getConfig();
       const takeProfitPct = config.takeProfitPct ?? 0;
 
       for (const pos of openPositions) {
         const priceData = data[pos.mintAddress];
-        if (!priceData || priceData.price <= 0) continue;
+        // usdPrice veya price alanından al (API sürümü farkı için)
+        const currentPriceUsd = priceData?.usdPrice ?? priceData?.price ?? 0;
+        if (!currentPriceUsd || currentPriceUsd <= 0) continue;
 
-        const currentPriceUsd = priceData.price;
         const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 87;
-        const unrealizedPnlSol =
-          (pos.buyTokenAmount ?? 0) * (currentPriceUsd / solPrice - (pos.buyPriceSol ?? 0));
-        const unrealizedPnlPct =
-          (pos.buyPriceSol ?? 0) > 0
-            ? ((currentPriceUsd / solPrice - pos.buyPriceSol!) / pos.buyPriceSol!) * 100
-            : 0;
+        const currentPriceSol = currentPriceUsd / solPrice;
 
-        const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
+        // PumpSwap pozisyonlarında buyPriceSol yoksa ilk fiyatı kaydet
+        let buyPriceSol = pos.buyPriceSol;
+        let updated: Position = { ...pos };
+        if (!buyPriceSol || buyPriceSol <= 0) {
+          buyPriceSol = currentPriceSol;
+          updated = { ...updated, buyPriceSol };
+          console.log(`📌 [PumpSwap] Alış fiyatı kaydedildi: ${pos.symbol} = ${currentPriceSol.toFixed(8)} SOL`);
+        }
+
+        const unrealizedPnlSol =
+          (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
+        const unrealizedPnlPct =
+          buyPriceSol > 0 ? ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100 : 0;
+
+        updated = { ...updated, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
         this.store.upsert(updated);
         this.emit("position_update", updated);
 
