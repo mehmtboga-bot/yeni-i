@@ -1,205 +1,216 @@
 {
-  "lastId": 79,
+  "lastId": 158,
   "events": [
     {
-      "id": 60,
+      "id": 139,
+      "type": "trade_config_update",
+      "data": {
+        "solAmount": 0.015,
+        "slippageBps": 500000,
+        "priorityFeeMicroLamports": 2000000,
+        "takeProfitPct": 30
+      },
+      "timestamp": 1779213366517
+    },
+    {
+      "id": 140,
+      "type": "trade_config_update",
+      "data": {
+        "solAmount": 0.015,
+        "slippageBps": 500000,
+        "priorityFeeMicroLamports": 2000000,
+        "takeProfitPct": 30
+      },
+      "timestamp": 1779213367817
+    },
+    {
+      "id": 141,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "\u001b[2m5:40:37 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/components/TradePanel.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m",
-        "timestamp": 1779212437930
+        "message": "💼 Trader cüzdanı yüklendi: HWQJG2ZntXUeWh4mNzgQpkQqutJc8NZ3hXyJHScNuzTw",
+        "timestamp": 1779213394151
       },
-      "timestamp": 1779212437930
+      "timestamp": 1779213394151
     },
     {
-      "id": 61,
+      "id": 142,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚀 Helius Monitor başlatılıyor (PumpSwap — sadece CreatePool)...",
+        "timestamp": 1779213394152
+      },
+      "timestamp": 1779213394152
+    },
+    {
+      "id": 143,
+      "type": "monitoring_state",
+      "data": {
+        "isMonitoring": true
+      },
+      "timestamp": 1779213394153
+    },
+    {
+      "id": 144,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:56:34 PM [express] serving on port 5000",
+        "timestamp": 1779213394279
+      },
+      "timestamp": 1779213394279
+    },
+    {
+      "id": 145,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💵 SOL/USD (Jupiter): $84.54",
+        "timestamp": 1779213394716
+      },
+      "timestamp": 1779213394716
+    },
+    {
+      "id": 146,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)",
+        "timestamp": 1779213395024
+      },
+      "timestamp": 1779213395024
+    },
+    {
+      "id": 147,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "📲 Telegram bildirimi gönderildi.",
+        "timestamp": 1779213395358
+      },
+      "timestamp": 1779213395358
+    },
+    {
+      "id": 148,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:56:37 PM [express] GET /api/events 200 in 5ms :: {\"events\":[{\"id\":141,\"type\":\"server_log\",\"data\":{…",
+        "timestamp": 1779213397799
+      },
+      "timestamp": 1779213397799
+    },
+    {
+      "id": 149,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Official Barron Trump (BARRON) | PumpSwap | 50.0000 SOL ($4227) | TVL ~$8454",
+        "timestamp": 1779213404713
+      },
+      "timestamp": 1779213404713
+    },
+    {
+      "id": 150,
+      "type": "lp_detected",
+      "data": {
+        "id": "EtbHjj8qEfGEtZTMqXxv46ihk1gHGWAvJDoTrcJ52P2t-1779213404713",
+        "mintAddress": "EtbHjj8qEfGEtZTMqXxv46ihk1gHGWAvJDoTrcJ52P2t",
+        "lpMint": "9CvPgsGtsVfWFwK8cexK92h5HgfpTqwmh5jN6LosggC7",
+        "name": "Official Barron Trump",
+        "symbol": "BARRON",
+        "detectedAt": 1779213404713,
+        "expiresAt": 1779213704713,
+        "liquidityAmount": 50,
+        "liquidityUsd": 4226.895180127318,
+        "tvlUsd": 8453.790360254636,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-EtbHjj8qEfGEtZTMqXxv46ihk1gHGWAvJDoTrcJ52P2t",
+        "dexscreenerUrl": "https://dexscreener.com/solana/EtbHjj8qEfGEtZTMqXxv46ihk1gHGWAvJDoTrcJ52P2t",
+        "pumpfunUrl": "https://pump.fun/EtbHjj8qEfGEtZTMqXxv46ihk1gHGWAvJDoTrcJ52P2t"
+      },
+      "timestamp": 1779213404714
+    },
+    {
+      "id": 151,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | BARRON | TVL=$8454 | eşik=$40000",
+        "timestamp": 1779213404724
+      },
+      "timestamp": 1779213404724
+    },
+    {
+      "id": 152,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "Browserslist: browsers data (caniuse-lite) is 19 months old. Please run:\n  npx update-browserslist-db@latest\n  Why you should do it regularly: https://github.com/browserslist/update-db#readme",
+        "timestamp": 1779213488957
+      },
+      "timestamp": 1779213488957
+    },
+    {
+      "id": 153,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "\nA PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.",
+        "timestamp": 1779213490020
+      },
+      "timestamp": 1779213490020
+    },
+    {
+      "id": 154,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:58:12 PM [express] GET /api/files/list 200 in 1ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
+        "timestamp": 1779213492038
+      },
+      "timestamp": 1779213492038
+    },
+    {
+      "id": 155,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:58:12 PM [express] GET /api/events 200 in 0ms :: {\"events\":[{\"id\":152,\"type\":\"server_log\",\"data\":{…",
+        "timestamp": 1779213492039
+      },
+      "timestamp": 1779213492039
+    },
+    {
+      "id": 156,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:58:12 PM [express] GET /api/files/read 200 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
+        "timestamp": 1779213492274
+      },
+      "timestamp": 1779213492274
+    },
+    {
+      "id": 157,
       "type": "server_log",
       "data": {
         "level": "info",
         "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-        "timestamp": 1779212440116
+        "timestamp": 1779213521436
       },
-      "timestamp": 1779212440116
+      "timestamp": 1779213521436
     },
     {
-      "id": 62,
+      "id": 158,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "\u001b[2m5:40:40 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m",
-        "timestamp": 1779212440117
+        "message": "\u001b[2m5:58:41 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=ZhlN9nViHjHZBtEtsPf9\u001b[22m",
+        "timestamp": 1779213521438
       },
-      "timestamp": 1779212440117
-    },
-    {
-      "id": 63,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-        "timestamp": 1779212459336
-      },
-      "timestamp": 1779212459336
-    },
-    {
-      "id": 64,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\u001b[2m5:40:59 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x2)\u001b[39m",
-        "timestamp": 1779212459337
-      },
-      "timestamp": 1779212459337
-    },
-    {
-      "id": 65,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-        "timestamp": 1779212467711
-      },
-      "timestamp": 1779212467711
-    },
-    {
-      "id": 66,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\u001b[2m5:41:07 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x3)\u001b[39m",
-        "timestamp": 1779212467712
-      },
-      "timestamp": 1779212467712
-    },
-    {
-      "id": 67,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "5:41:08 PM [express] GET /api/events 200 in 1ms :: {\"events\":[{\"id\":63,\"type\":\"server_log\",\"data\":{\"…",
-        "timestamp": 1779212468007
-      },
-      "timestamp": 1779212468007
-    },
-    {
-      "id": 68,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-        "timestamp": 1779212478786
-      },
-      "timestamp": 1779212478786
-    },
-    {
-      "id": 69,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\u001b[2m5:41:18 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x4)\u001b[39m",
-        "timestamp": 1779212478786
-      },
-      "timestamp": 1779212478786
-    },
-    {
-      "id": 70,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-        "timestamp": 1779212484654
-      },
-      "timestamp": 1779212484654
-    },
-    {
-      "id": 71,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\u001b[2m5:41:24 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x5)\u001b[39m",
-        "timestamp": 1779212484655
-      },
-      "timestamp": 1779212484655
-    },
-    {
-      "id": 72,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "5:41:37 PM [express] GET /api/files/list 200 in 1ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
-        "timestamp": 1779212497765
-      },
-      "timestamp": 1779212497765
-    },
-    {
-      "id": 73,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "5:41:37 PM [express] GET /api/events 200 in 1ms :: {\"events\":[{\"id\":53,\"type\":\"server_log\",\"data\":{\"…",
-        "timestamp": 1779212497767
-      },
-      "timestamp": 1779212497767
-    },
-    {
-      "id": 74,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "5:41:37 PM [express] GET /api/files/read 200 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
-        "timestamp": 1779212497844
-      },
-      "timestamp": 1779212497844
-    },
-    {
-      "id": 75,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "5:41:44 PM [express] GET /api/events 200 in 1ms :: {\"events\":[{\"id\":73,\"type\":\"server_log\",\"data\":{\"…",
-        "timestamp": 1779212504604
-      },
-      "timestamp": 1779212504604
-    },
-    {
-      "id": 76,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "5:41:44 PM [express] GET /api/files/list 304 in 0ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
-        "timestamp": 1779212504606
-      },
-      "timestamp": 1779212504606
-    },
-    {
-      "id": 77,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "5:41:44 PM [express] GET /api/files/read 304 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
-        "timestamp": 1779212504663
-      },
-      "timestamp": 1779212504663
-    },
-    {
-      "id": 78,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-        "timestamp": 1779212532701
-      },
-      "timestamp": 1779212532701
-    },
-    {
-      "id": 79,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\u001b[2m5:42:12 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x6)\u001b[39m",
-        "timestamp": 1779212532702
-      },
-      "timestamp": 1779212532702
+      "timestamp": 1779213521438
     }
   ]
 }

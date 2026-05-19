@@ -100,8 +100,22 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [isConnected, setIsConnected] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState("");
-  const [mintedTokens, setMintedTokens] = useState<MintedToken[]>([]);
-  const [lpLogs, setLpLogs] = useState<LPDetection[]>([]);
+  const [mintedTokens, setMintedTokens] = useState<MintedToken[]>(() => {
+    try {
+      const raw = localStorage.getItem("mintedTokens");
+      if (!raw) return [];
+      const now = Date.now();
+      return (JSON.parse(raw) as MintedToken[]).filter((t) => t.expiresAt > now).slice(0, MAX_MINTED_TOKENS);
+    } catch { return []; }
+  });
+  const [lpLogs, setLpLogs] = useState<LPDetection[]>(() => {
+    try {
+      const raw = localStorage.getItem("lpLogs");
+      if (!raw) return [];
+      const now = Date.now();
+      return (JSON.parse(raw) as LPDetection[]).filter((l) => l.expiresAt > now).slice(0, MAX_LP_LOGS);
+    } catch { return []; }
+  });
   const [newTokenId, setNewTokenId] = useState<string | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
