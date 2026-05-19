@@ -1,0 +1,9 @@
+{
+  "positions": [],
+  "config": {
+    "solAmount": 0.015,
+    "slippageBps": 500000,
+    "priorityFeeMicroLamports": 2000000,
+    "takeProfitPct": 30
+  }
+}

@@ -3,7 +3,7 @@ import path from "path";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const STORE_PATH = path.join(DATA_DIR, "events.json");
-const MAX_EVENTS = 20; // maksimum saklanacak event sayısı
+const MAX_EVENTS = 200; // maksimum saklanacak event sayısı
 
 type StoredEvent = {
   id: number;
