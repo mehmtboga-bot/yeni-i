@@ -1,47 +1,6 @@
 {
-  "lastId": 206,
+  "lastId": 209,
   "events": [
-    {
-      "id": 187,
-      "type": "lp_detected",
-      "data": {
-        "id": "DAXt4xeYV5VynEqvCKrjV2XfmhZJhmro6BcCreJQLojK-1779213871756",
-        "mintAddress": "DAXt4xeYV5VynEqvCKrjV2XfmhZJhmro6BcCreJQLojK",
-        "lpMint": "3J3Du9yn8ct9MnLLejAG4GgnbYgY5VEgYyNHRNy3Y43c",
-        "name": "Hunter Biden",
-        "symbol": "Henter",
-        "detectedAt": 1779213871756,
-        "expiresAt": 1779214171756,
-        "liquidityAmount": 520,
-        "liquidityUsd": 43959.7098733241,
-        "tvlUsd": 87919.4197466482,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-DAXt4xeYV5VynEqvCKrjV2XfmhZJhmro6BcCreJQLojK",
-        "dexscreenerUrl": "https://dexscreener.com/solana/DAXt4xeYV5VynEqvCKrjV2XfmhZJhmro6BcCreJQLojK",
-        "pumpfunUrl": "https://pump.fun/DAXt4xeYV5VynEqvCKrjV2XfmhZJhmro6BcCreJQLojK"
-      },
-      "timestamp": 1779213871756
-    },
-    {
-      "id": 188,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779213872328
-      },
-      "timestamp": 1779213872328
-    },
-    {
-      "id": 189,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Tether (USDT) | PumpSwap | ?",
-        "timestamp": 1779213898275
-      },
-      "timestamp": 1779213898275
-    },
     {
       "id": 190,
       "type": "lp_detected",
@@ -274,6 +233,47 @@
         "timestamp": 1779214016682
       },
       "timestamp": 1779214016682
+    },
+    {
+      "id": 207,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Tung Tung Tung Sahur (TripleT) | PumpSwap | 22.9900 SOL ($1944) | TVL ~$3887",
+        "timestamp": 1779214076102
+      },
+      "timestamp": 1779214076102
+    },
+    {
+      "id": 208,
+      "type": "lp_detected",
+      "data": {
+        "id": "8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP-1779214076102",
+        "mintAddress": "8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP",
+        "lpMint": "2th2nJXt7T1iZZ3h8Dar4RMZMnWHTKZKgGBjtXTWnhP1",
+        "name": "Tung Tung Tung Sahur",
+        "symbol": "TripleT",
+        "detectedAt": 1779214076102,
+        "expiresAt": 1779214376102,
+        "liquidityAmount": 22.99,
+        "liquidityUsd": 1943.5264038225405,
+        "tvlUsd": 3887.052807645081,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP",
+        "dexscreenerUrl": "https://dexscreener.com/solana/8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP",
+        "pumpfunUrl": "https://pump.fun/8yqcqAdqRED8DKHjZ4qtKAcJzxy9pMgHTWi1cR3yMKrP"
+      },
+      "timestamp": 1779214076102
+    },
+    {
+      "id": 209,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | TripleT | TVL=$3887 | eşik=$40000",
+        "timestamp": 1779214076111
+      },
+      "timestamp": 1779214076111
     }
   ]
 }
