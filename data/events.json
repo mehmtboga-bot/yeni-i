@@ -1,0 +1,173 @@
+{
+  "lastId": 17,
+  "events": [
+    {
+      "id": 1,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "⚠️ TRADER_PRIVATE_KEY tanımlı değil. Otomatik alım/satım devre dışı.",
+        "timestamp": 1779211497361
+      },
+      "timestamp": 1779211497361
+    },
+    {
+      "id": 2,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚀 Helius Monitor başlatılıyor (PumpSwap — sadece CreatePool)...",
+        "timestamp": 1779211497362
+      },
+      "timestamp": 1779211497362
+    },
+    {
+      "id": 3,
+      "type": "monitoring_state",
+      "data": {
+        "isMonitoring": true
+      },
+      "timestamp": 1779211497362
+    },
+    {
+      "id": 4,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:24:57 PM [express] serving on port 5000",
+        "timestamp": 1779211497484
+      },
+      "timestamp": 1779211497484
+    },
+    {
+      "id": 5,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💵 SOL/USD (Jupiter): $84.76",
+        "timestamp": 1779211498638
+      },
+      "timestamp": 1779211498638
+    },
+    {
+      "id": 6,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)",
+        "timestamp": 1779211498890
+      },
+      "timestamp": 1779211498890
+    },
+    {
+      "id": 7,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "📲 Telegram bildirimi gönderildi.",
+        "timestamp": 1779211499219
+      },
+      "timestamp": 1779211499219
+    },
+    {
+      "id": 8,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "Browserslist: browsers data (caniuse-lite) is 19 months old. Please run:\n  npx update-browserslist-db@latest\n  Why you should do it regularly: https://github.com/browserslist/update-db#readme",
+        "timestamp": 1779211500384
+      },
+      "timestamp": 1779211500384
+    },
+    {
+      "id": 9,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "\nA PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.",
+        "timestamp": 1779211502759
+      },
+      "timestamp": 1779211502759
+    },
+    {
+      "id": 10,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:25:06 PM [express] GET /api/files/list 200 in 4ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
+        "timestamp": 1779211506634
+      },
+      "timestamp": 1779211506634
+    },
+    {
+      "id": 11,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:25:06 PM [express] GET /api/events 200 in 2ms :: {\"events\":[{\"id\":1,\"type\":\"server_log\",\"data\":{\"l…",
+        "timestamp": 1779211506638
+      },
+      "timestamp": 1779211506638
+    },
+    {
+      "id": 12,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:25:06 PM [express] GET /api/files/read 200 in 3ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
+        "timestamp": 1779211506704
+      },
+      "timestamp": 1779211506704
+    },
+    {
+      "id": 13,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "⚠️ [LP] TX indexlenemedi, atlanıyor: 5CJ2hurN...",
+        "timestamp": 1779211506913
+      },
+      "timestamp": 1779211506913
+    },
+    {
+      "id": 14,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "⚠️ [WS] PumpSwap — token mint bulunamadı: 5CJ2hurN...",
+        "timestamp": 1779211506915
+      },
+      "timestamp": 1779211506915
+    },
+    {
+      "id": 15,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:25:18 PM [express] GET /api/events 200 in 4ms :: {\"events\":[]}",
+        "timestamp": 1779211518044
+      },
+      "timestamp": 1779211518044
+    },
+    {
+      "id": 16,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:25:18 PM [express] GET /api/files/list 304 in 1ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
+        "timestamp": 1779211518048
+      },
+      "timestamp": 1779211518048
+    },
+    {
+      "id": 17,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:25:18 PM [express] GET /api/files/read 304 in 2ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
+        "timestamp": 1779211518105
+      },
+      "timestamp": 1779211518105
+    }
+  ]
+}
