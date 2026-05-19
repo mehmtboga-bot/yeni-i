@@ -170,7 +170,12 @@ export function TradePanel({
               <Label htmlFor="slippage" className="text-xs">Slippage (bps)</Label>
               <Input id="slippage" type="number" step="1000" min="50" value={slippageInput}
                 onChange={(e) => setSlippageInput(e.target.value)} data-testid="input-slippage" />
-              <p className="text-[10px] text-muted-foreground">{Math.floor(parseInt(slippageInput || "0") / 100)}%</p>
+              <p className="text-[10px] text-muted-foreground">
+                {Math.floor(parseInt(slippageInput || "0") / 100)}%
+                {parseInt(slippageInput || "0") > 9900 && (
+                  <span className="text-amber-400 ml-1">· Jup: max %99</span>
+                )}
+              </p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="priority" className="text-xs">Priority Fee (µLamports)</Label>
