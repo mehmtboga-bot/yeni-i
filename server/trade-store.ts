@@ -9,6 +9,7 @@ const DEFAULT_CONFIG: TradeConfig = {
   solAmount: 0.01,
   slippageBps: 50000,
   priorityFeeMicroLamports: 20_000_000,
+  takeProfitPct: 0,
 };
 
 interface StoreData {
@@ -17,17 +18,13 @@ interface StoreData {
 }
 
 function ensureDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
 function load(): StoreData {
   try {
     ensureDir();
-    if (!fs.existsSync(STORE_PATH)) {
-      return { positions: [], config: { ...DEFAULT_CONFIG } };
-    }
+    if (!fs.existsSync(STORE_PATH)) return { positions: [], config: { ...DEFAULT_CONFIG } };
     const raw = fs.readFileSync(STORE_PATH, "utf-8");
     const parsed = JSON.parse(raw);
     return {
@@ -48,17 +45,10 @@ function save(data: StoreData) {
 export class TradeStore {
   private data: StoreData;
 
-  constructor() {
-    this.data = load();
-  }
+  constructor() { this.data = load(); }
 
-  getAll(): Position[] {
-    return [...this.data.positions];
-  }
-
-  getOpen(): Position[] {
-    return this.data.positions.filter((p) => p.status === "open" || p.status === "pending_sell");
-  }
+  getAll(): Position[] { return [...this.data.positions]; }
+  getOpen(): Position[] { return this.data.positions.filter((p) => p.status === "open" || p.status === "pending_sell"); }
 
   getByMint(mintAddress: string): Position | undefined {
     return this.data.positions.find(
@@ -66,9 +56,7 @@ export class TradeStore {
     );
   }
 
-  getById(id: string): Position | undefined {
-    return this.data.positions.find((p) => p.id === id);
-  }
+  getById(id: string): Position | undefined { return this.data.positions.find((p) => p.id === id); }
 
   delete(id: string): void {
     this.data.positions = this.data.positions.filter((p) => p.id !== id);
@@ -77,21 +65,16 @@ export class TradeStore {
 
   upsert(position: Position): Position {
     const idx = this.data.positions.findIndex((p) => p.id === position.id);
-    if (idx >= 0) {
-      this.data.positions[idx] = position;
-    } else {
-      this.data.positions.unshift(position);
-    }
+    if (idx >= 0) this.data.positions[idx] = position;
+    else this.data.positions.unshift(position);
     this.pruneClosed();
     save(this.data);
     return position;
   }
 
-  // Kapanan + Başarısız işlemlerden yalnızca en yeni MAX_CLOSED_HISTORY tanesini sakla
   private static MAX_CLOSED_HISTORY = 4;
   private pruneClosed() {
     const isClosed = (p: Position) => p.status === "closed" || p.status === "failed";
-    // En yeni en üstte (unshift kullanıyoruz), buyTimestamp ile garantileyelim
     const closed = this.data.positions
       .filter(isClosed)
       .sort((a, b) => (b.buyTimestamp ?? 0) - (a.buyTimestamp ?? 0));
@@ -99,9 +82,7 @@ export class TradeStore {
     this.data.positions = this.data.positions.filter((p) => !isClosed(p) || toKeep.has(p.id));
   }
 
-  getConfig(): TradeConfig {
-    return { ...this.data.config };
-  }
+  getConfig(): TradeConfig { return { ...this.data.config }; }
 
   updateConfig(partial: Partial<TradeConfig>): TradeConfig {
     this.data.config = { ...this.data.config, ...partial };

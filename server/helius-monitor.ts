@@ -180,6 +180,23 @@ export class HeliusMonitor {
   getState() { return this.isRunning; }
   getSolPriceUsd(): number { return this.solPriceUsd; }
 
+  async getWalletBalance(publicKey: string): Promise<number> {
+    const apiKey = process.env.HELIUS_API_KEY;
+    const rpcUrl = `https://mainnet.helius-rpc.com/?api-key=${apiKey}`;
+    const res = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", id: 1, method: "getBalance",
+        params: [publicKey, { commitment: "confirmed" }],
+      }),
+    });
+    if (!res.ok) throw new Error(`RPC hata: ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    return (data.result?.value ?? 0) / 1e9;
+  }
+
   private startHeartbeat() {
     if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
     this.sendHeartbeat();

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle } from "lucide-react";
+import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -20,7 +20,6 @@ interface TradePanelProps {
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
 }
 
-// USD fiyatını okunaklı formatla. Çok küçükse 4 anlamlı basamak göster.
 const formatUsd = (n?: number) => {
   if (n === undefined || n === null || Number.isNaN(n) || n <= 0) return "—";
   if (n >= 1) return `$${n.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
@@ -31,29 +30,22 @@ const formatUsd = (n?: number) => {
   return `$${n.toFixed(decimals).replace(/0+$/, "").replace(/\.$/, "")}`;
 };
 
-const truncate = (addr?: string) =>
-  addr ? `${addr.slice(0, 4)}...${addr.slice(-4)}` : "—";
+const truncate = (addr?: string) => addr ? `${addr.slice(0, 4)}...${addr.slice(-4)}` : "—";
 
-const formatTime = (ts?: number) => {
-  if (!ts) return "—";
-  return new Date(ts).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-};
+const formatTime = (ts?: number) =>
+  ts ? new Date(ts).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
 
 const formatNumber = (n?: number, digits = 4) =>
   n === undefined || n === null || Number.isNaN(n) ? "—" : n.toLocaleString("tr-TR", { maximumFractionDigits: digits });
 
-// Çok küçük sayıları bilimsel gösterim yerine okunaklı ondalık olarak gösterir.
-// Örn 7.012e-7 → "0.0000007012". 0.005 → "0.005000".
 const formatPrice = (n?: number) => {
   if (n === undefined || n === null || Number.isNaN(n) || n <= 0) return "—";
   if (n >= 0.001) return n.toFixed(6);
-  // <0.001 için en az 4 anlamlı basamak
   const log = Math.floor(Math.log10(n));
   const decimals = Math.min(18, Math.abs(log) + 4);
   return n.toFixed(decimals).replace(/0+$/, "").replace(/\.$/, "");
 };
 
-// Büyük token sayılarını M/K ile özetler (1.234.567 → "1.23M")
 const formatCompact = (n?: number) => {
   if (n === undefined || n === null || Number.isNaN(n)) return "—";
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
@@ -77,6 +69,7 @@ export function TradePanel({
   const [solAmountInput, setSolAmountInput] = useState(String(config.solAmount));
   const [slippageInput, setSlippageInput] = useState(String(config.slippageBps));
   const [priorityInput, setPriorityInput] = useState(String(config.priorityFeeMicroLamports));
+  const [takeProfitInput, setTakeProfitInput] = useState(String(config.takeProfitPct ?? 0));
 
   const copyAddress = async (address: string, id: string) => {
     await navigator.clipboard.writeText(address);
@@ -102,19 +95,24 @@ export function TradePanel({
     const sol = parseFloat(solAmountInput);
     const slip = parseInt(slippageInput, 10);
     const prio = parseInt(priorityInput, 10);
+    const tp = parseFloat(takeProfitInput);
     const partial: Partial<TradeConfig> = {};
     if (!Number.isNaN(sol) && sol > 0) partial.solAmount = sol;
-    if (!Number.isNaN(slip) && slip >= 50 && slip <= 10000) partial.slippageBps = slip;
+    if (!Number.isNaN(slip) && slip >= 50) partial.slippageBps = slip;
     if (!Number.isNaN(prio) && prio >= 0) partial.priorityFeeMicroLamports = prio;
+    if (!Number.isNaN(tp) && tp >= 0) partial.takeProfitPct = tp;
     if (Object.keys(partial).length) onUpdateConfig(partial);
   };
 
+  const takeProfitPct = config.takeProfitPct ?? 0;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* Üst Bilgi: Cüzdan + İstatistikler */}
+      {/* Üst Bilgi */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Cüzdan kartı */}
         <Card className="p-4 space-y-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Wallet className="h-5 w-5 text-primary" />
             <h2 className="text-base font-semibold">Trader Cüzdanı</h2>
             {traderReady ? (
@@ -135,7 +133,7 @@ export function TradePanel({
           ) : (
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-              <span>TRADER_PRIVATE_KEY tanımlı değil veya geçersiz. Otomatik alım/satım için Replit Secrets üzerinden geçerli bir base58 anahtar ekleyin.</span>
+              <span>TRADER_PRIVATE_KEY tanımlı değil. Dosyalar sekmesinden ekleyebilirsin.</span>
             </div>
           )}
           <div className="grid grid-cols-2 gap-3 pt-1">
@@ -156,57 +154,51 @@ export function TradePanel({
           </div>
         </Card>
 
+        {/* Ayarlar kartı */}
         <Card className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Settings className="h-5 w-5 text-chart-2" />
             <h2 className="text-base font-semibold">Trade Ayarları</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label htmlFor="sol-amount" className="text-xs">İşlem Başına SOL</Label>
-              <Input
-                id="sol-amount"
-                type="number"
-                step="0.01"
-                min="0.0001"
-                value={solAmountInput}
-                onChange={(e) => setSolAmountInput(e.target.value)}
-                data-testid="input-sol-amount"
-              />
+              <Input id="sol-amount" type="number" step="0.01" min="0.0001" value={solAmountInput}
+                onChange={(e) => setSolAmountInput(e.target.value)} data-testid="input-sol-amount" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="slippage" className="text-xs">Slippage (bps)</Label>
-              <Input
-                id="slippage"
-                type="number"
-                step="50"
-                min="50"
-                max="50000"
-                value={slippageInput}
-                onChange={(e) => setSlippageInput(e.target.value)}
-                data-testid="input-slippage"
-              />
-              <p className="text-[10px] text-muted-foreground">500000 = %5000 (yüksek slippage işlemi geçirir)</p>
+              <Input id="slippage" type="number" step="1000" min="50" value={slippageInput}
+                onChange={(e) => setSlippageInput(e.target.value)} data-testid="input-slippage" />
+              <p className="text-[10px] text-muted-foreground">{Math.floor(parseInt(slippageInput || "0") / 100)}%</p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="priority" className="text-xs">Priority Fee (µLamports)</Label>
-              <Input
-                id="priority"
-                type="number"
-                step="10000"
-                min="0"
-                value={priorityInput}
-                onChange={(e) => setPriorityInput(e.target.value)}
-                data-testid="input-priority"
-              />
+              <Input id="priority" type="number" step="1000000" min="0" value={priorityInput}
+                onChange={(e) => setPriorityInput(e.target.value)} data-testid="input-priority" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="take-profit" className="text-xs flex items-center gap-1">
+                <Target className="h-3 w-3 text-emerald-400" />
+                Kar Hedefi (%)
+              </Label>
+              <Input id="take-profit" type="number" step="5" min="0" max="10000" value={takeProfitInput}
+                onChange={(e) => setTakeProfitInput(e.target.value)} data-testid="input-take-profit"
+                className={parseFloat(takeProfitInput) > 0 ? "border-emerald-500/50 text-emerald-400" : ""} />
+              <p className="text-[10px] text-muted-foreground">
+                {parseFloat(takeProfitInput) > 0 ? `+%${takeProfitInput}'de otomatik sat` : "0 = devre dışı"}
+              </p>
             </div>
           </div>
           <Button onClick={saveConfig} className="w-full" data-testid="button-save-config">
             Ayarları Kaydet
           </Button>
-          <div className="text-xs text-muted-foreground">
-            Mevcut: {config.solAmount} SOL · {config.slippageBps} bps (%{(config.slippageBps / 100).toFixed(1)}) · {config.priorityFeeMicroLamports.toLocaleString()} µLamports
-          </div>
+          {takeProfitPct > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1.5">
+              <Target className="h-3.5 w-3.5 shrink-0" />
+              Kar hedefi aktif: +%{takeProfitPct}'ye ulaşınca otomatik satış
+            </div>
+          )}
         </Card>
       </div>
 
@@ -214,36 +206,24 @@ export function TradePanel({
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-base font-semibold mr-2">Pozisyonlar</h2>
         {(["all", "open", "closed"] as Filter[]).map((f) => (
-          <Button
-            key={f}
-            variant={filter === f ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter(f)}
-            data-testid={`button-filter-${f}`}
-          >
+          <Button key={f} variant={filter === f ? "default" : "outline"} size="sm"
+            onClick={() => setFilter(f)} data-testid={`button-filter-${f}`}>
             {f === "all" ? "Tümü" : f === "open" ? `Açık (${stats.openCount})` : `Kapanan (${stats.closedCount})`}
           </Button>
         ))}
       </div>
 
-      {/* Pozisyon Listesi */}
+      {/* Pozisyon listesi */}
       {filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Wallet className="h-10 w-10 mx-auto mb-2 opacity-40" />
-          <p className="text-sm">Henüz pozisyon yok. Dashboard'daki "Al" butonuyla işlem başlatın.</p>
+          <p className="text-sm">Henüz pozisyon yok. Dashboard'daki "Jup Al" veya "Pump Al" ile işlem başlat.</p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((p) => (
-            <PositionRow
-              key={p.id}
-              position={p}
-              copiedId={copiedId}
-              solPriceUsd={solPriceUsd}
-              onCopy={copyAddress}
-              onSell={onSell}
-              onDelete={onDelete}
-            />
+            <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
+              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -265,28 +245,27 @@ interface PositionRowProps {
   position: Position;
   copiedId: string | null;
   solPriceUsd: number;
+  takeProfitPct: number;
   onCopy: (addr: string, id: string) => void;
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
 }
 
-function PositionRow({ position: p, copiedId, solPriceUsd, onCopy, onSell, onDelete }: PositionRowProps) {
+function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete }: PositionRowProps) {
   const isOpen = p.status === "open";
   const isPending = p.status === "pending_buy" || p.status === "pending_sell";
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
+  const profitPct = isOpen ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
+  const profitPositive = (profitPct ?? 0) >= 0;
+  const nearTarget = takeProfitPct > 0 && isOpen && profitPct !== null && profitPct >= takeProfitPct * 0.8;
 
   return (
     <div
       className={`bg-card border rounded-lg p-3 ${
-        p.status === "closed"
-          ? pnlPositive
-            ? "border-emerald-500/30"
-            : "border-destructive/30"
-          : p.status === "failed"
-          ? "border-destructive/40"
-          : isOpen
-          ? "border-primary/40"
-          : "border-card-border"
+        p.status === "closed" ? (pnlPositive ? "border-emerald-500/30" : "border-destructive/30")
+        : p.status === "failed" ? "border-destructive/40"
+        : isOpen ? "border-primary/40"
+        : "border-card-border"
       }`}
       data-testid={`row-position-${p.id}`}
     >
@@ -296,17 +275,27 @@ function PositionRow({ position: p, copiedId, solPriceUsd, onCopy, onSell, onDel
             <span className="font-semibold text-sm" data-testid="text-pos-name">{p.name}</span>
             <span className="text-xs text-muted-foreground">{p.symbol}</span>
             <StatusBadge status={p.status} />
-            {p.status === "closed" && p.pnlSol !== undefined && (
+            {/* DEX rozeti */}
+            {p.dex && (
+              <Badge className={`text-[10px] ${p.dex === "pumpswap" ? "bg-orange-500/15 text-orange-400 border border-orange-500/30" : "bg-primary/15 text-primary border border-primary/30"}`}>
+                {p.dex === "pumpswap" ? "PumpSwap" : "Jupiter"}
+              </Badge>
+            )}
+            {/* Kar/Zarar yüzdesi — büyük ve belirgin */}
+            {profitPct !== null && (
               <Badge
-                className={`text-xs gap-1 ${
-                  pnlPositive
-                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
+                className={`text-xs gap-1 font-bold ${
+                  profitPositive
+                    ? nearTarget
+                      ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/60 animate-pulse"
+                      : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
                     : "bg-destructive/15 text-destructive border border-destructive/40"
                 }`}
+                data-testid="badge-pos-pnl-pct"
               >
-                {pnlPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                {pnlPositive ? "+" : ""}
-                {p.pnlSol.toFixed(4)} SOL ({p.pnlPct?.toFixed(1)}%)
+                {profitPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {profitPositive ? "+" : ""}{profitPct.toFixed(1)}%
+                {nearTarget && takeProfitPct > 0 && ` → %${takeProfitPct}`}
               </Badge>
             )}
             <span className="text-[10px] text-muted-foreground ml-auto">{formatTime(p.buyTimestamp)}</span>
@@ -316,36 +305,30 @@ function PositionRow({ position: p, copiedId, solPriceUsd, onCopy, onSell, onDel
             <code className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
               {truncate(p.mintAddress)}
             </code>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => onCopy(p.mintAddress, p.id)}
-              className="h-6 w-6"
-              data-testid="button-copy-pos-address"
-            >
+            <Button size="icon" variant="ghost" onClick={() => onCopy(p.mintAddress, p.id)} className="h-6 w-6" data-testid="button-copy-pos-address">
               {copiedId === p.id ? <Check className="h-3 w-3 text-chart-4" /> : <Copy className="h-3 w-3" />}
             </Button>
             <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
               <a href={`https://dexscreener.com/solana/${p.mintAddress}`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3 w-3 mr-1" /> Dex
+                <ExternalLink className="h-3 w-3 mr-1" />Dex
               </a>
             </Button>
             <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
               <a href={`https://jup.ag/swap/SOL-${p.mintAddress}`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3 w-3 mr-1" /> Jup
+                <ExternalLink className="h-3 w-3 mr-1" />Jup
               </a>
             </Button>
             {p.buyTxSignature && (
               <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
                 <a href={`https://solscan.io/tx/${p.buyTxSignature}`} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-3 w-3 mr-1" /> Buy
+                  <ExternalLink className="h-3 w-3 mr-1" />Buy TX
                 </a>
               </Button>
             )}
             {p.sellTxSignature && (
               <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
                 <a href={`https://solscan.io/tx/${p.sellTxSignature}`} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-3 w-3 mr-1" /> Sell
+                  <ExternalLink className="h-3 w-3 mr-1" />Sell TX
                 </a>
               </Button>
             )}
@@ -365,18 +348,14 @@ function PositionRow({ position: p, copiedId, solPriceUsd, onCopy, onSell, onDel
             <Cell
               label={isOpen && p.currentPriceUsd ? "Şu Anki Fiyat" : "Alım Fiyatı"}
               value={
-                isOpen && p.currentPriceUsd
-                  ? formatUsd(p.currentPriceUsd)
-                  : solPriceUsd > 0 && p.buyPriceSol
-                    ? formatUsd(p.buyPriceSol * solPriceUsd)
-                    : `${formatPrice(p.buyPriceSol)} SOL`
+                isOpen && p.currentPriceUsd ? formatUsd(p.currentPriceUsd)
+                : solPriceUsd > 0 && p.buyPriceSol ? formatUsd(p.buyPriceSol * solPriceUsd)
+                : `${formatPrice(p.buyPriceSol)} SOL`
               }
               sub={
                 isOpen && p.currentPriceUsd && p.buyPriceSol
                   ? `Aldığın: ${formatUsd(p.buyPriceSol * solPriceUsd)}`
-                  : solPriceUsd > 0 && p.buyPriceSol
-                    ? `${formatPrice(p.buyPriceSol)} SOL`
-                    : undefined
+                  : solPriceUsd > 0 && p.buyPriceSol ? `${formatPrice(p.buyPriceSol)} SOL` : undefined
               }
             />
             <Cell
@@ -385,40 +364,28 @@ function PositionRow({ position: p, copiedId, solPriceUsd, onCopy, onSell, onDel
                 isOpen && p.unrealizedPnlSol !== undefined
                   ? `${p.unrealizedPnlSol >= 0 ? "+" : ""}${formatUsd(Math.abs(p.unrealizedPnlSol * solPriceUsd))}`
                   : p.sellPriceSol
-                    ? solPriceUsd > 0
-                      ? formatUsd(p.sellPriceSol * solPriceUsd)
-                      : `${formatPrice(p.sellPriceSol)} SOL`
+                    ? solPriceUsd > 0 ? formatUsd(p.sellPriceSol * solPriceUsd) : `${formatPrice(p.sellPriceSol)} SOL`
                     : "—"
               }
               sub={
                 isOpen && p.unrealizedPnlPct !== undefined
-                  ? `${p.unrealizedPnlPct >= 0 ? "+" : ""}${p.unrealizedPnlPct.toFixed(1)}%`
-                  : p.sellPriceSol
-                    ? `${formatPrice(p.sellPriceSol)} SOL${
-                        p.sellSolAmount
-                          ? ` · ${p.sellSolAmount.toFixed(4)} SOL${solPriceUsd > 0 ? ` (${formatUsd(p.sellSolAmount * solPriceUsd)})` : ""}`
-                          : ""
-                      }`
+                  ? `${p.unrealizedPnlPct >= 0 ? "+" : ""}${p.unrealizedPnlPct.toFixed(2)}%`
+                  : p.sellSolAmount
+                    ? `${p.sellSolAmount.toFixed(4)} SOL${solPriceUsd > 0 ? ` (${formatUsd(p.sellSolAmount * solPriceUsd)})` : ""}`
                     : undefined
               }
+              highlight={isOpen && (p.unrealizedPnlPct ?? 0) >= 0 ? "green" : isOpen ? "red" : undefined}
             />
           </div>
 
           {p.error && (
-            <div className="text-[11px] text-destructive bg-destructive/10 rounded px-2 py-1">
-              ⚠️ {p.error}
-            </div>
+            <div className="text-[11px] text-destructive bg-destructive/10 rounded px-2 py-1">⚠️ {p.error}</div>
           )}
         </div>
 
         <div className="shrink-0 flex gap-2">
           {isOpen && (
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => onSell(p.id)}
-              data-testid={`button-sell-${p.id}`}
-            >
+            <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
               Sat
             </Button>
           )}
@@ -429,18 +396,16 @@ function PositionRow({ position: p, copiedId, solPriceUsd, onCopy, onSell, onDel
             </Button>
           )}
           <Button
-            size="icon"
-            variant="ghost"
+            size="icon" variant="ghost"
             onClick={() => {
               if (isPending) {
-                const msg = p.status === "pending_buy" ? "Alım iptal edilecek" : "Satış iptal edilecek";
-                if (confirm(`${msg}, emin misin?`)) onDelete(p.id);
+                if (confirm(`${p.status === "pending_buy" ? "Alım" : "Satış"} iptal edilecek, emin misin?`)) onDelete(p.id);
               } else {
                 onDelete(p.id);
               }
             }}
             className="h-8 w-8 text-destructive/60 hover:text-destructive"
-            title={isPending ? "İşlemi iptal edip sil" : "Pozisyonu sil"}
+            title={isPending ? "İşlemi iptal et" : "Pozisyonu sil"}
           >
             ✕
           </Button>
@@ -450,11 +415,13 @@ function PositionRow({ position: p, copiedId, solPriceUsd, onCopy, onSell, onDel
   );
 }
 
-function Cell({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Cell({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: "green" | "red" }) {
   return (
-    <div className="bg-muted/30 rounded px-2 py-1">
+    <div className={`rounded px-2 py-1 ${
+      highlight === "green" ? "bg-emerald-500/10" : highlight === "red" ? "bg-destructive/10" : "bg-muted/30"
+    }`}>
       <p className="text-[10px] text-muted-foreground">{label}</p>
-      <p className="font-mono">{value}</p>
+      <p className={`font-mono ${highlight === "green" ? "text-emerald-400" : highlight === "red" ? "text-destructive" : ""}`}>{value}</p>
       {sub && <p className="text-[9px] text-muted-foreground/70 font-mono truncate" title={sub}>{sub}</p>}
     </div>
   );
@@ -462,11 +429,11 @@ function Cell({ label, value, sub }: { label: string; value: string; sub?: strin
 
 function StatusBadge({ status }: { status: Position["status"] }) {
   const map: Record<Position["status"], { label: string; cls: string }> = {
-    pending_buy: { label: "Alınıyor", cls: "bg-primary/15 text-primary border border-primary/40" },
-    open: { label: "Açık", cls: "bg-chart-4/15 text-chart-4 border border-chart-4/40" },
+    pending_buy:  { label: "Alınıyor",  cls: "bg-primary/15 text-primary border border-primary/40" },
+    open:         { label: "Açık",      cls: "bg-chart-4/15 text-chart-4 border border-chart-4/40" },
     pending_sell: { label: "Satılıyor", cls: "bg-primary/15 text-primary border border-primary/40" },
-    closed: { label: "Kapandı", cls: "bg-muted text-muted-foreground border border-muted-foreground/30" },
-    failed: { label: "Başarısız", cls: "bg-destructive/15 text-destructive border border-destructive/40" },
+    closed:       { label: "Kapandı",   cls: "bg-muted text-muted-foreground border border-muted-foreground/30" },
+    failed:       { label: "Başarısız", cls: "bg-destructive/15 text-destructive border border-destructive/40" },
   };
   const cfg = map[status];
   return <Badge className={`text-xs ${cfg.cls}`}>{cfg.label}</Badge>;

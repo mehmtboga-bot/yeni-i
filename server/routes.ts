@@ -205,11 +205,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   monitor.start();
 
   // Canlı fiyat güncelleme (açık pozisyonlar için)
-  const pricer = new PositionPricer(tradeStore, monitor.getSolPriceUsd(), (event: string, data: any) => {
-    if (event === "position_update") {
-      broadcastToClients({ type: "position_update", data });
-    }
-  });
+  const pricer = new PositionPricer(
+    tradeStore,
+    monitor.getSolPriceUsd(),
+    (event: string, data: any) => {
+      if (event === "position_update") broadcastToClients({ type: "position_update", data });
+    },
+    (positionId: string) => {
+      trader.sell(positionId).catch((err) => console.error("auto-sell hatası:", err));
+    },
+  );
   pricer.start();
 
   wss.on("connection", (ws: WebSocket) => {
@@ -249,13 +254,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }));
           }
         } else if (message.type === "buy_token") {
-          const { mintAddress, name, symbol } = message.data || {};
+          const { mintAddress, name, symbol, dex } = message.data || {};
           if (mintAddress) {
-            trader.buy({
-              mintAddress,
-              name: name || "Bilinmiyor",
-              symbol: symbol || "?",
-            }).catch((err) => console.error("buy_token hatası:", err));
+            const nm = name || "Bilinmiyor";
+            const sym = symbol || "?";
+            if (dex === "pumpswap") {
+              trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym })
+                .catch((err) => console.error("buyPumpSwap hatası:", err));
+            } else {
+              trader.buy({ mintAddress, name: nm, symbol: sym })
+                .catch((err) => console.error("buy_token hatası:", err));
+            }
           }
         } else if (message.type === "sell_token") {
           const { positionId } = message.data || {};
@@ -263,11 +272,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             trader.sell(positionId).catch((err) => console.error("sell_token hatası:", err));
           }
         } else if (message.type === "trade_config_update") {
-          const { solAmount, slippageBps, priorityFeeMicroLamports } = message.data || {};
+          const { solAmount, slippageBps, priorityFeeMicroLamports, takeProfitPct } = message.data || {};
           const partial: Record<string, number> = {};
           if (typeof solAmount === "number" && solAmount > 0) partial.solAmount = solAmount;
-          if (typeof slippageBps === "number" && slippageBps >= 50 && slippageBps <= 10000) partial.slippageBps = slippageBps;
+          if (typeof slippageBps === "number" && slippageBps >= 50) partial.slippageBps = slippageBps;
           if (typeof priorityFeeMicroLamports === "number" && priorityFeeMicroLamports >= 0) partial.priorityFeeMicroLamports = priorityFeeMicroLamports;
+          if (typeof takeProfitPct === "number" && takeProfitPct >= 0) partial.takeProfitPct = takeProfitPct;
           if (Object.keys(partial).length) trader.updateConfig(partial as any);
         } else if (message.type === "delete_position") {
           const { positionId } = message.data || {};
