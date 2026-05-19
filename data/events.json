@@ -1,26 +1,6 @@
 {
-  "lastId": 17,
+  "lastId": 22,
   "events": [
-    {
-      "id": 1,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "⚠️ TRADER_PRIVATE_KEY tanımlı değil. Otomatik alım/satım devre dışı.",
-        "timestamp": 1779211497361
-      },
-      "timestamp": 1779211497361
-    },
-    {
-      "id": 2,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚀 Helius Monitor başlatılıyor (PumpSwap — sadece CreatePool)...",
-        "timestamp": 1779211497362
-      },
-      "timestamp": 1779211497362
-    },
     {
       "id": 3,
       "type": "monitoring_state",
@@ -168,6 +148,56 @@
         "timestamp": 1779211518105
       },
       "timestamp": 1779211518105
+    },
+    {
+      "id": 18,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "⚠️ [LP] TX indexlenemedi, atlanıyor: 2MF6ccCX...",
+        "timestamp": 1779211596693
+      },
+      "timestamp": 1779211596693
+    },
+    {
+      "id": 19,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "⚠️ [WS] PumpSwap — token mint bulunamadı: 2MF6ccCX...",
+        "timestamp": 1779211596694
+      },
+      "timestamp": 1779211596694
+    },
+    {
+      "id": 20,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:27:20 PM [express] GET /api/files/list 200 in 1ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
+        "timestamp": 1779211640091
+      },
+      "timestamp": 1779211640091
+    },
+    {
+      "id": 21,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:27:20 PM [express] GET /api/events 200 in 0ms :: {\"events\":[{\"id\":1,\"type\":\"server_log\",\"data\":{\"l…",
+        "timestamp": 1779211640094
+      },
+      "timestamp": 1779211640094
+    },
+    {
+      "id": 22,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:27:20 PM [express] GET /api/files/read 200 in 2ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
+        "timestamp": 1779211640330
+      },
+      "timestamp": 1779211640330
     }
   ]
 }
