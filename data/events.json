@@ -1,244 +1,250 @@
 {
-  "lastId": 260,
+  "lastId": 295,
   "events": [
     {
-      "id": 241,
+      "id": 276,
       "type": "server_log",
       "data": {
         "level": "warn",
-        "message": "⏳ [Jupiter Buy UGOS] Deneme 1/5 başarısız — 1000ms bekleniyor...",
-        "timestamp": 1779214690748
+        "message": "⏳ [Jupiter Buy SAOS] Deneme 2/5 başarısız — 1000ms bekleniyor...",
+        "timestamp": 1779215042123
       },
-      "timestamp": 1779214690748
+      "timestamp": 1779215042123
     },
     {
-      "id": 242,
+      "id": 277,
       "type": "server_log",
       "data": {
         "level": "warn",
-        "message": "⏳ [Jupiter Buy UGOS] Deneme 2/5 başarısız — 1000ms bekleniyor...",
-        "timestamp": 1779214691807
+        "message": "⏳ [Jupiter Buy SAOS] Deneme 3/5 başarısız — 1000ms bekleniyor...",
+        "timestamp": 1779215043185
       },
-      "timestamp": 1779214691807
+      "timestamp": 1779215043185
     },
     {
-      "id": 243,
+      "id": 278,
       "type": "server_log",
       "data": {
         "level": "warn",
-        "message": "⏳ [Jupiter Buy UGOS] Deneme 3/5 başarısız — 1000ms bekleniyor...",
-        "timestamp": 1779214692868
+        "message": "⏳ [Jupiter Buy SAOS] Deneme 4/5 başarısız — 1000ms bekleniyor...",
+        "timestamp": 1779215044247
       },
-      "timestamp": 1779214692868
+      "timestamp": 1779215044247
     },
     {
-      "id": 244,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "⏳ [Jupiter Buy UGOS] Deneme 4/5 başarısız — 1000ms bekleniyor...",
-        "timestamp": 1779214693929
-      },
-      "timestamp": 1779214693929
-    },
-    {
-      "id": 245,
+      "id": 279,
       "type": "position_update",
       "data": {
-        "id": "pos-Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m-1779214690639",
-        "mintAddress": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
-        "name": "United Global Oil Supply",
-        "symbol": "UGOS",
+        "id": "pos-CtqBgWcG8uW2ewi7FGR7M4h4mdkRy1qgcFipbhJERiRf-1779215040941",
+        "mintAddress": "CtqBgWcG8uW2ewi7FGR7M4h4mdkRy1qgcFipbhJERiRf",
+        "name": "Strategic American Oil Supply",
+        "symbol": "SAOS",
         "dex": "jupiter",
         "status": "failed",
-        "buyTimestamp": 1779214690639,
+        "buyTimestamp": 1779215040941,
         "buySolAmount": 0.015,
-        "error": "Jupiter quote 400: {\"error\":\"Cannot compute other amount threshold, with amount 6406 and slippageBps 50000\",\"errorCode\":\"CANNOT_COMPUTE_OTHER_AMOUNT_THRESHOLD\"}"
+        "error": "Jupiter quote 400: {\"error\":\"Cannot compute other amount threshold, with amount 64688953636 and slippageBps 50000\",\"errorCode\":\"CANNOT_COMPUTE_OTHER_AMOUNT_THRESHOLD\"}"
       },
-      "timestamp": 1779214694989
+      "timestamp": 1779215045309
     },
     {
-      "id": 246,
+      "id": 280,
       "type": "server_log",
       "data": {
         "level": "error",
-        "message": "❌ [Jupiter] ALIM hatası UGOS: Jupiter quote 400: {\"error\":\"Cannot compute other amount threshold, with amount 6406 and slippageBps 50000\",\"errorCode\":\"CANNOT_COMPUTE_OTHER_AMOUNT_THRESHOLD\"}",
-        "timestamp": 1779214694990
+        "message": "❌ [Jupiter] ALIM hatası SAOS: Jupiter quote 400: {\"error\":\"Cannot compute other amount threshold, with amount 64688953636 and slippageBps 50000\",\"errorCode\":\"CANNOT_COMPUTE_OTHER_AMOUNT_THRESHOLD\"}",
+        "timestamp": 1779215045310
       },
-      "timestamp": 1779214694990
+      "timestamp": 1779215045310
     },
     {
-      "id": 247,
+      "id": 281,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "💧 [LP] AMAZON FIRE MAP LIZARD (Amfliz) | PumpSwap | 193.5281 SOL ($16360) | TVL ~$32721",
-        "timestamp": 1779214735836
+        "message": "💧 [LP] Purple Alien (PA) | PumpSwap | 520.0000 SOL ($43960) | TVL ~$87919",
+        "timestamp": 1779215076925
       },
-      "timestamp": 1779214735836
+      "timestamp": 1779215076925
     },
     {
-      "id": 248,
+      "id": 282,
       "type": "lp_detected",
       "data": {
-        "id": "AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump-1779214735833",
-        "mintAddress": "AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump",
-        "lpMint": "7KEAxmKjQKjESiCqqkHDmWF8iNyCEZRtNmwZ5PTSz7CC",
-        "name": "AMAZON FIRE MAP LIZARD",
-        "symbol": "Amfliz",
-        "detectedAt": 1779214735833,
-        "expiresAt": 1779215035833,
-        "liquidityAmount": 193.528086895,
-        "liquidityUsd": 16360.458754314725,
-        "tvlUsd": 32720.91750862945,
+        "id": "9Hi5GmFSwuWwFSdzvez3GnpkaDQSzxgPPHTYLcuBKE7-1779215076925",
+        "mintAddress": "9Hi5GmFSwuWwFSdzvez3GnpkaDQSzxgPPHTYLcuBKE7",
+        "lpMint": "9AnBjJQR8zk6f72VHN4hAazHiUCBC6t3XC5WjKeKuHiH",
+        "name": "Purple Alien",
+        "symbol": "PA",
+        "detectedAt": 1779215076925,
+        "expiresAt": 1779215376925,
+        "liquidityAmount": 520,
+        "liquidityUsd": 43959.7098733241,
+        "tvlUsd": 87919.4197466482,
         "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump",
-        "dexscreenerUrl": "https://dexscreener.com/solana/AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump",
-        "pumpfunUrl": "https://pump.fun/AQFnXvdce16Y851CWNn8EDLFomS9mDRAx7kKsKKfpump"
+        "jupiterUrl": "https://jup.ag/swap/SOL-9Hi5GmFSwuWwFSdzvez3GnpkaDQSzxgPPHTYLcuBKE7",
+        "dexscreenerUrl": "https://dexscreener.com/solana/9Hi5GmFSwuWwFSdzvez3GnpkaDQSzxgPPHTYLcuBKE7",
+        "pumpfunUrl": "https://pump.fun/9Hi5GmFSwuWwFSdzvez3GnpkaDQSzxgPPHTYLcuBKE7"
       },
-      "timestamp": 1779214735836
+      "timestamp": 1779215076925
     },
     {
-      "id": 249,
+      "id": 283,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | Amfliz | TVL=$32721 | eşik=$40000",
-        "timestamp": 1779214735846
+        "message": "📲 Telegram bildirimi gönderildi.",
+        "timestamp": 1779215077490
       },
-      "timestamp": 1779214735846
+      "timestamp": 1779215077490
     },
     {
-      "id": 250,
+      "id": 284,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "💧 [LP] United Global Oil Supply (UGOS) | PumpSwap | 200.0000 SOL ($16908) | TVL ~$33815",
-        "timestamp": 1779214783852
+        "message": "💧 [LP] Baby DOWGE (Baby DOWGE) | PumpSwap | 50.0000 SOL ($4227) | TVL ~$8454",
+        "timestamp": 1779215142734
       },
-      "timestamp": 1779214783852
+      "timestamp": 1779215142734
     },
     {
-      "id": 251,
+      "id": 285,
       "type": "lp_detected",
       "data": {
-        "id": "EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d-1779214783852",
-        "mintAddress": "EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d",
-        "lpMint": "FwmrqVPUvMCXL1xKqfahfeizEn6Hg8jNYbTvMdRNMpLn",
-        "name": "United Global Oil Supply",
-        "symbol": "UGOS",
-        "detectedAt": 1779214783852,
-        "expiresAt": 1779215083852,
-        "liquidityAmount": 200,
-        "liquidityUsd": 16907.58072050927,
-        "tvlUsd": 33815.16144101854,
+        "id": "6tHi2WPDT1Y6z3DNY1nq7E8erug7b6pnvAtWWqncJzix-1779215142733",
+        "mintAddress": "6tHi2WPDT1Y6z3DNY1nq7E8erug7b6pnvAtWWqncJzix",
+        "lpMint": "EMfhqZomjdoKg1UURGMjqfKJGSoA1z5Kcnf6wojAxMwJ",
+        "name": "Baby DOWGE",
+        "symbol": "Baby DOWGE",
+        "detectedAt": 1779215142733,
+        "expiresAt": 1779215442733,
+        "liquidityAmount": 50,
+        "liquidityUsd": 4226.895180127318,
+        "tvlUsd": 8453.790360254636,
         "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d",
-        "dexscreenerUrl": "https://dexscreener.com/solana/EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d",
-        "pumpfunUrl": "https://pump.fun/EpQuA1FhPPcZRhTaV4NVhKT4wNVFi51sogYovCRL8u4d"
+        "jupiterUrl": "https://jup.ag/swap/SOL-6tHi2WPDT1Y6z3DNY1nq7E8erug7b6pnvAtWWqncJzix",
+        "dexscreenerUrl": "https://dexscreener.com/solana/6tHi2WPDT1Y6z3DNY1nq7E8erug7b6pnvAtWWqncJzix",
+        "pumpfunUrl": "https://pump.fun/6tHi2WPDT1Y6z3DNY1nq7E8erug7b6pnvAtWWqncJzix"
       },
-      "timestamp": 1779214783853
+      "timestamp": 1779215142734
     },
     {
-      "id": 252,
+      "id": 286,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | UGOS | TVL=$33815 | eşik=$40000",
-        "timestamp": 1779214783863
+        "message": "🚫 [LP] Telegram atlandı | Baby DOWGE | TVL=$8454 | eşik=$40000",
+        "timestamp": 1779215142744
       },
-      "timestamp": 1779214783863
+      "timestamp": 1779215142744
     },
     {
-      "id": 253,
+      "id": 287,
+      "type": "trade_config_update",
+      "data": {
+        "solAmount": 0.01,
+        "slippageBps": 5000,
+        "priorityFeeMicroLamports": 200000,
+        "takeProfitPct": 30
+      },
+      "timestamp": 1779215149368
+    },
+    {
+      "id": 288,
+      "type": "trade_config_update",
+      "data": {
+        "solAmount": 0.01,
+        "slippageBps": 5000,
+        "priorityFeeMicroLamports": 200000,
+        "takeProfitPct": 30
+      },
+      "timestamp": 1779215149980
+    },
+    {
+      "id": 289,
+      "type": "trade_config_update",
+      "data": {
+        "solAmount": 0.01,
+        "slippageBps": 5000,
+        "priorityFeeMicroLamports": 200000,
+        "takeProfitPct": 30
+      },
+      "timestamp": 1779215150578
+    },
+    {
+      "id": 290,
+      "type": "trade_config_update",
+      "data": {
+        "solAmount": 0.01,
+        "slippageBps": 5000,
+        "priorityFeeMicroLamports": 200000,
+        "takeProfitPct": 35
+      },
+      "timestamp": 1779215152558
+    },
+    {
+      "id": 291,
+      "type": "trade_config_update",
+      "data": {
+        "solAmount": 0.01,
+        "slippageBps": 5000,
+        "priorityFeeMicroLamports": 200000,
+        "takeProfitPct": 35
+      },
+      "timestamp": 1779215153298
+    },
+    {
+      "id": 292,
+      "type": "trade_config_update",
+      "data": {
+        "solAmount": 0.01,
+        "slippageBps": 5000,
+        "priorityFeeMicroLamports": 200000,
+        "takeProfitPct": 35
+      },
+      "timestamp": 1779215154540
+    },
+    {
+      "id": 293,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "💧 [LP] SCANDICCOINECO (SNC) | PumpSwap | 85.0000 SOL ($7186) | TVL ~$14371",
-        "timestamp": 1779214784122
+        "message": "💧 [LP] The Nietzschean Man (Karl) | PumpSwap | 84.9904 SOL ($7185) | TVL ~$14370",
+        "timestamp": 1779215159509
       },
-      "timestamp": 1779214784122
+      "timestamp": 1779215159509
     },
     {
-      "id": 254,
+      "id": 294,
       "type": "lp_detected",
       "data": {
-        "id": "2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj-1779214784122",
-        "mintAddress": "2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj",
-        "lpMint": "9mXc4qVvMHmjVQc9xk4gwZLzxf1opTiQk5Xc4fw25Hbi",
-        "name": "SCANDICCOINECO",
-        "symbol": "SNC",
-        "detectedAt": 1779214784122,
-        "expiresAt": 1779215084122,
-        "liquidityAmount": 85,
-        "liquidityUsd": 7185.72180621644,
-        "tvlUsd": 14371.44361243288,
+        "id": "3YMj4UHtBz611WRxnw5gf6VHJ6ALA9P8dhyAzsri1Xwi-1779215159508",
+        "mintAddress": "3YMj4UHtBz611WRxnw5gf6VHJ6ALA9P8dhyAzsri1Xwi",
+        "lpMint": "9DsJSqHPvFPHvVnbp79NnSN6B4SvXeWmyryoXpRbzKHf",
+        "name": "The Nietzschean Man",
+        "symbol": "Karl",
+        "detectedAt": 1779215159508,
+        "expiresAt": 1779215459508,
+        "liquidityAmount": 84.990359506,
+        "liquidityUsd": 7184.906819063987,
+        "tvlUsd": 14369.813638127975,
         "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj",
-        "dexscreenerUrl": "https://dexscreener.com/solana/2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj",
-        "pumpfunUrl": "https://pump.fun/2enSZMzwNkaxLfTeqPRRMMgB7rY6NejDYcvWpuDui2Zj"
+        "jupiterUrl": "https://jup.ag/swap/SOL-3YMj4UHtBz611WRxnw5gf6VHJ6ALA9P8dhyAzsri1Xwi",
+        "dexscreenerUrl": "https://dexscreener.com/solana/3YMj4UHtBz611WRxnw5gf6VHJ6ALA9P8dhyAzsri1Xwi",
+        "pumpfunUrl": "https://pump.fun/3YMj4UHtBz611WRxnw5gf6VHJ6ALA9P8dhyAzsri1Xwi"
       },
-      "timestamp": 1779214784122
+      "timestamp": 1779215159509
     },
     {
-      "id": 255,
+      "id": 295,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | SNC | TVL=$14371 | eşik=$40000",
-        "timestamp": 1779214784123
+        "message": "🚫 [LP] Telegram atlandı | Karl | TVL=$14370 | eşik=$40000",
+        "timestamp": 1779215159522
       },
-      "timestamp": 1779214784123
-    },
-    {
-      "id": 256,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "6:20:31 PM [express] GET /api/events 200 in 1ms :: {\"events\":[]}",
-        "timestamp": 1779214831567
-      },
-      "timestamp": 1779214831567
-    },
-    {
-      "id": 257,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "6:20:31 PM [express] GET /api/files/list 200 in 0ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
-        "timestamp": 1779214831569
-      },
-      "timestamp": 1779214831569
-    },
-    {
-      "id": 258,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "6:20:31 PM [express] GET /api/files/read 200 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
-        "timestamp": 1779214831809
-      },
-      "timestamp": 1779214831809
-    },
-    {
-      "id": 259,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-        "timestamp": 1779214935202
-      },
-      "timestamp": 1779214935202
-    },
-    {
-      "id": 260,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "\u001b[2m6:22:15 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/components/TradePanel.tsx, /src/index.css?v=ZhlN9nViHjHZBtEtsPf9\u001b[22m",
-        "timestamp": 1779214935204
-      },
-      "timestamp": 1779214935204
+      "timestamp": 1779215159522
     }
   ]
 }
