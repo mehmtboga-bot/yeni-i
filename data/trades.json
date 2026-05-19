@@ -1,8 +1,20 @@
 {
-  "positions": [],
+  "positions": [
+    {
+      "id": "pos-Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m-1779214690639",
+      "mintAddress": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
+      "name": "United Global Oil Supply",
+      "symbol": "UGOS",
+      "dex": "jupiter",
+      "status": "failed",
+      "buyTimestamp": 1779214690639,
+      "buySolAmount": 0.015,
+      "error": "Jupiter quote 400: {\"error\":\"Cannot compute other amount threshold, with amount 6406 and slippageBps 50000\",\"errorCode\":\"CANNOT_COMPUTE_OTHER_AMOUNT_THRESHOLD\"}"
+    }
+  ],
   "config": {
     "solAmount": 0.015,
-    "slippageBps": 500000,
+    "slippageBps": 50000,
     "priorityFeeMicroLamports": 2000000,
     "takeProfitPct": 30
   }
