@@ -1,203 +1,205 @@
 {
-  "lastId": 22,
+  "lastId": 79,
   "events": [
     {
-      "id": 3,
-      "type": "monitoring_state",
-      "data": {
-        "isMonitoring": true
-      },
-      "timestamp": 1779211497362
-    },
-    {
-      "id": 4,
+      "id": 60,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:24:57 PM [express] serving on port 5000",
-        "timestamp": 1779211497484
+        "message": "\u001b[2m5:40:37 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/components/TradePanel.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m",
+        "timestamp": 1779212437930
       },
-      "timestamp": 1779211497484
+      "timestamp": 1779212437930
     },
     {
-      "id": 5,
+      "id": 61,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "💵 SOL/USD (Jupiter): $84.76",
-        "timestamp": 1779211498638
+        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "timestamp": 1779212440116
       },
-      "timestamp": 1779211498638
+      "timestamp": 1779212440116
     },
     {
-      "id": 6,
+      "id": 62,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)",
-        "timestamp": 1779211498890
+        "message": "\u001b[2m5:40:40 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m",
+        "timestamp": 1779212440117
       },
-      "timestamp": 1779211498890
+      "timestamp": 1779212440117
     },
     {
-      "id": 7,
+      "id": 63,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779211499219
+        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "timestamp": 1779212459336
       },
-      "timestamp": 1779211499219
+      "timestamp": 1779212459336
     },
     {
-      "id": 8,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "Browserslist: browsers data (caniuse-lite) is 19 months old. Please run:\n  npx update-browserslist-db@latest\n  Why you should do it regularly: https://github.com/browserslist/update-db#readme",
-        "timestamp": 1779211500384
-      },
-      "timestamp": 1779211500384
-    },
-    {
-      "id": 9,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "\nA PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.",
-        "timestamp": 1779211502759
-      },
-      "timestamp": 1779211502759
-    },
-    {
-      "id": 10,
+      "id": 64,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:25:06 PM [express] GET /api/files/list 200 in 4ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
-        "timestamp": 1779211506634
+        "message": "\u001b[2m5:40:59 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x2)\u001b[39m",
+        "timestamp": 1779212459337
       },
-      "timestamp": 1779211506634
+      "timestamp": 1779212459337
     },
     {
-      "id": 11,
+      "id": 65,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:25:06 PM [express] GET /api/events 200 in 2ms :: {\"events\":[{\"id\":1,\"type\":\"server_log\",\"data\":{\"l…",
-        "timestamp": 1779211506638
+        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "timestamp": 1779212467711
       },
-      "timestamp": 1779211506638
+      "timestamp": 1779212467711
     },
     {
-      "id": 12,
+      "id": 66,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:25:06 PM [express] GET /api/files/read 200 in 3ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
-        "timestamp": 1779211506704
+        "message": "\u001b[2m5:41:07 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x3)\u001b[39m",
+        "timestamp": 1779212467712
       },
-      "timestamp": 1779211506704
+      "timestamp": 1779212467712
     },
     {
-      "id": 13,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "⚠️ [LP] TX indexlenemedi, atlanıyor: 5CJ2hurN...",
-        "timestamp": 1779211506913
-      },
-      "timestamp": 1779211506913
-    },
-    {
-      "id": 14,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "⚠️ [WS] PumpSwap — token mint bulunamadı: 5CJ2hurN...",
-        "timestamp": 1779211506915
-      },
-      "timestamp": 1779211506915
-    },
-    {
-      "id": 15,
+      "id": 67,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:25:18 PM [express] GET /api/events 200 in 4ms :: {\"events\":[]}",
-        "timestamp": 1779211518044
+        "message": "5:41:08 PM [express] GET /api/events 200 in 1ms :: {\"events\":[{\"id\":63,\"type\":\"server_log\",\"data\":{\"…",
+        "timestamp": 1779212468007
       },
-      "timestamp": 1779211518044
+      "timestamp": 1779212468007
     },
     {
-      "id": 16,
+      "id": 68,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:25:18 PM [express] GET /api/files/list 304 in 1ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
-        "timestamp": 1779211518048
+        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "timestamp": 1779212478786
       },
-      "timestamp": 1779211518048
+      "timestamp": 1779212478786
     },
     {
-      "id": 17,
+      "id": 69,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:25:18 PM [express] GET /api/files/read 304 in 2ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
-        "timestamp": 1779211518105
+        "message": "\u001b[2m5:41:18 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x4)\u001b[39m",
+        "timestamp": 1779212478786
       },
-      "timestamp": 1779211518105
+      "timestamp": 1779212478786
     },
     {
-      "id": 18,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "⚠️ [LP] TX indexlenemedi, atlanıyor: 2MF6ccCX...",
-        "timestamp": 1779211596693
-      },
-      "timestamp": 1779211596693
-    },
-    {
-      "id": 19,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "⚠️ [WS] PumpSwap — token mint bulunamadı: 2MF6ccCX...",
-        "timestamp": 1779211596694
-      },
-      "timestamp": 1779211596694
-    },
-    {
-      "id": 20,
+      "id": 70,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:27:20 PM [express] GET /api/files/list 200 in 1ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
-        "timestamp": 1779211640091
+        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "timestamp": 1779212484654
       },
-      "timestamp": 1779211640091
+      "timestamp": 1779212484654
     },
     {
-      "id": 21,
+      "id": 71,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:27:20 PM [express] GET /api/events 200 in 0ms :: {\"events\":[{\"id\":1,\"type\":\"server_log\",\"data\":{\"l…",
-        "timestamp": 1779211640094
+        "message": "\u001b[2m5:41:24 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x5)\u001b[39m",
+        "timestamp": 1779212484655
       },
-      "timestamp": 1779211640094
+      "timestamp": 1779212484655
     },
     {
-      "id": 22,
+      "id": 72,
       "type": "server_log",
       "data": {
         "level": "info",
-        "message": "5:27:20 PM [express] GET /api/files/read 200 in 2ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
-        "timestamp": 1779211640330
+        "message": "5:41:37 PM [express] GET /api/files/list 200 in 1ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
+        "timestamp": 1779212497765
       },
-      "timestamp": 1779211640330
+      "timestamp": 1779212497765
+    },
+    {
+      "id": 73,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:41:37 PM [express] GET /api/events 200 in 1ms :: {\"events\":[{\"id\":53,\"type\":\"server_log\",\"data\":{\"…",
+        "timestamp": 1779212497767
+      },
+      "timestamp": 1779212497767
+    },
+    {
+      "id": 74,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:41:37 PM [express] GET /api/files/read 200 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
+        "timestamp": 1779212497844
+      },
+      "timestamp": 1779212497844
+    },
+    {
+      "id": 75,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:41:44 PM [express] GET /api/events 200 in 1ms :: {\"events\":[{\"id\":73,\"type\":\"server_log\",\"data\":{\"…",
+        "timestamp": 1779212504604
+      },
+      "timestamp": 1779212504604
+    },
+    {
+      "id": 76,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:41:44 PM [express] GET /api/files/list 304 in 0ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
+        "timestamp": 1779212504606
+      },
+      "timestamp": 1779212504606
+    },
+    {
+      "id": 77,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:41:44 PM [express] GET /api/files/read 304 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
+        "timestamp": 1779212504663
+      },
+      "timestamp": 1779212504663
+    },
+    {
+      "id": 78,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "timestamp": 1779212532701
+      },
+      "timestamp": 1779212532701
+    },
+    {
+      "id": 79,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "\u001b[2m5:42:12 PM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/pages/home.tsx, /src/index.css?v=fwQAoOlA4HvIw1FMQlzXi\u001b[22m \u001b[33m(x6)\u001b[39m",
+        "timestamp": 1779212532702
+      },
+      "timestamp": 1779212532702
     }
   ]
 }

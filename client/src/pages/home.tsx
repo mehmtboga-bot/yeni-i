@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Coins, Droplet, Lock, Wallet, Zap } from "lucide-react";
+import { Coins, Droplet, Lock } from "lucide-react";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { MintedTokenCard } from "@/components/MintedTokenCard";
 import { LPLogTable } from "@/components/LPLogTable";
@@ -21,6 +21,7 @@ const DEFAULT_CONFIG: TradeConfig = {
   solAmount: 0.01,
   slippageBps: 5000,
   priorityFeeMicroLamports: 200_000,
+  takeProfitPct: 0,
 };
 
 // StoredEvent type (server tarafından gelen event)
@@ -127,9 +128,9 @@ export default function Home() {
     }
   };
 
-  const handleBuy = (mintAddress: string, name: string, symbol: string) => {
+  const handleBuy = (mintAddress: string, name: string, symbol: string, dex: "jupiter" | "pumpswap" = "jupiter") => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "buy_token", data: { mintAddress, name, symbol } }));
+      ws.send(JSON.stringify({ type: "buy_token", data: { mintAddress, name, symbol, dex } }));
     }
   };
 
@@ -299,10 +300,8 @@ export default function Home() {
   }, [activeTab, serverLogs]);
 
   const lockedLogs = lpLogs.filter((l) => l.isLocked);
-  const totalSol = lpLogs.reduce((s, l) => s + (l.liquidityAmount ?? 0), 0);
   // Dinamik fiyat: solPriceUsd server'dan geliyor, fallback: 87
   const displayPrice = solPriceUsd > 0 ? solPriceUsd : 87;
-  const totalUsd = totalSol * displayPrice;
   const openPositionCount = positions.filter((p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell").length;
 
   const activeBuyMints = new Set(
@@ -427,19 +426,6 @@ export default function Home() {
               setWalletBalance={setWalletBalance}
             />
 
-            {/* İstatistik kartları */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard label="Aktif Mint"   value={mintedTokens.length} color="text-primary"  icon={<Coins   className="h-4 w-4" />} />
-              <StatCard label="Tüm LP"       value={lpLogs.length}       color="text-chart-4"  icon={<Droplet className="h-4 w-4" />} />
-              <StatCard label="Kilitli LP"   value={lockedLogs.length}   color="text-chart-2"  icon={<Lock    className="h-4 w-4" />} />
-              <StatCard
-                label="Toplam TVL"
-                value={`$${(2 * totalUsd).toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
-                color="text-chart-3"
-                icon={<Wallet className="h-4 w-4" />}
-              />
-            </div>
-
             {/* Ana grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Sol: LP Tespitleri */}
@@ -520,15 +506,3 @@ export default function Home() {
   );
 }
 
-function StatCard({
-  label, value, color, icon,
-}: { label: string; value: string | number; color: string; icon: React.ReactNode }) {
-  return (
-    <div className="bg-card border border-card-border rounded-lg p-3 space-y-1">
-      <div className={`flex items-center gap-1.5 text-xs text-muted-foreground ${color}`}>
-        {icon}<span>{label}</span>
-      </div>
-      <p className={`text-xl font-bold ${color}`}>{value}</p>
-    </div>
-  );
-}

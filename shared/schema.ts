@@ -40,6 +40,7 @@ export const positionSchema = z.object({
   name: z.string(),
   symbol: z.string(),
   status: z.enum(["pending_buy", "open", "pending_sell", "closed", "failed"]),
+  dex: z.enum(["jupiter", "pumpswap"]).optional(),
   buyTimestamp: z.number(),
   buySolAmount: z.number(),
   buyTokenAmount: z.number().optional(),
@@ -61,21 +62,16 @@ export type Position = z.infer<typeof positionSchema>;
 
 export const tradeConfigSchema = z.object({
   solAmount: z.number().min(0.0001),
-  slippageBps: z.number().min(50).max(1000000),
+  slippageBps: z.number().min(50).max(1_000_000),
   priorityFeeMicroLamports: z.number().min(0).max(100_000_000),
+  takeProfitPct: z.number().min(0).max(10000).optional().default(0),
 });
 
 export type TradeConfig = z.infer<typeof tradeConfigSchema>;
 
 export const wsMessageSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("mint_detected"),
-    data: mintedTokenSchema,
-  }),
-  z.object({
-    type: z.literal("lp_detected"),
-    data: lpDetectionSchema,
-  }),
+  z.object({ type: z.literal("mint_detected"), data: mintedTokenSchema }),
+  z.object({ type: z.literal("lp_detected"), data: lpDetectionSchema }),
   z.object({
     type: z.literal("connection_status"),
     data: z.object({
@@ -84,33 +80,12 @@ export const wsMessageSchema = z.discriminatedUnion("type", [
       isMonitoring: z.boolean().optional(),
     }),
   }),
-  z.object({
-    type: z.literal("monitoring_state"),
-    data: z.object({
-      isMonitoring: z.boolean(),
-    }),
-  }),
-  z.object({
-    type: z.literal("error"),
-    data: z.object({
-      message: z.string(),
-      type: z.string().optional(),
-    }),
-  }),
-  z.object({
-    type: z.literal("balance_update"),
-    data: z.object({
-      balance: z.number(),
-      publicKey: z.string(),
-    }),
-  }),
+  z.object({ type: z.literal("monitoring_state"), data: z.object({ isMonitoring: z.boolean() }) }),
+  z.object({ type: z.literal("error"), data: z.object({ message: z.string(), type: z.string().optional() }) }),
+  z.object({ type: z.literal("balance_update"), data: z.object({ balance: z.number(), publicKey: z.string() }) }),
   z.object({
     type: z.literal("server_log"),
-    data: z.object({
-      level: z.enum(["info", "warn", "error"]),
-      message: z.string(),
-      timestamp: z.number(),
-    }),
+    data: z.object({ level: z.enum(["info", "warn", "error"]), message: z.string(), timestamp: z.number() }),
   }),
   z.object({
     type: z.literal("positions_snapshot"),
@@ -119,16 +94,11 @@ export const wsMessageSchema = z.discriminatedUnion("type", [
       config: tradeConfigSchema,
       traderPublicKey: z.string().optional(),
       traderReady: z.boolean(),
+      solPriceUsd: z.number().optional(),
     }),
   }),
-  z.object({
-    type: z.literal("position_update"),
-    data: positionSchema,
-  }),
-  z.object({
-    type: z.literal("trade_config_update"),
-    data: tradeConfigSchema,
-  }),
+  z.object({ type: z.literal("position_update"), data: positionSchema }),
+  z.object({ type: z.literal("trade_config_update"), data: tradeConfigSchema }),
 ]);
 
 export type WSMessage = z.infer<typeof wsMessageSchema>;

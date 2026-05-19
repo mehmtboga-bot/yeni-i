@@ -11,7 +11,7 @@ interface MintedTokenCardProps {
   isNew?: boolean;
   traderReady?: boolean;
   hasOpenPosition?: boolean;
-  onBuy?: (mintAddress: string, name: string, symbol: string) => void;
+  onBuy?: (mintAddress: string, name: string, symbol: string, dex: "jupiter" | "pumpswap") => void;
 }
 
 export function MintedTokenCard({
@@ -29,32 +29,21 @@ export function MintedTokenCard({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const truncateAddress = (addr: string) => {
-    return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
-  };
-
-  const raydiumUrl = `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${token.mintAddress}`;
   const jupiterUrl = `https://jup.ag/swap/SOL-${token.mintAddress}`;
   const dexscreenerUrl = `https://dexscreener.com/solana/${token.mintAddress}`;
+  const canBuy = traderReady && !hasOpenPosition;
 
   return (
     <Card
-      className={`p-4 hover-elevate transition-all duration-300 ${
-        isNew ? "animate-in slide-in-from-top-2 border-primary" : ""
-      }`}
+      className={`p-4 hover-elevate transition-all duration-300 ${isNew ? "animate-in slide-in-from-top-2 border-primary" : ""}`}
       data-testid={`card-token-${token.id}`}
     >
       <div className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-foreground truncate" data-testid="text-token-name">
-              {token.name}
-            </h3>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge
-                className="bg-gradient-to-r from-primary to-chart-2 text-primary-foreground border-0"
-                data-testid="badge-symbol"
-              >
+            <h3 className="text-lg font-semibold text-foreground truncate" data-testid="text-token-name">{token.name}</h3>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge className="bg-gradient-to-r from-primary to-chart-2 text-primary-foreground border-0" data-testid="badge-symbol">
                 {token.symbol}
               </Badge>
               {token.isLocked ? (
@@ -80,64 +69,52 @@ export function MintedTokenCard({
         </div>
 
         <div className="flex items-center gap-2">
-          <code
-            className="flex-1 text-xs font-mono text-muted-foreground bg-muted px-2 py-1.5 rounded-md truncate"
-            data-testid="text-mint-address"
-          >
-            {truncateAddress(token.mintAddress)}
+          <code className="flex-1 text-xs font-mono text-muted-foreground bg-muted px-2 py-1.5 rounded-md truncate" data-testid="text-mint-address">
+            {token.mintAddress.slice(0, 4)}...{token.mintAddress.slice(-4)}
           </code>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={copyAddress}
-            className="h-8 w-8 shrink-0"
-            data-testid="button-copy-address"
-          >
-            {copied ? (
-              <Check className="h-3.5 w-3.5 text-chart-4" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" />
-            )}
+          <Button size="icon" variant="ghost" onClick={copyAddress} className="h-8 w-8 shrink-0" data-testid="button-copy-address">
+            {copied ? <Check className="h-3.5 w-3.5 text-chart-4" /> : <Copy className="h-3.5 w-3.5" />}
           </Button>
         </div>
 
         <div className="flex flex-wrap gap-2">
           {onBuy && (
-            <Button
-              size="sm"
-              variant="default"
-              disabled={!traderReady || hasOpenPosition}
-              onClick={() => onBuy(token.mintAddress, token.name, token.symbol)}
-              className="flex-1 min-w-[80px]"
-              data-testid="button-buy-token"
-              title={!traderReady ? "Trader cüzdanı tanımlı değil" : hasOpenPosition ? "Bu token zaten portföyde" : "Otomatik alım yap"}
-            >
-              <Zap className="h-3.5 w-3.5 mr-1.5" />
-              {hasOpenPosition ? "Portföyde" : "Al"}
-            </Button>
+            <>
+              {/* Jupiter Al */}
+              <Button
+                size="sm"
+                variant="default"
+                disabled={!canBuy}
+                onClick={() => onBuy(token.mintAddress, token.name, token.symbol, "jupiter")}
+                className="flex-1 min-w-[70px]"
+                data-testid="button-buy-jupiter"
+                title={!traderReady ? "Trader cüzdanı tanımlı değil" : hasOpenPosition ? "Portföyde" : "Jupiter ile al"}
+              >
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+                {hasOpenPosition ? "Portföyde" : "Jup Al"}
+              </Button>
+              {/* PumpSwap Al */}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!canBuy}
+                onClick={() => onBuy(token.mintAddress, token.name, token.symbol, "pumpswap")}
+                className="flex-1 min-w-[70px] border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                data-testid="button-buy-pumpswap"
+                title={!traderReady ? "Trader cüzdanı tanımlı değil" : hasOpenPosition ? "Portföyde" : "PumpSwap ile al"}
+              >
+                {hasOpenPosition ? "Portföyde" : "Pump Al"}
+              </Button>
+            </>
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            asChild
-            className="flex-1 min-w-[80px]"
-            data-testid="button-jupiter"
-          >
+          <Button size="sm" variant="outline" asChild className="flex-1 min-w-[70px]" data-testid="button-jupiter">
             <a href={jupiterUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-              Jupiter
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />Jupiter
             </a>
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            asChild
-            className="flex-1 min-w-[80px]"
-            data-testid="button-dexscreener"
-          >
+          <Button size="sm" variant="outline" asChild className="flex-1 min-w-[70px]" data-testid="button-dexscreener">
             <a href={dexscreenerUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-              Dex
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />Dex
             </a>
           </Button>
         </div>
