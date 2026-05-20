@@ -1,47 +1,6 @@
 {
-  "lastId": 2210,
+  "lastId": 2213,
   "events": [
-    {
-      "id": 2011,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] PULSE CALLER (PULSE) | PumpSwap | 84.9904 SOL ($7162) | TVL ~$14323",
-        "timestamp": 1779243212313
-      },
-      "timestamp": 1779243212313
-    },
-    {
-      "id": 2012,
-      "type": "lp_detected",
-      "data": {
-        "id": "85LhzHY3zVwW65bj2DrqarcUzaUPZq1pRCsFRTsVDUa-1779243212313",
-        "mintAddress": "85LhzHY3zVwW65bj2DrqarcUzaUPZq1pRCsFRTsVDUa",
-        "lpMint": "DGHXngYFSXqM2tEzvUZYm3r1jm1gt7ECEYsmDobfTR55",
-        "name": "PULSE CALLER",
-        "symbol": "PULSE",
-        "detectedAt": 1779243212313,
-        "expiresAt": 1779243512313,
-        "liquidityAmount": 84.990359217,
-        "liquidityUsd": 7161.550224409128,
-        "tvlUsd": 14323.100448818255,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-85LhzHY3zVwW65bj2DrqarcUzaUPZq1pRCsFRTsVDUa",
-        "dexscreenerUrl": "https://dexscreener.com/solana/85LhzHY3zVwW65bj2DrqarcUzaUPZq1pRCsFRTsVDUa",
-        "pumpfunUrl": "https://pump.fun/85LhzHY3zVwW65bj2DrqarcUzaUPZq1pRCsFRTsVDUa"
-      },
-      "timestamp": 1779243212314
-    },
-    {
-      "id": 2013,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | PULSE | TVL=$14323 | eşik=$40000",
-        "timestamp": 1779243212327
-      },
-      "timestamp": 1779243212327
-    },
     {
       "id": 2014,
       "type": "server_log",
@@ -2415,6 +2374,47 @@
         "timestamp": 1779252603368
       },
       "timestamp": 1779252603368
+    },
+    {
+      "id": 2211,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Chinese Oil Asset Reserve (COAR) | PumpSwap | 700.0000 SOL ($58812) | TVL ~$117624",
+        "timestamp": 1779252650307
+      },
+      "timestamp": 1779252650307
+    },
+    {
+      "id": 2212,
+      "type": "lp_detected",
+      "data": {
+        "id": "3brm4cnkECLokHkUVyPGmnnb3vp2Kdj7M981R9kTPYD5-1779252650307",
+        "mintAddress": "3brm4cnkECLokHkUVyPGmnnb3vp2Kdj7M981R9kTPYD5",
+        "lpMint": "67UDhghEbzUucPyw3uXT6Ua9xAian4hZu4uvELu6eWdb",
+        "name": "Chinese Oil Asset Reserve",
+        "symbol": "COAR",
+        "detectedAt": 1779252650307,
+        "expiresAt": 1779252950307,
+        "liquidityAmount": 700,
+        "liquidityUsd": 58812.07814022132,
+        "tvlUsd": 117624.15628044264,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-3brm4cnkECLokHkUVyPGmnnb3vp2Kdj7M981R9kTPYD5",
+        "dexscreenerUrl": "https://dexscreener.com/solana/3brm4cnkECLokHkUVyPGmnnb3vp2Kdj7M981R9kTPYD5",
+        "pumpfunUrl": "https://pump.fun/3brm4cnkECLokHkUVyPGmnnb3vp2Kdj7M981R9kTPYD5"
+      },
+      "timestamp": 1779252650309
+    },
+    {
+      "id": 2213,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "📲 Telegram bildirimi gönderildi.",
+        "timestamp": 1779252650878
+      },
+      "timestamp": 1779252650878
     }
   ]
 }
