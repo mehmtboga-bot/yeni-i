@@ -3,9 +3,8 @@ import { secrets } from "./secrets-loader";
 
 const HELIUS_API_KEY = secrets.HELIUS_API_KEY;
 
-// WebSocket: ücretsiz public RPC — swap/remove/claim bildirimleri Helius kredisi yemez
-const WS_URL  = `wss://api.mainnet-beta.solana.com`;
-// HTTP: Helius — sadece CreatePool tespitinde getTransaction + getAsset için kullanılır
+// WebSocket + HTTP: Helius — kararlı bağlantı, public RPC'de logsSubscribe güvenilmez çalışmıyor
+const WS_URL   = `wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const HTTP_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 
 const TELEGRAM_BOT_TOKEN = secrets.TELEGRAM_BOT_TOKEN;
@@ -224,7 +223,7 @@ export class HeliusMonitor {
     this.dexWebSocket = new WebSocket(WS_URL);
 
     this.dexWebSocket.on("open", () => {
-      console.log("✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)");
+      console.log("✅ [WS] DEX WebSocket bağlandı (Helius WS — PumpSwap LP only)");
       this.dexWebSocket?.send(JSON.stringify({
         jsonrpc: "2.0",
         id: 100,
