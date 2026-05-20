@@ -394,6 +394,11 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
               Sat
             </Button>
           )}
+          {p.status === "failed" && p.buyTxSignature && (
+            <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
+              Tekrar Sat
+            </Button>
+          )}
           {isPending && (
             <Button size="sm" variant="outline" disabled>
               <Loader2 className="h-3 w-3 mr-1 animate-spin" />

@@ -1,552 +1,6 @@
 {
-  "lastId": 2689,
+  "lastId": 2715,
   "events": [
-    {
-      "id": 2490,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017164923506722585,
-        "unrealizedPnlSol": 0.00167375271196182,
-        "unrealizedPnlPct": 16.7375271196182
-      },
-      "timestamp": 1779253789996
-    },
-    {
-      "id": 2491,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017164923506722585,
-        "unrealizedPnlSol": 0.00167375271196182,
-        "unrealizedPnlPct": 16.7375271196182
-      },
-      "timestamp": 1779253791484
-    },
-    {
-      "id": 2492,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017113819646494587,
-        "unrealizedPnlSol": 0.0016389973093703292,
-        "unrealizedPnlPct": 16.38997309370329
-      },
-      "timestamp": 1779253793051
-    },
-    {
-      "id": 2493,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017113819646494587,
-        "unrealizedPnlSol": 0.0016389973093703292,
-        "unrealizedPnlPct": 16.38997309370329
-      },
-      "timestamp": 1779253794485
-    },
-    {
-      "id": 2494,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017113819646494587,
-        "unrealizedPnlSol": 0.0016389973093703292,
-        "unrealizedPnlPct": 16.38997309370329
-      },
-      "timestamp": 1779253795989
-    },
-    {
-      "id": 2495,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017113819646494587,
-        "unrealizedPnlSol": 0.0016389973093703292,
-        "unrealizedPnlPct": 16.38997309370329
-      },
-      "timestamp": 1779253797488
-    },
-    {
-      "id": 2496,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017271233709470296,
-        "unrealizedPnlSol": 0.001746053588639147,
-        "unrealizedPnlPct": 17.46053588639147
-      },
-      "timestamp": 1779253799047
-    },
-    {
-      "id": 2497,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017271233709470296,
-        "unrealizedPnlSol": 0.001746053588639147,
-        "unrealizedPnlPct": 17.46053588639147
-      },
-      "timestamp": 1779253800493
-    },
-    {
-      "id": 2498,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017271233709470296,
-        "unrealizedPnlSol": 0.001746053588639147,
-        "unrealizedPnlPct": 17.46053588639147
-      },
-      "timestamp": 1779253801990
-    },
-    {
-      "id": 2499,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017271233709470296,
-        "unrealizedPnlSol": 0.001746053588639147,
-        "unrealizedPnlPct": 17.46053588639147
-      },
-      "timestamp": 1779253803502
-    },
-    {
-      "id": 2500,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.00001819927704545924,
-        "unrealizedPnlSol": 0.0023772098187310564,
-        "unrealizedPnlPct": 23.77209818731057
-      },
-      "timestamp": 1779253805045
-    },
-    {
-      "id": 2501,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.00001819927704545924,
-        "unrealizedPnlSol": 0.0023772098187310564,
-        "unrealizedPnlPct": 23.77209818731057
-      },
-      "timestamp": 1779253806479
-    },
-    {
-      "id": 2502,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.00001819927704545924,
-        "unrealizedPnlSol": 0.0023772098187310564,
-        "unrealizedPnlPct": 23.77209818731057
-      },
-      "timestamp": 1779253807991
-    },
-    {
-      "id": 2503,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.00001819927704545924,
-        "unrealizedPnlSol": 0.0023772098187310564,
-        "unrealizedPnlPct": 23.77209818731057
-      },
-      "timestamp": 1779253809488
-    },
-    {
-      "id": 2504,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.00001730511719450006,
-        "unrealizedPnlSol": 0.001769097526184341,
-        "unrealizedPnlPct": 17.690975261843413
-      },
-      "timestamp": 1779253811060
-    },
-    {
-      "id": 2505,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.00001730511719450006,
-        "unrealizedPnlSol": 0.001769097526184341,
-        "unrealizedPnlPct": 17.690975261843413
-      },
-      "timestamp": 1779253812496
-    },
-    {
-      "id": 2506,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.00001730511719450006,
-        "unrealizedPnlSol": 0.001769097526184341,
-        "unrealizedPnlPct": 17.690975261843413
-      },
-      "timestamp": 1779253813998
-    },
-    {
-      "id": 2507,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.00001730511719450006,
-        "unrealizedPnlSol": 0.001769097526184341,
-        "unrealizedPnlPct": 17.690975261843413
-      },
-      "timestamp": 1779253815525
-    },
-    {
-      "id": 2508,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017523766465661662,
-        "unrealizedPnlSol": 0.001917799471823164,
-        "unrealizedPnlPct": 19.17799471823164
-      },
-      "timestamp": 1779253817056
-    },
-    {
-      "id": 2509,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017523766465661662,
-        "unrealizedPnlSol": 0.001917799471823164,
-        "unrealizedPnlPct": 19.17799471823164
-      },
-      "timestamp": 1779253818492
-    },
-    {
-      "id": 2510,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017523766465661662,
-        "unrealizedPnlSol": 0.001917799471823164,
-        "unrealizedPnlPct": 19.17799471823164
-      },
-      "timestamp": 1779253819993
-    },
-    {
-      "id": 2511,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.000017523766465661662,
-        "unrealizedPnlSol": 0.001917799471823164,
-        "unrealizedPnlPct": 19.17799471823164
-      },
-      "timestamp": 1779253821485
-    },
-    {
-      "id": 2512,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.0000177238219840726,
-        "unrealizedPnlSol": 0.002053855927284674,
-        "unrealizedPnlPct": 20.53855927284674
-      },
-      "timestamp": 1779253823056
-    },
-    {
-      "id": 2513,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.0000177238219840726,
-        "unrealizedPnlSol": 0.002053855927284674,
-        "unrealizedPnlPct": 20.53855927284674
-      },
-      "timestamp": 1779253824495
-    },
-    {
-      "id": 2514,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.0000177238219840726,
-        "unrealizedPnlSol": 0.002053855927284674,
-        "unrealizedPnlPct": 20.53855927284674
-      },
-      "timestamp": 1779253826018
-    },
-    {
-      "id": 2515,
-      "type": "position_update",
-      "data": {
-        "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
-        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-        "name": "RCSC",
-        "symbol": "RCSC",
-        "dex": "jupiter",
-        "status": "open",
-        "buyTimestamp": 1779253095772,
-        "buySolAmount": 0.01,
-        "buyTokenAmount": 59168.133522,
-        "buyPriceSol": 1.6900989442706998e-7,
-        "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
-        "currentPriceUsd": 0.0000177238219840726,
-        "unrealizedPnlSol": 0.002053855927284674,
-        "unrealizedPnlPct": 20.53855927284674
-      },
-      "timestamp": 1779253827501
-    },
     {
       "id": 2516,
       "type": "position_update",
@@ -3833,6 +3287,343 @@
         "timestamp": 1779254563965
       },
       "timestamp": 1779254563965
+    },
+    {
+      "id": 2690,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Tuyo (TUYO) | PumpSwap | 52.6700 SOL ($4456) | TVL ~$8913",
+        "timestamp": 1779254566434
+      },
+      "timestamp": 1779254566434
+    },
+    {
+      "id": 2691,
+      "type": "lp_detected",
+      "data": {
+        "id": "HN46v47Ucegex1MG7e1qQ4k64WMpR2ABGWRzuLjeKpU6-1779254566434",
+        "mintAddress": "HN46v47Ucegex1MG7e1qQ4k64WMpR2ABGWRzuLjeKpU6",
+        "lpMint": "Gvymx6shhiCuENkp64iTK5TZYmqRBrGLp71kpi51T1HA",
+        "name": "Tuyo",
+        "symbol": "TUYO",
+        "detectedAt": 1779254566434,
+        "expiresAt": 1779254866434,
+        "liquidityAmount": 52.67,
+        "liquidityUsd": 4456.425101431284,
+        "tvlUsd": 8912.850202862568,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-HN46v47Ucegex1MG7e1qQ4k64WMpR2ABGWRzuLjeKpU6",
+        "dexscreenerUrl": "https://dexscreener.com/solana/HN46v47Ucegex1MG7e1qQ4k64WMpR2ABGWRzuLjeKpU6",
+        "pumpfunUrl": "https://pump.fun/HN46v47Ucegex1MG7e1qQ4k64WMpR2ABGWRzuLjeKpU6"
+      },
+      "timestamp": 1779254566436
+    },
+    {
+      "id": 2692,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | TUYO | TVL=$8913 | eşik=$40000",
+        "timestamp": 1779254566447
+      },
+      "timestamp": 1779254566447
+    },
+    {
+      "id": 2693,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Donald Trump Bot (DONALDBOT) | PumpSwap | 88.8800 SOL ($7520) | TVL ~$15040",
+        "timestamp": 1779254680418
+      },
+      "timestamp": 1779254680418
+    },
+    {
+      "id": 2694,
+      "type": "lp_detected",
+      "data": {
+        "id": "YtvS5wKoTSBBcxyX2XcX1NtBnz9Cbtd3GoEtD4uRKGw-1779254680418",
+        "mintAddress": "YtvS5wKoTSBBcxyX2XcX1NtBnz9Cbtd3GoEtD4uRKGw",
+        "lpMint": "6r9ML8m5zzrDEEFimKqWqqU1vCkXcSaajYpDQjvEEtSk",
+        "name": "Donald Trump Bot",
+        "symbol": "DONALDBOT",
+        "detectedAt": 1779254680418,
+        "expiresAt": 1779254980418,
+        "liquidityAmount": 88.88,
+        "liquidityUsd": 7520.164477220666,
+        "tvlUsd": 15040.328954441333,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-YtvS5wKoTSBBcxyX2XcX1NtBnz9Cbtd3GoEtD4uRKGw",
+        "dexscreenerUrl": "https://dexscreener.com/solana/YtvS5wKoTSBBcxyX2XcX1NtBnz9Cbtd3GoEtD4uRKGw",
+        "pumpfunUrl": "https://pump.fun/YtvS5wKoTSBBcxyX2XcX1NtBnz9Cbtd3GoEtD4uRKGw"
+      },
+      "timestamp": 1779254680420
+    },
+    {
+      "id": 2695,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | DONALDBOT | TVL=$15040 | eşik=$40000",
+        "timestamp": 1779254680422
+      },
+      "timestamp": 1779254680422
+    },
+    {
+      "id": 2696,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Morphism (MORPH) | PumpSwap | 84.9904 SOL ($7191) | TVL ~$14382",
+        "timestamp": 1779254692304
+      },
+      "timestamp": 1779254692304
+    },
+    {
+      "id": 2697,
+      "type": "lp_detected",
+      "data": {
+        "id": "Boq6GgQXKvr2sunmxiHDxtYWT7SzCH2e2KzAvGAqskmz-1779254692304",
+        "mintAddress": "Boq6GgQXKvr2sunmxiHDxtYWT7SzCH2e2KzAvGAqskmz",
+        "lpMint": "GAwwnH2C9jzjM7pANRD1ytAGPn9y2bGrbsXrvEkdfTq5",
+        "name": "Morphism",
+        "symbol": "MORPH",
+        "detectedAt": 1779254692304,
+        "expiresAt": 1779254992304,
+        "liquidityAmount": 84.990359261,
+        "liquidityUsd": 7191.060763060246,
+        "tvlUsd": 14382.121526120492,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-Boq6GgQXKvr2sunmxiHDxtYWT7SzCH2e2KzAvGAqskmz",
+        "dexscreenerUrl": "https://dexscreener.com/solana/Boq6GgQXKvr2sunmxiHDxtYWT7SzCH2e2KzAvGAqskmz",
+        "pumpfunUrl": "https://pump.fun/Boq6GgQXKvr2sunmxiHDxtYWT7SzCH2e2KzAvGAqskmz"
+      },
+      "timestamp": 1779254692306
+    },
+    {
+      "id": 2698,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | MORPH | TVL=$14382 | eşik=$40000",
+        "timestamp": 1779254692319
+      },
+      "timestamp": 1779254692319
+    },
+    {
+      "id": 2699,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:26:29 AM [express] GET /api/files/list 200 in 0ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
+        "timestamp": 1779254789458
+      },
+      "timestamp": 1779254789458
+    },
+    {
+      "id": 2700,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:26:29 AM [express] GET /api/events 200 in 1ms :: {\"events\":[{\"id\":2699,\"type\":\"server_log\",\"data\":…",
+        "timestamp": 1779254789489
+      },
+      "timestamp": 1779254789489
+    },
+    {
+      "id": 2701,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "5:26:29 AM [express] GET /api/files/read 200 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
+        "timestamp": 1779254789745
+      },
+      "timestamp": 1779254789745
+    },
+    {
+      "id": 2702,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] The Great Memepression (Memepressi) | PumpSwap | 200.0000 SOL ($16922) | TVL ~$33844",
+        "timestamp": 1779254900524
+      },
+      "timestamp": 1779254900524
+    },
+    {
+      "id": 2703,
+      "type": "lp_detected",
+      "data": {
+        "id": "EmSguHbK7JfwpUB9bpyp4NsbKYY8aULYRBvYtBqKdBXc-1779254900524",
+        "mintAddress": "EmSguHbK7JfwpUB9bpyp4NsbKYY8aULYRBvYtBqKdBXc",
+        "lpMint": "5wr8sXB2o4tjFpEXbVRmY9A1c2eFYo2ahENTcEXqtHzL",
+        "name": "The Great Memepression",
+        "symbol": "Memepressi",
+        "detectedAt": 1779254900524,
+        "expiresAt": 1779255200524,
+        "liquidityAmount": 200,
+        "liquidityUsd": 16922.062279974496,
+        "tvlUsd": 33844.12455994899,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-EmSguHbK7JfwpUB9bpyp4NsbKYY8aULYRBvYtBqKdBXc",
+        "dexscreenerUrl": "https://dexscreener.com/solana/EmSguHbK7JfwpUB9bpyp4NsbKYY8aULYRBvYtBqKdBXc",
+        "pumpfunUrl": "https://pump.fun/EmSguHbK7JfwpUB9bpyp4NsbKYY8aULYRBvYtBqKdBXc"
+      },
+      "timestamp": 1779254900525
+    },
+    {
+      "id": 2704,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | Memepressi | TVL=$33844 | eşik=$40000",
+        "timestamp": 1779254900527
+      },
+      "timestamp": 1779254900527
+    },
+    {
+      "id": 2705,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] first AI actress (TILLY) | PumpSwap | 50.0000 SOL ($4231) | TVL ~$8461",
+        "timestamp": 1779254905946
+      },
+      "timestamp": 1779254905946
+    },
+    {
+      "id": 2706,
+      "type": "lp_detected",
+      "data": {
+        "id": "dqLCDf9bBUpqiKhAYFTvKhVk8LKBMpMssoM3RVboft9-1779254905945",
+        "mintAddress": "dqLCDf9bBUpqiKhAYFTvKhVk8LKBMpMssoM3RVboft9",
+        "lpMint": "8uTyFHTERGbnGR8SCvg4xheiP6ZiWmLUrGzJ8CYp8rwq",
+        "name": "first AI actress",
+        "symbol": "TILLY",
+        "detectedAt": 1779254905945,
+        "expiresAt": 1779255205945,
+        "liquidityAmount": 50,
+        "liquidityUsd": 4230.515569993624,
+        "tvlUsd": 8461.031139987248,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-dqLCDf9bBUpqiKhAYFTvKhVk8LKBMpMssoM3RVboft9",
+        "dexscreenerUrl": "https://dexscreener.com/solana/dqLCDf9bBUpqiKhAYFTvKhVk8LKBMpMssoM3RVboft9",
+        "pumpfunUrl": "https://pump.fun/dqLCDf9bBUpqiKhAYFTvKhVk8LKBMpMssoM3RVboft9"
+      },
+      "timestamp": 1779254905948
+    },
+    {
+      "id": 2707,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | TILLY | TVL=$8461 | eşik=$40000",
+        "timestamp": 1779254905950
+      },
+      "timestamp": 1779254905950
+    },
+    {
+      "id": 2708,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Cheers to Gronk (格罗克) | PumpSwap | 84.9900 SOL ($7191) | TVL ~$14382",
+        "timestamp": 1779254910815
+      },
+      "timestamp": 1779254910815
+    },
+    {
+      "id": 2709,
+      "type": "lp_detected",
+      "data": {
+        "id": "CdndHwseaAouquWSUyiSo2x1jxP9hJeWdCqreDwSZbAV-1779254910815",
+        "mintAddress": "CdndHwseaAouquWSUyiSo2x1jxP9hJeWdCqreDwSZbAV",
+        "lpMint": "7yQHT9nkNASbbZQcfQEri567bJEtG74jLtQK8fuWc7Hm",
+        "name": "Cheers to Gronk",
+        "symbol": "格罗克",
+        "detectedAt": 1779254910815,
+        "expiresAt": 1779255210815,
+        "liquidityAmount": 84.99,
+        "liquidityUsd": 7191.030365875162,
+        "tvlUsd": 14382.060731750324,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-CdndHwseaAouquWSUyiSo2x1jxP9hJeWdCqreDwSZbAV",
+        "dexscreenerUrl": "https://dexscreener.com/solana/CdndHwseaAouquWSUyiSo2x1jxP9hJeWdCqreDwSZbAV",
+        "pumpfunUrl": "https://pump.fun/CdndHwseaAouquWSUyiSo2x1jxP9hJeWdCqreDwSZbAV"
+      },
+      "timestamp": 1779254910817
+    },
+    {
+      "id": 2710,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | 格罗克 | TVL=$14382 | eşik=$40000",
+        "timestamp": 1779254910819
+      },
+      "timestamp": 1779254910819
+    },
+    {
+      "id": 2711,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Holy Pump (HOLYPUMP) | PumpSwap | 50.0000 SOL ($4231) | TVL ~$8461",
+        "timestamp": 1779254929978
+      },
+      "timestamp": 1779254929978
+    },
+    {
+      "id": 2712,
+      "type": "lp_detected",
+      "data": {
+        "id": "5GXL5UHV1oFr3pcSAR5yM9ydZPJFmAX6QKHPpc8EbSWU-1779254929978",
+        "mintAddress": "5GXL5UHV1oFr3pcSAR5yM9ydZPJFmAX6QKHPpc8EbSWU",
+        "lpMint": "Ex7b6u6kiwNvkuVYFn6RKZXCzN2PVAo5MHqoBda1hbGN",
+        "name": "Holy Pump",
+        "symbol": "HOLYPUMP",
+        "detectedAt": 1779254929978,
+        "expiresAt": 1779255229978,
+        "liquidityAmount": 50,
+        "liquidityUsd": 4230.515569993624,
+        "tvlUsd": 8461.031139987248,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-5GXL5UHV1oFr3pcSAR5yM9ydZPJFmAX6QKHPpc8EbSWU",
+        "dexscreenerUrl": "https://dexscreener.com/solana/5GXL5UHV1oFr3pcSAR5yM9ydZPJFmAX6QKHPpc8EbSWU",
+        "pumpfunUrl": "https://pump.fun/5GXL5UHV1oFr3pcSAR5yM9ydZPJFmAX6QKHPpc8EbSWU"
+      },
+      "timestamp": 1779254929980
+    },
+    {
+      "id": 2713,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | HOLYPUMP | TVL=$8461 | eşik=$40000",
+        "timestamp": 1779254929983
+      },
+      "timestamp": 1779254929983
+    },
+    {
+      "id": 2714,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "timestamp": 1779254959664
+      },
+      "timestamp": 1779254959664
+    },
+    {
+      "id": 2715,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "\u001b[2m5:29:19 AM\u001b[22m \u001b[36m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[32mhmr update \u001b[39m\u001b[2m/src/components/TradePanel.tsx, /src/index.css?v=9VuT2YY1sZT-je6a4QELv\u001b[22m",
+        "timestamp": 1779254959667
+      },
+      "timestamp": 1779254959667
     }
   ]
 }
