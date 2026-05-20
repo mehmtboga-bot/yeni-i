@@ -28,6 +28,6 @@
     "solAmount": 0.01,
     "slippageBps": 5000,
     "priorityFeeMicroLamports": 200000,
-    "takeProfitPct": 100
+    "takeProfitPct": 35
   }
 }
