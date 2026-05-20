@@ -1,17 +1,6 @@
 {
   "positions": [
     {
-      "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253127011",
-      "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
-      "name": "RCSC",
-      "symbol": "RCSC",
-      "dex": "pumpswap",
-      "status": "failed",
-      "buyTimestamp": 1779253127011,
-      "buySolAmount": 0.01,
-      "error": "PumpPortal API 400: Bad Request"
-    },
-    {
       "id": "pos-95vQwbFtsoyrn1A1y45gkesWR6EkMkPq2S9ZJ92ucQbp-1779218126948",
       "mintAddress": "95vQwbFtsoyrn1A1y45gkesWR6EkMkPq2S9ZJ92ucQbp",
       "name": "Global Digital Oil Reserve",
