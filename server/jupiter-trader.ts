@@ -337,13 +337,14 @@ export class JupiterTrader {
   async sell(positionId: string): Promise<Position | null> {
     const pos = this.store.getById(positionId);
     if (!pos) { console.warn(`⚠️ Pozisyon bulunamadı: ${positionId}`); return null; }
-    if (pos.status !== "open") { console.warn(`⚠️ Satışa uygun değil (${pos.status}): ${pos.symbol}`); return pos; }
+    if (!["open", "failed"].includes(pos.status)) { console.warn(`⚠️ Satışa uygun değil (${pos.status}): ${pos.symbol}`); return pos; }
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — satış atlandı"); return null; }
     if (this.inFlight.has(`sell:${pos.id}`)) return pos;
     this.inFlight.add(`sell:${pos.id}`);
 
     const config = this.store.getConfig();
-    let updated: Position = { ...pos, status: "pending_sell" };
+    // failed → pending_sell (retry)
+    let updated: Position = { ...pos, status: "pending_sell", error: undefined };
     this.updateAndEmit(updated);
     const dexLabel = pos.dex === "pumpswap" ? "PumpSwap" : "Jupiter";
     console.log(`💸 [${dexLabel}] SATIŞ: ${pos.symbol}`);
