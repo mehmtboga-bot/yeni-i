@@ -197,7 +197,7 @@ export class JupiterTrader {
       amount: opts.amount,
       slippage: opts.slippagePct,
       priorityFee: opts.priorityFeeSol,
-      pool: "pump",
+      pool: "pumpswap",
     };
 
     const res = await fetch(PUMP_TRADE_API, {
