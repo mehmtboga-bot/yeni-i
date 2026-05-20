@@ -1,739 +1,6 @@
 {
-  "lastId": 1981,
+  "lastId": 2038,
   "events": [
-    {
-      "id": 1782,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] conviction (conviction) | PumpSwap | 200.0000 SOL ($16874) | TVL ~$33748",
-        "timestamp": 1779220119627
-      },
-      "timestamp": 1779220119627
-    },
-    {
-      "id": 1783,
-      "type": "lp_detected",
-      "data": {
-        "id": "G6MPGpp8YfvHXwoW7RYcYWNnLQ2rSC8oyJgcBuANnW3h-1779220119626",
-        "mintAddress": "G6MPGpp8YfvHXwoW7RYcYWNnLQ2rSC8oyJgcBuANnW3h",
-        "lpMint": "GGuDM6XAvzDV4YFjuoHv672DxnZxNjdn9Y6AqjVW9Jjm",
-        "name": "conviction",
-        "symbol": "conviction",
-        "detectedAt": 1779220119626,
-        "expiresAt": 1779220419626,
-        "liquidityAmount": 200,
-        "liquidityUsd": 16873.80702177466,
-        "tvlUsd": 33747.61404354932,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-G6MPGpp8YfvHXwoW7RYcYWNnLQ2rSC8oyJgcBuANnW3h",
-        "dexscreenerUrl": "https://dexscreener.com/solana/G6MPGpp8YfvHXwoW7RYcYWNnLQ2rSC8oyJgcBuANnW3h",
-        "pumpfunUrl": "https://pump.fun/G6MPGpp8YfvHXwoW7RYcYWNnLQ2rSC8oyJgcBuANnW3h"
-      },
-      "timestamp": 1779220119628
-    },
-    {
-      "id": 1784,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | conviction | TVL=$33748 | eşik=$40000",
-        "timestamp": 1779220119639
-      },
-      "timestamp": 1779220119639
-    },
-    {
-      "id": 1785,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "7:49:20 PM [express] GET /api/events 200 in 1ms :: {\"events\":[{\"id\":1773,\"type\":\"server_log\",\"data\":…",
-        "timestamp": 1779220160695
-      },
-      "timestamp": 1779220160695
-    },
-    {
-      "id": 1786,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] TrashCoin (TRASH) | PumpSwap | 50.0000 SOL ($4218) | TVL ~$8437",
-        "timestamp": 1779220217404
-      },
-      "timestamp": 1779220217404
-    },
-    {
-      "id": 1787,
-      "type": "lp_detected",
-      "data": {
-        "id": "9nqrqfHtmg5thHMrb8mF8db132rHDpa2U71TdcvLcjzf-1779220217403",
-        "mintAddress": "9nqrqfHtmg5thHMrb8mF8db132rHDpa2U71TdcvLcjzf",
-        "lpMint": "DCLs1bQjED18u751pR9wic4LjLSK1jqcFk5rhctBatUW",
-        "name": "TrashCoin",
-        "symbol": "TRASH",
-        "detectedAt": 1779220217403,
-        "expiresAt": 1779220517403,
-        "liquidityAmount": 50,
-        "liquidityUsd": 4218.451755443665,
-        "tvlUsd": 8436.90351088733,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-9nqrqfHtmg5thHMrb8mF8db132rHDpa2U71TdcvLcjzf",
-        "dexscreenerUrl": "https://dexscreener.com/solana/9nqrqfHtmg5thHMrb8mF8db132rHDpa2U71TdcvLcjzf",
-        "pumpfunUrl": "https://pump.fun/9nqrqfHtmg5thHMrb8mF8db132rHDpa2U71TdcvLcjzf"
-      },
-      "timestamp": 1779220217405
-    },
-    {
-      "id": 1788,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | TRASH | TVL=$8437 | eşik=$40000",
-        "timestamp": 1779220217410
-      },
-      "timestamp": 1779220217410
-    },
-    {
-      "id": 1789,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] PEPO (PEPO) | PumpSwap | 50.0000 SOL ($4218) | TVL ~$8437",
-        "timestamp": 1779220256555
-      },
-      "timestamp": 1779220256555
-    },
-    {
-      "id": 1790,
-      "type": "lp_detected",
-      "data": {
-        "id": "5Ecg1BqgtiujwQCwRnimFAMuqC77GTYQf3GCmi9GZuc5-1779220256555",
-        "mintAddress": "5Ecg1BqgtiujwQCwRnimFAMuqC77GTYQf3GCmi9GZuc5",
-        "lpMint": "3eHtmYmq2nrCzuCDaDEu7xLV6KnAgRjiu3ySsXUjALs1",
-        "name": "PEPO",
-        "symbol": "PEPO",
-        "detectedAt": 1779220256555,
-        "expiresAt": 1779220556555,
-        "liquidityAmount": 50,
-        "liquidityUsd": 4218.451755443665,
-        "tvlUsd": 8436.90351088733,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-5Ecg1BqgtiujwQCwRnimFAMuqC77GTYQf3GCmi9GZuc5",
-        "dexscreenerUrl": "https://dexscreener.com/solana/5Ecg1BqgtiujwQCwRnimFAMuqC77GTYQf3GCmi9GZuc5",
-        "pumpfunUrl": "https://pump.fun/5Ecg1BqgtiujwQCwRnimFAMuqC77GTYQf3GCmi9GZuc5"
-      },
-      "timestamp": 1779220256557
-    },
-    {
-      "id": 1791,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | PEPO | TVL=$8437 | eşik=$40000",
-        "timestamp": 1779220256568
-      },
-      "timestamp": 1779220256568
-    },
-    {
-      "id": 1792,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Putin Arctic Radar Bear (Arcbr) | PumpSwap | 181.8342 SOL ($15341) | TVL ~$30682",
-        "timestamp": 1779220327123
-      },
-      "timestamp": 1779220327123
-    },
-    {
-      "id": 1793,
-      "type": "lp_detected",
-      "data": {
-        "id": "Fw1FBJPMK2oHJAL7hWcuL79ZSLhbCHjEjrvbqDxrpump-1779220327123",
-        "mintAddress": "Fw1FBJPMK2oHJAL7hWcuL79ZSLhbCHjEjrvbqDxrpump",
-        "lpMint": "Fwt4LhukPMHE2N6qFjzpBnRWfS87aDc2p8UundMdWRMv",
-        "name": "Putin Arctic Radar Bear",
-        "symbol": "Arcbr",
-        "detectedAt": 1779220327123,
-        "expiresAt": 1779220627123,
-        "liquidityAmount": 181.834202235,
-        "liquidityUsd": 15341.176192358684,
-        "tvlUsd": 30682.352384717367,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-Fw1FBJPMK2oHJAL7hWcuL79ZSLhbCHjEjrvbqDxrpump",
-        "dexscreenerUrl": "https://dexscreener.com/solana/Fw1FBJPMK2oHJAL7hWcuL79ZSLhbCHjEjrvbqDxrpump",
-        "pumpfunUrl": "https://pump.fun/Fw1FBJPMK2oHJAL7hWcuL79ZSLhbCHjEjrvbqDxrpump"
-      },
-      "timestamp": 1779220327125
-    },
-    {
-      "id": 1794,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | Arcbr | TVL=$30682 | eşik=$40000",
-        "timestamp": 1779220327135
-      },
-      "timestamp": 1779220327135
-    },
-    {
-      "id": 1795,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] The Most Valuable Currency (ATTENTION) | PumpSwap | 600.0000 SOL ($50621) | TVL ~$101243",
-        "timestamp": 1779220347187
-      },
-      "timestamp": 1779220347187
-    },
-    {
-      "id": 1796,
-      "type": "lp_detected",
-      "data": {
-        "id": "FcNtTqXLjygevr7stGk5ViW5bHYCZjbQLH7VcxQvnPKp-1779220347187",
-        "mintAddress": "FcNtTqXLjygevr7stGk5ViW5bHYCZjbQLH7VcxQvnPKp",
-        "lpMint": "4iBrdiT61fxS1AKwPJ4EvRrzkcQxa8PJqSjjSroh76v2",
-        "name": "The Most Valuable Currency",
-        "symbol": "ATTENTION",
-        "detectedAt": 1779220347187,
-        "expiresAt": 1779220647187,
-        "liquidityAmount": 600,
-        "liquidityUsd": 50621.421065323986,
-        "tvlUsd": 101242.84213064797,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-FcNtTqXLjygevr7stGk5ViW5bHYCZjbQLH7VcxQvnPKp",
-        "dexscreenerUrl": "https://dexscreener.com/solana/FcNtTqXLjygevr7stGk5ViW5bHYCZjbQLH7VcxQvnPKp",
-        "pumpfunUrl": "https://pump.fun/FcNtTqXLjygevr7stGk5ViW5bHYCZjbQLH7VcxQvnPKp"
-      },
-      "timestamp": 1779220347188
-    },
-    {
-      "id": 1797,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779220347733
-      },
-      "timestamp": 1779220347733
-    },
-    {
-      "id": 1798,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] The Most Valuable Currency (ATTENTION) | PumpSwap | 360.0000 SOL ($30373) | TVL ~$60746",
-        "timestamp": 1779220355752
-      },
-      "timestamp": 1779220355752
-    },
-    {
-      "id": 1799,
-      "type": "lp_detected",
-      "data": {
-        "id": "CganBypzLJfGgwysrJibv8jrjF1m4ng35HbfEFzkuwWb-1779220355752",
-        "mintAddress": "CganBypzLJfGgwysrJibv8jrjF1m4ng35HbfEFzkuwWb",
-        "lpMint": "F5rXAX56qzzeqiBfFDH6LC2LwEfsx7wmu1ReLAAVp5db",
-        "name": "The Most Valuable Currency",
-        "symbol": "ATTENTION",
-        "detectedAt": 1779220355752,
-        "expiresAt": 1779220655752,
-        "liquidityAmount": 360,
-        "liquidityUsd": 30372.85263919439,
-        "tvlUsd": 60745.70527838878,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-CganBypzLJfGgwysrJibv8jrjF1m4ng35HbfEFzkuwWb",
-        "dexscreenerUrl": "https://dexscreener.com/solana/CganBypzLJfGgwysrJibv8jrjF1m4ng35HbfEFzkuwWb",
-        "pumpfunUrl": "https://pump.fun/CganBypzLJfGgwysrJibv8jrjF1m4ng35HbfEFzkuwWb"
-      },
-      "timestamp": 1779220355753
-    },
-    {
-      "id": 1800,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779220356299
-      },
-      "timestamp": 1779220356299
-    },
-    {
-      "id": 1801,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] The Most Valuable Currency (ATTENTION) | PumpSwap | 520.0000 SOL ($43872) | TVL ~$87744",
-        "timestamp": 1779220449172
-      },
-      "timestamp": 1779220449172
-    },
-    {
-      "id": 1802,
-      "type": "lp_detected",
-      "data": {
-        "id": "Gp2ENQ6xwqq7UdMhFbDTjXndBMLoMxqSwU88hdHor7Mi-1779220449172",
-        "mintAddress": "Gp2ENQ6xwqq7UdMhFbDTjXndBMLoMxqSwU88hdHor7Mi",
-        "lpMint": "BAC1Y6pPURVoEos18oxvCEoDWjvFssSCbdRcRaUvdL4U",
-        "name": "The Most Valuable Currency",
-        "symbol": "ATTENTION",
-        "detectedAt": 1779220449172,
-        "expiresAt": 1779220749172,
-        "liquidityAmount": 520,
-        "liquidityUsd": 43871.89825661412,
-        "tvlUsd": 87743.79651322824,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-Gp2ENQ6xwqq7UdMhFbDTjXndBMLoMxqSwU88hdHor7Mi",
-        "dexscreenerUrl": "https://dexscreener.com/solana/Gp2ENQ6xwqq7UdMhFbDTjXndBMLoMxqSwU88hdHor7Mi",
-        "pumpfunUrl": "https://pump.fun/Gp2ENQ6xwqq7UdMhFbDTjXndBMLoMxqSwU88hdHor7Mi"
-      },
-      "timestamp": 1779220449173
-    },
-    {
-      "id": 1803,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779220449748
-      },
-      "timestamp": 1779220449748
-    },
-    {
-      "id": 1804,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Dothls (DOTHL) | PumpSwap | 84.9904 SOL ($7171) | TVL ~$14341",
-        "timestamp": 1779220498322
-      },
-      "timestamp": 1779220498322
-    },
-    {
-      "id": 1805,
-      "type": "lp_detected",
-      "data": {
-        "id": "5PShrpBLWuw5ftDQgEDUouN5WV39woFuKwJh3n2UEx3y-1779220498322",
-        "mintAddress": "5PShrpBLWuw5ftDQgEDUouN5WV39woFuKwJh3n2UEx3y",
-        "lpMint": "5ZVNCgBWWLuQYo7zn5NunyhHMp8ooV67JvvYLji9ZHgQ",
-        "name": "Dothls",
-        "symbol": "DOTHL",
-        "detectedAt": 1779220498322,
-        "expiresAt": 1779220798322,
-        "liquidityAmount": 84.990359545,
-        "liquidityUsd": 7170.5546283678705,
-        "tvlUsd": 14341.109256735741,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-5PShrpBLWuw5ftDQgEDUouN5WV39woFuKwJh3n2UEx3y",
-        "dexscreenerUrl": "https://dexscreener.com/solana/5PShrpBLWuw5ftDQgEDUouN5WV39woFuKwJh3n2UEx3y",
-        "pumpfunUrl": "https://pump.fun/5PShrpBLWuw5ftDQgEDUouN5WV39woFuKwJh3n2UEx3y"
-      },
-      "timestamp": 1779220498324
-    },
-    {
-      "id": 1806,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | DOTHL | TVL=$14341 | eşik=$40000",
-        "timestamp": 1779220498327
-      },
-      "timestamp": 1779220498327
-    },
-    {
-      "id": 1807,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Sudan Evacuation Camel (Sdevac) | PumpSwap | 186.2620 SOL ($15715) | TVL ~$31429",
-        "timestamp": 1779220538079
-      },
-      "timestamp": 1779220538079
-    },
-    {
-      "id": 1808,
-      "type": "lp_detected",
-      "data": {
-        "id": "EFe6tQjM8YiZyiJg5w849KW16LeWbNWdA5TU4SPKpump-1779220538079",
-        "mintAddress": "EFe6tQjM8YiZyiJg5w849KW16LeWbNWdA5TU4SPKpump",
-        "lpMint": "2KZWDjPXoJPfRA1YP9ihgcMuFzGU4eSN9kksRV6tiMr1",
-        "name": "Sudan Evacuation Camel",
-        "symbol": "Sdevac",
-        "detectedAt": 1779220538079,
-        "expiresAt": 1779220838079,
-        "liquidityAmount": 186.262018996,
-        "liquidityUsd": 15714.74682012315,
-        "tvlUsd": 31429.4936402463,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-EFe6tQjM8YiZyiJg5w849KW16LeWbNWdA5TU4SPKpump",
-        "dexscreenerUrl": "https://dexscreener.com/solana/EFe6tQjM8YiZyiJg5w849KW16LeWbNWdA5TU4SPKpump",
-        "pumpfunUrl": "https://pump.fun/EFe6tQjM8YiZyiJg5w849KW16LeWbNWdA5TU4SPKpump"
-      },
-      "timestamp": 1779220538081
-    },
-    {
-      "id": 1809,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | Sdevac | TVL=$31429 | eşik=$40000",
-        "timestamp": 1779220538093
-      },
-      "timestamp": 1779220538093
-    },
-    {
-      "id": 1810,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Q* (Q*) | PumpSwap | 85.0904 SOL ($7179) | TVL ~$14358",
-        "timestamp": 1779220574577
-      },
-      "timestamp": 1779220574577
-    },
-    {
-      "id": 1811,
-      "type": "lp_detected",
-      "data": {
-        "id": "EThyULeaiZ9YBBX9gGSBfjZLLe6hDSCyA4KseyxkWaML-1779220574576",
-        "mintAddress": "EThyULeaiZ9YBBX9gGSBfjZLLe6hDSCyA4KseyxkWaML",
-        "lpMint": null,
-        "name": "Q*",
-        "symbol": "Q*",
-        "detectedAt": 1779220574576,
-        "expiresAt": 1779220874576,
-        "liquidityAmount": 85.090359355,
-        "liquidityUsd": 7178.991515848641,
-        "tvlUsd": 14357.983031697282,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-EThyULeaiZ9YBBX9gGSBfjZLLe6hDSCyA4KseyxkWaML",
-        "dexscreenerUrl": "https://dexscreener.com/solana/EThyULeaiZ9YBBX9gGSBfjZLLe6hDSCyA4KseyxkWaML",
-        "pumpfunUrl": "https://pump.fun/EThyULeaiZ9YBBX9gGSBfjZLLe6hDSCyA4KseyxkWaML"
-      },
-      "timestamp": 1779220574578
-    },
-    {
-      "id": 1812,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | Q* | TVL=$14358 | eşik=$40000",
-        "timestamp": 1779220574589
-      },
-      "timestamp": 1779220574589
-    },
-    {
-      "id": 1813,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] The Poke Kid (Avery) | PumpSwap | 50.0000 SOL ($4218) | TVL ~$8437",
-        "timestamp": 1779220584892
-      },
-      "timestamp": 1779220584892
-    },
-    {
-      "id": 1814,
-      "type": "lp_detected",
-      "data": {
-        "id": "8k7gVCRVUUcm5erfcsJsgsQeFjzwfUpuDZzqLwpkadzy-1779220584892",
-        "mintAddress": "8k7gVCRVUUcm5erfcsJsgsQeFjzwfUpuDZzqLwpkadzy",
-        "lpMint": "FURjnEowV8QiNNZBCTqVHNqq4X4gMiEf1WBfS8yYdhHv",
-        "name": "The Poke Kid",
-        "symbol": "Avery",
-        "detectedAt": 1779220584892,
-        "expiresAt": 1779220884892,
-        "liquidityAmount": 50,
-        "liquidityUsd": 4218.451755443665,
-        "tvlUsd": 8436.90351088733,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-8k7gVCRVUUcm5erfcsJsgsQeFjzwfUpuDZzqLwpkadzy",
-        "dexscreenerUrl": "https://dexscreener.com/solana/8k7gVCRVUUcm5erfcsJsgsQeFjzwfUpuDZzqLwpkadzy",
-        "pumpfunUrl": "https://pump.fun/8k7gVCRVUUcm5erfcsJsgsQeFjzwfUpuDZzqLwpkadzy"
-      },
-      "timestamp": 1779220584894
-    },
-    {
-      "id": 1815,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | Avery | TVL=$8437 | eşik=$40000",
-        "timestamp": 1779220584897
-      },
-      "timestamp": 1779220584897
-    },
-    {
-      "id": 1816,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] The Most Valuable Currency (ATTENTION) | PumpSwap | 86.0000 SOL ($7256) | TVL ~$14511",
-        "timestamp": 1779220668336
-      },
-      "timestamp": 1779220668336
-    },
-    {
-      "id": 1817,
-      "type": "lp_detected",
-      "data": {
-        "id": "Et7gXgur1XHSdWiB3vfb9VhrTbe2cAqpnhV1yfAdCgNs-1779220668336",
-        "mintAddress": "Et7gXgur1XHSdWiB3vfb9VhrTbe2cAqpnhV1yfAdCgNs",
-        "lpMint": "LxGKgxuVnCtkkEpucJgDGpbRnaZVL4hQ4U9oyLpEnve",
-        "name": "The Most Valuable Currency",
-        "symbol": "ATTENTION",
-        "detectedAt": 1779220668336,
-        "expiresAt": 1779220968336,
-        "liquidityAmount": 86,
-        "liquidityUsd": 7255.737019363104,
-        "tvlUsd": 14511.474038726208,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-Et7gXgur1XHSdWiB3vfb9VhrTbe2cAqpnhV1yfAdCgNs",
-        "dexscreenerUrl": "https://dexscreener.com/solana/Et7gXgur1XHSdWiB3vfb9VhrTbe2cAqpnhV1yfAdCgNs",
-        "pumpfunUrl": "https://pump.fun/Et7gXgur1XHSdWiB3vfb9VhrTbe2cAqpnhV1yfAdCgNs"
-      },
-      "timestamp": 1779220668337
-    },
-    {
-      "id": 1818,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | ATTENTION | TVL=$14511 | eşik=$40000",
-        "timestamp": 1779220668339
-      },
-      "timestamp": 1779220668339
-    },
-    {
-      "id": 1819,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Meme me (MEME) | PumpSwap | 50.0000 SOL ($4218) | TVL ~$8437",
-        "timestamp": 1779220707878
-      },
-      "timestamp": 1779220707878
-    },
-    {
-      "id": 1820,
-      "type": "lp_detected",
-      "data": {
-        "id": "477u2wAnQzxM1jANMSNFYXngB6dNHTxAcEaowHjCm8ZD-1779220707878",
-        "mintAddress": "477u2wAnQzxM1jANMSNFYXngB6dNHTxAcEaowHjCm8ZD",
-        "lpMint": "HeDPVU9rdsL3K9sFUUSSbmPf4XPhftjv6mdkcBgFNMNf",
-        "name": "Meme me",
-        "symbol": "MEME",
-        "detectedAt": 1779220707878,
-        "expiresAt": 1779221007878,
-        "liquidityAmount": 50,
-        "liquidityUsd": 4218.451755443665,
-        "tvlUsd": 8436.90351088733,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-477u2wAnQzxM1jANMSNFYXngB6dNHTxAcEaowHjCm8ZD",
-        "dexscreenerUrl": "https://dexscreener.com/solana/477u2wAnQzxM1jANMSNFYXngB6dNHTxAcEaowHjCm8ZD",
-        "pumpfunUrl": "https://pump.fun/477u2wAnQzxM1jANMSNFYXngB6dNHTxAcEaowHjCm8ZD"
-      },
-      "timestamp": 1779220707879
-    },
-    {
-      "id": 1821,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | MEME | TVL=$8437 | eşik=$40000",
-        "timestamp": 1779220707890
-      },
-      "timestamp": 1779220707890
-    },
-    {
-      "id": 1822,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] The Most Valuable Currency (ATTENTION) | PumpSwap | 86.0000 SOL ($7256) | TVL ~$14511",
-        "timestamp": 1779220759915
-      },
-      "timestamp": 1779220759915
-    },
-    {
-      "id": 1823,
-      "type": "lp_detected",
-      "data": {
-        "id": "7j4UaoAwfMBzcbnfzb6BQJa6wuZe8KnoPGhjVCT5aYtS-1779220759915",
-        "mintAddress": "7j4UaoAwfMBzcbnfzb6BQJa6wuZe8KnoPGhjVCT5aYtS",
-        "lpMint": "9ErpSqK7F7L4GHT5JX2XojLBNjReFMoNap3bq4nZSdog",
-        "name": "The Most Valuable Currency",
-        "symbol": "ATTENTION",
-        "detectedAt": 1779220759915,
-        "expiresAt": 1779221059915,
-        "liquidityAmount": 86,
-        "liquidityUsd": 7255.737019363104,
-        "tvlUsd": 14511.474038726208,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-7j4UaoAwfMBzcbnfzb6BQJa6wuZe8KnoPGhjVCT5aYtS",
-        "dexscreenerUrl": "https://dexscreener.com/solana/7j4UaoAwfMBzcbnfzb6BQJa6wuZe8KnoPGhjVCT5aYtS",
-        "pumpfunUrl": "https://pump.fun/7j4UaoAwfMBzcbnfzb6BQJa6wuZe8KnoPGhjVCT5aYtS"
-      },
-      "timestamp": 1779220759917
-    },
-    {
-      "id": 1824,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | ATTENTION | TVL=$14511 | eşik=$40000",
-        "timestamp": 1779220759927
-      },
-      "timestamp": 1779220759927
-    },
-    {
-      "id": 1825,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💼 Trader cüzdanı yüklendi: HWQJG2ZntXUeWh4mNzgQpkQqutJc8NZ3hXyJHScNuzTw",
-        "timestamp": 1779223863316
-      },
-      "timestamp": 1779223863316
-    },
-    {
-      "id": 1826,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚀 Helius Monitor başlatılıyor (PumpSwap — sadece CreatePool)...",
-        "timestamp": 1779223863318
-      },
-      "timestamp": 1779223863318
-    },
-    {
-      "id": 1827,
-      "type": "monitoring_state",
-      "data": {
-        "isMonitoring": true
-      },
-      "timestamp": 1779223863328
-    },
-    {
-      "id": 1828,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "8:51:03 PM [express] serving on port 5000",
-        "timestamp": 1779223863426
-      },
-      "timestamp": 1779223863426
-    },
-    {
-      "id": 1829,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💵 SOL/USD (Jupiter): $84.43",
-        "timestamp": 1779223864072
-      },
-      "timestamp": 1779223864072
-    },
-    {
-      "id": 1830,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)",
-        "timestamp": 1779223864207
-      },
-      "timestamp": 1779223864207
-    },
-    {
-      "id": 1831,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779223864620
-      },
-      "timestamp": 1779223864620
-    },
-    {
-      "id": 1832,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "Browserslist: browsers data (caniuse-lite) is 19 months old. Please run:\n  npx update-browserslist-db@latest\n  Why you should do it regularly: https://github.com/browserslist/update-db#readme",
-        "timestamp": 1779223936976
-      },
-      "timestamp": 1779223936976
-    },
-    {
-      "id": 1833,
-      "type": "server_log",
-      "data": {
-        "level": "warn",
-        "message": "\nA PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.",
-        "timestamp": 1779223937880
-      },
-      "timestamp": 1779223937880
-    },
-    {
-      "id": 1834,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "8:52:19 PM [express] GET /api/files/list 200 in 2ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
-        "timestamp": 1779223939976
-      },
-      "timestamp": 1779223939976
-    },
-    {
-      "id": 1835,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "8:52:20 PM [express] GET /api/events 200 in 2ms :: {\"events\":[{\"id\":1785,\"type\":\"server_log\",\"data\":…",
-        "timestamp": 1779223940020
-      },
-      "timestamp": 1779223940020
-    },
-    {
-      "id": 1836,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "8:52:20 PM [express] GET /api/files/read 200 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
-        "timestamp": 1779223940326
-      },
-      "timestamp": 1779223940326
-    },
-    {
-      "id": 1837,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Quantum Maze (Qcim) | PumpSwap | 214.0938 SOL ($18075) | TVL ~$36151",
-        "timestamp": 1779223943585
-      },
-      "timestamp": 1779223943585
-    },
-    {
-      "id": 1838,
-      "type": "lp_detected",
-      "data": {
-        "id": "4qnsYRpHy5vC68G9fnLzNeRBeNWfBZBeecRiXLDJpump-1779223943585",
-        "mintAddress": "4qnsYRpHy5vC68G9fnLzNeRBeNWfBZBeecRiXLDJpump",
-        "lpMint": "7jwSB7UzikYv74GkvSfswzuCCyNXj3j1HFoJ98RnUJ5F",
-        "name": "Quantum Maze",
-        "symbol": "Qcim",
-        "detectedAt": 1779223943585,
-        "expiresAt": 1779224243585,
-        "liquidityAmount": 214.093802128,
-        "liquidityUsd": 18075.27557010522,
-        "tvlUsd": 36150.55114021044,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-4qnsYRpHy5vC68G9fnLzNeRBeNWfBZBeecRiXLDJpump",
-        "dexscreenerUrl": "https://dexscreener.com/solana/4qnsYRpHy5vC68G9fnLzNeRBeNWfBZBeecRiXLDJpump",
-        "pumpfunUrl": "https://pump.fun/4qnsYRpHy5vC68G9fnLzNeRBeNWfBZBeecRiXLDJpump"
-      },
-      "timestamp": 1779223943587
-    },
     {
       "id": 1839,
       "type": "server_log",
@@ -2523,6 +1790,739 @@
         "timestamp": 1779252671320
       },
       "timestamp": 1779252671320
+    },
+    {
+      "id": 1982,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "Browserslist: browsers data (caniuse-lite) is 19 months old. Please run:\n  npx update-browserslist-db@latest\n  Why you should do it regularly: https://github.com/browserslist/update-db#readme",
+        "timestamp": 1779252701430
+      },
+      "timestamp": 1779252701431
+    },
+    {
+      "id": 1983,
+      "type": "server_log",
+      "data": {
+        "level": "warn",
+        "message": "\nA PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.",
+        "timestamp": 1779252702136
+      },
+      "timestamp": 1779252702136
+    },
+    {
+      "id": 1984,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "4:51:43 AM [express] GET /api/files/list 200 in 3ms :: {\"files\":[\"server/helius-monitor.ts\",\"server/…",
+        "timestamp": 1779252703836
+      },
+      "timestamp": 1779252703836
+    },
+    {
+      "id": 1985,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "4:51:43 AM [express] GET /api/events 200 in 0ms :: {\"events\":[]}",
+        "timestamp": 1779252703855
+      },
+      "timestamp": 1779252703855
+    },
+    {
+      "id": 1986,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "4:51:44 AM [express] GET /api/files/read 200 in 1ms :: {\"content\":\"import WebSocket from \\\"ws\\\";\\nim…",
+        "timestamp": 1779252704071
+      },
+      "timestamp": 1779252704071
+    },
+    {
+      "id": 1987,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Kevin the Fed Chair (Kevin) | PumpSwap | 134.9900 SOL ($11344) | TVL ~$22689",
+        "timestamp": 1779252717450
+      },
+      "timestamp": 1779252717450
+    },
+    {
+      "id": 1988,
+      "type": "lp_detected",
+      "data": {
+        "id": "BLabBeByXhSb16RxADgCp1jEUoTmZMnnYBWkwYk1ENP9-1779252717450",
+        "mintAddress": "BLabBeByXhSb16RxADgCp1jEUoTmZMnnYBWkwYk1ENP9",
+        "lpMint": "DDgiZJVCKxqagkJTNntihyUggxyRgcHk7zRY1GCqdZVc",
+        "name": "Kevin the Fed Chair",
+        "symbol": "Kevin",
+        "detectedAt": 1779252717450,
+        "expiresAt": 1779253017450,
+        "liquidityAmount": 134.99,
+        "liquidityUsd": 11344.366599629697,
+        "tvlUsd": 22688.733199259394,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-BLabBeByXhSb16RxADgCp1jEUoTmZMnnYBWkwYk1ENP9",
+        "dexscreenerUrl": "https://dexscreener.com/solana/BLabBeByXhSb16RxADgCp1jEUoTmZMnnYBWkwYk1ENP9",
+        "pumpfunUrl": "https://pump.fun/BLabBeByXhSb16RxADgCp1jEUoTmZMnnYBWkwYk1ENP9"
+      },
+      "timestamp": 1779252717451
+    },
+    {
+      "id": 1989,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | Kevin | TVL=$22689 | eşik=$40000",
+        "timestamp": 1779252717453
+      },
+      "timestamp": 1779252717453
+    },
+    {
+      "id": 1990,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] The Tremp Family (Tremps) | PumpSwap | 111.0000 SOL ($9328) | TVL ~$18657",
+        "timestamp": 1779252727646
+      },
+      "timestamp": 1779252727646
+    },
+    {
+      "id": 1991,
+      "type": "lp_detected",
+      "data": {
+        "id": "7reeLxFRKgktDyF4vN3g71jEab211g3f81AfYj2t4Cfj-1779252727645",
+        "mintAddress": "7reeLxFRKgktDyF4vN3g71jEab211g3f81AfYj2t4Cfj",
+        "lpMint": "12jgExSGpXHEyYWpMea8BRRuMSfoMPNAi7SrzqUVEu6H",
+        "name": "The Tremp Family",
+        "symbol": "Tremps",
+        "detectedAt": 1779252727645,
+        "expiresAt": 1779253027645,
+        "liquidityAmount": 111,
+        "liquidityUsd": 9328.281299051012,
+        "tvlUsd": 18656.562598102024,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-7reeLxFRKgktDyF4vN3g71jEab211g3f81AfYj2t4Cfj",
+        "dexscreenerUrl": "https://dexscreener.com/solana/7reeLxFRKgktDyF4vN3g71jEab211g3f81AfYj2t4Cfj",
+        "pumpfunUrl": "https://pump.fun/7reeLxFRKgktDyF4vN3g71jEab211g3f81AfYj2t4Cfj"
+      },
+      "timestamp": 1779252727648
+    },
+    {
+      "id": 1992,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | Tremps | TVL=$18657 | eşik=$40000",
+        "timestamp": 1779252727660
+      },
+      "timestamp": 1779252727660
+    },
+    {
+      "id": 1993,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Apple (Apple) | PumpSwap | 52.6700 SOL ($4426) | TVL ~$8853",
+        "timestamp": 1779252768907
+      },
+      "timestamp": 1779252768907
+    },
+    {
+      "id": 1994,
+      "type": "lp_detected",
+      "data": {
+        "id": "bVzvLXEyEpWoLVwtGre5aV2hxfkK8GiwCP44KxYBmSw-1779252768907",
+        "mintAddress": "bVzvLXEyEpWoLVwtGre5aV2hxfkK8GiwCP44KxYBmSw",
+        "lpMint": "2vZqqv377c5U3yYtSZD5fJehEZ8ufSpZh11akehmQA2n",
+        "name": "Apple",
+        "symbol": "Apple",
+        "detectedAt": 1779252768907,
+        "expiresAt": 1779253068907,
+        "liquidityAmount": 52.67,
+        "liquidityUsd": 4426.311495684837,
+        "tvlUsd": 8852.622991369673,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-bVzvLXEyEpWoLVwtGre5aV2hxfkK8GiwCP44KxYBmSw",
+        "dexscreenerUrl": "https://dexscreener.com/solana/bVzvLXEyEpWoLVwtGre5aV2hxfkK8GiwCP44KxYBmSw",
+        "pumpfunUrl": "https://pump.fun/bVzvLXEyEpWoLVwtGre5aV2hxfkK8GiwCP44KxYBmSw"
+      },
+      "timestamp": 1779252768909
+    },
+    {
+      "id": 1995,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | Apple | TVL=$8853 | eşik=$40000",
+        "timestamp": 1779252768911
+      },
+      "timestamp": 1779252768911
+    },
+    {
+      "id": 1996,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] THE LONE WOLF (BEY03F) | PumpSwap | 122.0000 SOL ($10253) | TVL ~$20505",
+        "timestamp": 1779252794139
+      },
+      "timestamp": 1779252794139
+    },
+    {
+      "id": 1997,
+      "type": "lp_detected",
+      "data": {
+        "id": "7sSU88rCTni4TtcF8RkyqV3NKbMHgCvbwiQa6hcvwKuJ-1779252794139",
+        "mintAddress": "7sSU88rCTni4TtcF8RkyqV3NKbMHgCvbwiQa6hcvwKuJ",
+        "lpMint": "Cc5u3R7SoA3Q5cc2pEcq9pdmrmNqV5BQgHFJX5ctWu3N",
+        "name": "THE LONE WOLF",
+        "symbol": "BEY03F",
+        "detectedAt": 1779252794139,
+        "expiresAt": 1779253094139,
+        "liquidityAmount": 122,
+        "liquidityUsd": 10252.705571929942,
+        "tvlUsd": 20505.411143859885,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-7sSU88rCTni4TtcF8RkyqV3NKbMHgCvbwiQa6hcvwKuJ",
+        "dexscreenerUrl": "https://dexscreener.com/solana/7sSU88rCTni4TtcF8RkyqV3NKbMHgCvbwiQa6hcvwKuJ",
+        "pumpfunUrl": "https://pump.fun/7sSU88rCTni4TtcF8RkyqV3NKbMHgCvbwiQa6hcvwKuJ"
+      },
+      "timestamp": 1779252794140
+    },
+    {
+      "id": 1998,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | BEY03F | TVL=$20505 | eşik=$40000",
+        "timestamp": 1779252794153
+      },
+      "timestamp": 1779252794153
+    },
+    {
+      "id": 1999,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] UKRAINE SEA BLACK SIREN (Ubss) | PumpSwap | 221.2269 SOL ($18592) | TVL ~$37183",
+        "timestamp": 1779252830628
+      },
+      "timestamp": 1779252830628
+    },
+    {
+      "id": 2000,
+      "type": "lp_detected",
+      "data": {
+        "id": "2tFr6fSh5uCacMvG7J4zCcYVsuCxPYw6iqzu9n2ypump-1779252830628",
+        "mintAddress": "2tFr6fSh5uCacMvG7J4zCcYVsuCxPYw6iqzu9n2ypump",
+        "lpMint": "7MbiaADH3rNTWK8UXcnuckscbg4LJVCVKQn8oSEGpBYx",
+        "name": "UKRAINE SEA BLACK SIREN",
+        "symbol": "Ubss",
+        "detectedAt": 1779252830628,
+        "expiresAt": 1779253130628,
+        "liquidityAmount": 221.226943721,
+        "liquidityUsd": 18591.59605368302,
+        "tvlUsd": 37183.19210736604,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-2tFr6fSh5uCacMvG7J4zCcYVsuCxPYw6iqzu9n2ypump",
+        "dexscreenerUrl": "https://dexscreener.com/solana/2tFr6fSh5uCacMvG7J4zCcYVsuCxPYw6iqzu9n2ypump",
+        "pumpfunUrl": "https://pump.fun/2tFr6fSh5uCacMvG7J4zCcYVsuCxPYw6iqzu9n2ypump"
+      },
+      "timestamp": 1779252830629
+    },
+    {
+      "id": 2001,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | Ubss | TVL=$37183 | eşik=$40000",
+        "timestamp": 1779252830640
+      },
+      "timestamp": 1779252830640
+    },
+    {
+      "id": 2002,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] nitya (NITYA) | PumpSwap | 98.8534 SOL ($8307) | TVL ~$16615",
+        "timestamp": 1779252899730
+      },
+      "timestamp": 1779252899730
+    },
+    {
+      "id": 2003,
+      "type": "lp_detected",
+      "data": {
+        "id": "3VBPS8ceT3XsCuGneiHMtyHih3YTwvmMLfga6FeNde3E-1779252899730",
+        "mintAddress": "3VBPS8ceT3XsCuGneiHMtyHih3YTwvmMLfga6FeNde3E",
+        "lpMint": "8bbV3FFUR8ogyfXxrV8FyLkzwKcfVrWV1i3ooYMJCanJ",
+        "name": "nitya",
+        "symbol": "NITYA",
+        "detectedAt": 1779252899730,
+        "expiresAt": 1779253199730,
+        "liquidityAmount": 98.8534,
+        "liquidityUsd": 8307.498401509994,
+        "tvlUsd": 16614.99680301999,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-3VBPS8ceT3XsCuGneiHMtyHih3YTwvmMLfga6FeNde3E",
+        "dexscreenerUrl": "https://dexscreener.com/solana/3VBPS8ceT3XsCuGneiHMtyHih3YTwvmMLfga6FeNde3E",
+        "pumpfunUrl": "https://pump.fun/3VBPS8ceT3XsCuGneiHMtyHih3YTwvmMLfga6FeNde3E"
+      },
+      "timestamp": 1779252899733
+    },
+    {
+      "id": 2004,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | NITYA | TVL=$16615 | eşik=$40000",
+        "timestamp": 1779252899736
+      },
+      "timestamp": 1779252899736
+    },
+    {
+      "id": 2005,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] 1 dollar pepe (pepe) | PumpSwap | 50.0000 SOL ($4202) | TVL ~$8404",
+        "timestamp": 1779252907743
+      },
+      "timestamp": 1779252907743
+    },
+    {
+      "id": 2006,
+      "type": "lp_detected",
+      "data": {
+        "id": "AMqprcC93TPi3MSL74mhxgk3E9Typ464buAcKPwfPbtw-1779252907743",
+        "mintAddress": "AMqprcC93TPi3MSL74mhxgk3E9Typ464buAcKPwfPbtw",
+        "lpMint": "4BN9VSUpTrsCPD7C53WTbBpnmj7hjrcQxQDT53tK9sPz",
+        "name": "1 dollar pepe",
+        "symbol": "pepe",
+        "detectedAt": 1779252907743,
+        "expiresAt": 1779253207743,
+        "liquidityAmount": 50,
+        "liquidityUsd": 4201.928513086042,
+        "tvlUsd": 8403.857026172083,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-AMqprcC93TPi3MSL74mhxgk3E9Typ464buAcKPwfPbtw",
+        "dexscreenerUrl": "https://dexscreener.com/solana/AMqprcC93TPi3MSL74mhxgk3E9Typ464buAcKPwfPbtw",
+        "pumpfunUrl": "https://pump.fun/AMqprcC93TPi3MSL74mhxgk3E9Typ464buAcKPwfPbtw"
+      },
+      "timestamp": 1779252907745
+    },
+    {
+      "id": 2007,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | pepe | TVL=$8404 | eşik=$40000",
+        "timestamp": 1779252907746
+      },
+      "timestamp": 1779252907746
+    },
+    {
+      "id": 2008,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] nitya (NITYA) | PumpSwap | 111.0000 SOL ($9328) | TVL ~$18657",
+        "timestamp": 1779252949878
+      },
+      "timestamp": 1779252949878
+    },
+    {
+      "id": 2009,
+      "type": "lp_detected",
+      "data": {
+        "id": "E44bSDwuL2ezTSnS1LX5frv9BaTDmJQHKSopiwpqXF3M-1779252949878",
+        "mintAddress": "E44bSDwuL2ezTSnS1LX5frv9BaTDmJQHKSopiwpqXF3M",
+        "lpMint": "FkWQ5j4Q2JDwiRziEn32anu281518FWBDKyv54Qw8b9e",
+        "name": "nitya",
+        "symbol": "NITYA",
+        "detectedAt": 1779252949878,
+        "expiresAt": 1779253249878,
+        "liquidityAmount": 111,
+        "liquidityUsd": 9328.281299051012,
+        "tvlUsd": 18656.562598102024,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-E44bSDwuL2ezTSnS1LX5frv9BaTDmJQHKSopiwpqXF3M",
+        "dexscreenerUrl": "https://dexscreener.com/solana/E44bSDwuL2ezTSnS1LX5frv9BaTDmJQHKSopiwpqXF3M",
+        "pumpfunUrl": "https://pump.fun/E44bSDwuL2ezTSnS1LX5frv9BaTDmJQHKSopiwpqXF3M"
+      },
+      "timestamp": 1779252949879
+    },
+    {
+      "id": 2010,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | NITYA | TVL=$18657 | eşik=$40000",
+        "timestamp": 1779252949889
+      },
+      "timestamp": 1779252949889
+    },
+    {
+      "id": 2011,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] first AI actress (TILLY) | PumpSwap | 50.0000 SOL ($4202) | TVL ~$8404",
+        "timestamp": 1779252956068
+      },
+      "timestamp": 1779252956068
+    },
+    {
+      "id": 2012,
+      "type": "lp_detected",
+      "data": {
+        "id": "47rJuEpcn7LoRuyKVuK3VMT6Anwcw1Q7BqkHEKhFgERo-1779252956068",
+        "mintAddress": "47rJuEpcn7LoRuyKVuK3VMT6Anwcw1Q7BqkHEKhFgERo",
+        "lpMint": "pJPYLtoSM9pStNiP5A8xGvSm2aQB4Y9yTGViWMVx9df",
+        "name": "first AI actress",
+        "symbol": "TILLY",
+        "detectedAt": 1779252956068,
+        "expiresAt": 1779253256068,
+        "liquidityAmount": 50,
+        "liquidityUsd": 4201.928513086042,
+        "tvlUsd": 8403.857026172083,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-47rJuEpcn7LoRuyKVuK3VMT6Anwcw1Q7BqkHEKhFgERo",
+        "dexscreenerUrl": "https://dexscreener.com/solana/47rJuEpcn7LoRuyKVuK3VMT6Anwcw1Q7BqkHEKhFgERo",
+        "pumpfunUrl": "https://pump.fun/47rJuEpcn7LoRuyKVuK3VMT6Anwcw1Q7BqkHEKhFgERo"
+      },
+      "timestamp": 1779252956069
+    },
+    {
+      "id": 2013,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | TILLY | TVL=$8404 | eşik=$40000",
+        "timestamp": 1779252956071
+      },
+      "timestamp": 1779252956071
+    },
+    {
+      "id": 2014,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Pump Intelligence Agency (PIA) | PumpSwap | 85.0000 SOL ($7143) | TVL ~$14287",
+        "timestamp": 1779252997647
+      },
+      "timestamp": 1779252997647
+    },
+    {
+      "id": 2015,
+      "type": "lp_detected",
+      "data": {
+        "id": "4Jq9VFytukKFLghNLuur86pE44essWyvCchLqsCVqFtD-1779252997647",
+        "mintAddress": "4Jq9VFytukKFLghNLuur86pE44essWyvCchLqsCVqFtD",
+        "lpMint": "Dw4zGFtvbxvqmRCMNAJnG61y4vL5thH8tv9A13oRF5Q9",
+        "name": "Pump Intelligence Agency",
+        "symbol": "PIA",
+        "detectedAt": 1779252997647,
+        "expiresAt": 1779253297647,
+        "liquidityAmount": 85,
+        "liquidityUsd": 7143.278472246271,
+        "tvlUsd": 14286.556944492542,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-4Jq9VFytukKFLghNLuur86pE44essWyvCchLqsCVqFtD",
+        "dexscreenerUrl": "https://dexscreener.com/solana/4Jq9VFytukKFLghNLuur86pE44essWyvCchLqsCVqFtD",
+        "pumpfunUrl": "https://pump.fun/4Jq9VFytukKFLghNLuur86pE44essWyvCchLqsCVqFtD"
+      },
+      "timestamp": 1779252997649
+    },
+    {
+      "id": 2016,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | PIA | TVL=$14287 | eşik=$40000",
+        "timestamp": 1779252997661
+      },
+      "timestamp": 1779252997661
+    },
+    {
+      "id": 2017,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Kevin the Fed Chair (Kevin) | PumpSwap | 134.9900 SOL ($11344) | TVL ~$22689",
+        "timestamp": 1779253013768
+      },
+      "timestamp": 1779253013768
+    },
+    {
+      "id": 2018,
+      "type": "lp_detected",
+      "data": {
+        "id": "FyegBVLvbRGBEx93CaKrfJPUNLv46fvWKiRN93NuwFas-1779253013768",
+        "mintAddress": "FyegBVLvbRGBEx93CaKrfJPUNLv46fvWKiRN93NuwFas",
+        "lpMint": "AaiAyC7jZ8GkmLXoJesnPAKoao12HpFdRXm52TCa8GNg",
+        "name": "Kevin the Fed Chair",
+        "symbol": "Kevin",
+        "detectedAt": 1779253013768,
+        "expiresAt": 1779253313768,
+        "liquidityAmount": 134.99,
+        "liquidityUsd": 11344.366599629697,
+        "tvlUsd": 22688.733199259394,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-FyegBVLvbRGBEx93CaKrfJPUNLv46fvWKiRN93NuwFas",
+        "dexscreenerUrl": "https://dexscreener.com/solana/FyegBVLvbRGBEx93CaKrfJPUNLv46fvWKiRN93NuwFas",
+        "pumpfunUrl": "https://pump.fun/FyegBVLvbRGBEx93CaKrfJPUNLv46fvWKiRN93NuwFas"
+      },
+      "timestamp": 1779253013771
+    },
+    {
+      "id": 2019,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | Kevin | TVL=$22689 | eşik=$40000",
+        "timestamp": 1779253013783
+      },
+      "timestamp": 1779253013783
+    },
+    {
+      "id": 2020,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] TrashCoin (TRASH) | PumpSwap | 50.0000 SOL ($4202) | TVL ~$8404",
+        "timestamp": 1779253064694
+      },
+      "timestamp": 1779253064694
+    },
+    {
+      "id": 2021,
+      "type": "lp_detected",
+      "data": {
+        "id": "7TxB2t8iKUAeSaqkqbMNZHDvMS9YNrzxj19PpBHDxui9-1779253064694",
+        "mintAddress": "7TxB2t8iKUAeSaqkqbMNZHDvMS9YNrzxj19PpBHDxui9",
+        "lpMint": "3m1NmPHbdJos231dP4stkfxk7kUEEdwu4dFhhiR8hjMc",
+        "name": "TrashCoin",
+        "symbol": "TRASH",
+        "detectedAt": 1779253064694,
+        "expiresAt": 1779253364694,
+        "liquidityAmount": 50,
+        "liquidityUsd": 4201.928513086042,
+        "tvlUsd": 8403.857026172083,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-7TxB2t8iKUAeSaqkqbMNZHDvMS9YNrzxj19PpBHDxui9",
+        "dexscreenerUrl": "https://dexscreener.com/solana/7TxB2t8iKUAeSaqkqbMNZHDvMS9YNrzxj19PpBHDxui9",
+        "pumpfunUrl": "https://pump.fun/7TxB2t8iKUAeSaqkqbMNZHDvMS9YNrzxj19PpBHDxui9"
+      },
+      "timestamp": 1779253064695
+    },
+    {
+      "id": 2022,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | TRASH | TVL=$8404 | eşik=$40000",
+        "timestamp": 1779253064711
+      },
+      "timestamp": 1779253064711
+    },
+    {
+      "id": 2023,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "4:58:03 AM [express] GET /api/events 200 in 2ms :: {\"events\":[]}",
+        "timestamp": 1779253083869
+      },
+      "timestamp": 1779253083869
+    },
+    {
+      "id": 2024,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "4:58:03 AM [express] GET /api/events 200 in 1ms :: {\"events\":[]}",
+        "timestamp": 1779253083873
+      },
+      "timestamp": 1779253083873
+    },
+    {
+      "id": 2025,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💼 Trader cüzdanı yüklendi: HWQJG2ZntXUeWh4mNzgQpkQqutJc8NZ3hXyJHScNuzTw",
+        "timestamp": 1779253085428
+      },
+      "timestamp": 1779253085429
+    },
+    {
+      "id": 2026,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚀 Helius Monitor başlatılıyor (PumpSwap — sadece CreatePool)...",
+        "timestamp": 1779253085431
+      },
+      "timestamp": 1779253085431
+    },
+    {
+      "id": 2027,
+      "type": "monitoring_state",
+      "data": {
+        "isMonitoring": true
+      },
+      "timestamp": 1779253085433
+    },
+    {
+      "id": 2028,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💵 SOL/USD (Jupiter): $84.10",
+        "timestamp": 1779253086169
+      },
+      "timestamp": 1779253086169
+    },
+    {
+      "id": 2029,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)",
+        "timestamp": 1779253086308
+      },
+      "timestamp": 1779253086308
+    },
+    {
+      "id": 2030,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "📲 Telegram bildirimi gönderildi.",
+        "timestamp": 1779253086756
+      },
+      "timestamp": 1779253086756
+    },
+    {
+      "id": 2031,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] RCSC (RCSC) | PumpSwap | 85.0000 SOL ($7148) | TVL ~$14296",
+        "timestamp": 1779253089601
+      },
+      "timestamp": 1779253089601
+    },
+    {
+      "id": 2032,
+      "type": "lp_detected",
+      "data": {
+        "id": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253089601",
+        "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
+        "lpMint": "2qgX51rtsY24d8SkFnSUJu716BaRbdTma9zmqwfy3s4j",
+        "name": "RCSC",
+        "symbol": "RCSC",
+        "detectedAt": 1779253089601,
+        "expiresAt": 1779253389601,
+        "liquidityAmount": 85,
+        "liquidityUsd": 7148.194633629636,
+        "tvlUsd": 14296.389267259272,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
+        "dexscreenerUrl": "https://dexscreener.com/solana/EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
+        "pumpfunUrl": "https://pump.fun/EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj"
+      },
+      "timestamp": 1779253089603
+    },
+    {
+      "id": 2033,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | RCSC | TVL=$14296 | eşik=$40000",
+        "timestamp": 1779253089604
+      },
+      "timestamp": 1779253089604
+    },
+    {
+      "id": 2034,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Pump Intelligence Agency (PIA) | PumpSwap | 85.0000 SOL ($7148) | TVL ~$14296",
+        "timestamp": 1779253169932
+      },
+      "timestamp": 1779253169932
+    },
+    {
+      "id": 2035,
+      "type": "lp_detected",
+      "data": {
+        "id": "EQXfd64ohUBnC4VHCAMhKZpW5NcCef7s8xdokMXvrSen-1779253169931",
+        "mintAddress": "EQXfd64ohUBnC4VHCAMhKZpW5NcCef7s8xdokMXvrSen",
+        "lpMint": "BgbvgESJFbKTnyEgRuSNSfvXz3dEejLz6TQ5nvFt4h51",
+        "name": "Pump Intelligence Agency",
+        "symbol": "PIA",
+        "detectedAt": 1779253169931,
+        "expiresAt": 1779253469931,
+        "liquidityAmount": 85,
+        "liquidityUsd": 7148.194633629636,
+        "tvlUsd": 14296.389267259272,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-EQXfd64ohUBnC4VHCAMhKZpW5NcCef7s8xdokMXvrSen",
+        "dexscreenerUrl": "https://dexscreener.com/solana/EQXfd64ohUBnC4VHCAMhKZpW5NcCef7s8xdokMXvrSen",
+        "pumpfunUrl": "https://pump.fun/EQXfd64ohUBnC4VHCAMhKZpW5NcCef7s8xdokMXvrSen"
+      },
+      "timestamp": 1779253169933
+    },
+    {
+      "id": 2036,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | PIA | TVL=$14296 | eşik=$40000",
+        "timestamp": 1779253169934
+      },
+      "timestamp": 1779253169934
+    },
+    {
+      "id": 2037,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Chinese Oil Asset Reserve (COAR) | PumpSwap | 633.0000 SOL ($53233) | TVL ~$106466",
+        "timestamp": 1779253225248
+      },
+      "timestamp": 1779253225248
+    },
+    {
+      "id": 2038,
+      "type": "lp_detected",
+      "data": {
+        "id": "EDwNhFnxSqap1zowFcGmRMr7NfiJDRCxWBc1trsNhNEa-1779253225248",
+        "mintAddress": "EDwNhFnxSqap1zowFcGmRMr7NfiJDRCxWBc1trsNhNEa",
+        "lpMint": "AxwFbYzYHVsHYckUue1r8eKRfpmqeaoYfAnGE4si5DZv",
+        "name": "Chinese Oil Asset Reserve",
+        "symbol": "COAR",
+        "detectedAt": 1779253225248,
+        "expiresAt": 1779253525248,
+        "liquidityAmount": 633,
+        "liquidityUsd": 53233.02591867717,
+        "tvlUsd": 106466.05183735435,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-EDwNhFnxSqap1zowFcGmRMr7NfiJDRCxWBc1trsNhNEa",
+        "dexscreenerUrl": "https://dexscreener.com/solana/EDwNhFnxSqap1zowFcGmRMr7NfiJDRCxWBc1trsNhNEa",
+        "pumpfunUrl": "https://pump.fun/EDwNhFnxSqap1zowFcGmRMr7NfiJDRCxWBc1trsNhNEa"
+      },
+      "timestamp": 1779253225250
     }
   ]
 }

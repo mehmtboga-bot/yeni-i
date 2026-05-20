@@ -1,6 +1,33 @@
 {
   "positions": [
     {
+      "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253095772",
+      "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
+      "name": "RCSC",
+      "symbol": "RCSC",
+      "dex": "jupiter",
+      "status": "open",
+      "buyTimestamp": 1779253095772,
+      "buySolAmount": 0.01,
+      "buyTokenAmount": 59168.133522,
+      "buyPriceSol": 1.6900989442706998e-7,
+      "buyTxSignature": "3tksCwRxjKPRTCqpcrnW4Z2MbmPwiTszE9anh3AhW9nxBxxRAyj4sgsjkEhyq5iuGh61bR9qF9KjnHPd9ejRpL5b",
+      "currentPriceUsd": 0.00001337132269629216,
+      "unrealizedPnlSol": -0.0009062504981613376,
+      "unrealizedPnlPct": -9.062504981613378
+    },
+    {
+      "id": "pos-EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj-1779253127011",
+      "mintAddress": "EJE44VtXn53KvNTPNr3ijscitc47jwNKxdCjaN3P4mAj",
+      "name": "RCSC",
+      "symbol": "RCSC",
+      "dex": "pumpswap",
+      "status": "failed",
+      "buyTimestamp": 1779253127011,
+      "buySolAmount": 0.01,
+      "error": "PumpPortal API 400: Bad Request"
+    },
+    {
       "id": "pos-95vQwbFtsoyrn1A1y45gkesWR6EkMkPq2S9ZJ92ucQbp-1779218126948",
       "mintAddress": "95vQwbFtsoyrn1A1y45gkesWR6EkMkPq2S9ZJ92ucQbp",
       "name": "Global Digital Oil Reserve",
