@@ -1,108 +1,6 @@
 {
-  "lastId": 1973,
+  "lastId": 1981,
   "events": [
-    {
-      "id": 1774,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)",
-        "timestamp": 1779220037919
-      },
-      "timestamp": 1779220037919
-    },
-    {
-      "id": 1775,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779220038278
-      },
-      "timestamp": 1779220038278
-    },
-    {
-      "id": 1776,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] The Poke Kid (Avery) | PumpSwap | 50.0000 SOL ($4218) | TVL ~$8437",
-        "timestamp": 1779220085379
-      },
-      "timestamp": 1779220085379
-    },
-    {
-      "id": 1777,
-      "type": "lp_detected",
-      "data": {
-        "id": "2usihktjUhu6Yh4bJFCpcEq1nTAbdLPrZJRTgkeEKUhy-1779220085379",
-        "mintAddress": "2usihktjUhu6Yh4bJFCpcEq1nTAbdLPrZJRTgkeEKUhy",
-        "lpMint": "4BTffmoPr5iUYWnmMWmB9CbZKbDKo117qtq8yokYRX9v",
-        "name": "The Poke Kid",
-        "symbol": "Avery",
-        "detectedAt": 1779220085379,
-        "expiresAt": 1779220385379,
-        "liquidityAmount": 50,
-        "liquidityUsd": 4218.451755443665,
-        "tvlUsd": 8436.90351088733,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-2usihktjUhu6Yh4bJFCpcEq1nTAbdLPrZJRTgkeEKUhy",
-        "dexscreenerUrl": "https://dexscreener.com/solana/2usihktjUhu6Yh4bJFCpcEq1nTAbdLPrZJRTgkeEKUhy",
-        "pumpfunUrl": "https://pump.fun/2usihktjUhu6Yh4bJFCpcEq1nTAbdLPrZJRTgkeEKUhy"
-      },
-      "timestamp": 1779220085380
-    },
-    {
-      "id": 1778,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | Avery | TVL=$8437 | eşik=$40000",
-        "timestamp": 1779220085391
-      },
-      "timestamp": 1779220085391
-    },
-    {
-      "id": 1779,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] UKRAINE SEA BLACK SHIELD (UKBSS) | PumpSwap | 186.0360 SOL ($15696) | TVL ~$31391",
-        "timestamp": 1779220090321
-      },
-      "timestamp": 1779220090321
-    },
-    {
-      "id": 1780,
-      "type": "lp_detected",
-      "data": {
-        "id": "HGN8NHSt9YvCzvPF3AKBcfDV38eAaKT5jwg7pMarpump-1779220090321",
-        "mintAddress": "HGN8NHSt9YvCzvPF3AKBcfDV38eAaKT5jwg7pMarpump",
-        "lpMint": "DgvGRtqTc2JyCdgRf2GnVWfcGR7oa81NvN55GtzVshtG",
-        "name": "UKRAINE SEA BLACK SHIELD",
-        "symbol": "UKBSS",
-        "detectedAt": 1779220090321,
-        "expiresAt": 1779220390321,
-        "liquidityAmount": 186.036011243,
-        "liquidityUsd": 15695.678764075416,
-        "tvlUsd": 31391.35752815083,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-HGN8NHSt9YvCzvPF3AKBcfDV38eAaKT5jwg7pMarpump",
-        "dexscreenerUrl": "https://dexscreener.com/solana/HGN8NHSt9YvCzvPF3AKBcfDV38eAaKT5jwg7pMarpump",
-        "pumpfunUrl": "https://pump.fun/HGN8NHSt9YvCzvPF3AKBcfDV38eAaKT5jwg7pMarpump"
-      },
-      "timestamp": 1779220090324
-    },
-    {
-      "id": 1781,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | UKBSS | TVL=$31391 | eşik=$40000",
-        "timestamp": 1779220090338
-      },
-      "timestamp": 1779220090338
-    },
     {
       "id": 1782,
       "type": "server_log",
@@ -2547,6 +2445,84 @@
         "timestamp": 1779242727163
       },
       "timestamp": 1779242727163
+    },
+    {
+      "id": 1974,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💼 Trader cüzdanı yüklendi: HWQJG2ZntXUeWh4mNzgQpkQqutJc8NZ3hXyJHScNuzTw",
+        "timestamp": 1779252670292
+      },
+      "timestamp": 1779252670292
+    },
+    {
+      "id": 1975,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚀 Helius Monitor başlatılıyor (PumpSwap — sadece CreatePool)...",
+        "timestamp": 1779252670294
+      },
+      "timestamp": 1779252670294
+    },
+    {
+      "id": 1976,
+      "type": "monitoring_state",
+      "data": {
+        "isMonitoring": true
+      },
+      "timestamp": 1779252670296
+    },
+    {
+      "id": 1977,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "4:51:10 AM [express] serving on port 5000",
+        "timestamp": 1779252670381
+      },
+      "timestamp": 1779252670381
+    },
+    {
+      "id": 1978,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💵 SOL/USD (Jupiter): $84.04",
+        "timestamp": 1779252670748
+      },
+      "timestamp": 1779252670748
+    },
+    {
+      "id": 1979,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)",
+        "timestamp": 1779252670879
+      },
+      "timestamp": 1779252670879
+    },
+    {
+      "id": 1980,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "📲 Telegram bildirimi gönderildi.",
+        "timestamp": 1779252671300
+      },
+      "timestamp": 1779252671300
+    },
+    {
+      "id": 1981,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "4:51:11 AM [express] GET /api/events 200 in 3ms :: {\"events\":[]}",
+        "timestamp": 1779252671320
+      },
+      "timestamp": 1779252671320
     }
   ]
 }
