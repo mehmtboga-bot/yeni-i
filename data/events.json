@@ -1,120 +1,6 @@
 {
-  "lastId": 2201,
+  "lastId": 2210,
   "events": [
-    {
-      "id": 2002,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779243116924
-      },
-      "timestamp": 1779243116924
-    },
-    {
-      "id": 2003,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Reclaim Agent (RCLM) | PumpSwap | 85.0904 SOL ($7170) | TVL ~$14340",
-        "timestamp": 1779243128321
-      },
-      "timestamp": 1779243128321
-    },
-    {
-      "id": 2004,
-      "type": "lp_detected",
-      "data": {
-        "id": "2uVzvNcxU8CGc5tqWDFfeidrZjqmoBfqhi6CJqgrpump-1779243128321",
-        "mintAddress": "2uVzvNcxU8CGc5tqWDFfeidrZjqmoBfqhi6CJqgrpump",
-        "lpMint": null,
-        "name": "Reclaim Agent",
-        "symbol": "RCLM",
-        "detectedAt": 1779243128321,
-        "expiresAt": 1779243428321,
-        "liquidityAmount": 85.090359358,
-        "liquidityUsd": 7169.976545215596,
-        "tvlUsd": 14339.953090431192,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-2uVzvNcxU8CGc5tqWDFfeidrZjqmoBfqhi6CJqgrpump",
-        "dexscreenerUrl": "https://dexscreener.com/solana/2uVzvNcxU8CGc5tqWDFfeidrZjqmoBfqhi6CJqgrpump",
-        "pumpfunUrl": "https://pump.fun/2uVzvNcxU8CGc5tqWDFfeidrZjqmoBfqhi6CJqgrpump"
-      },
-      "timestamp": 1779243128323
-    },
-    {
-      "id": 2005,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "🚫 [LP] Telegram atlandı | RCLM | TVL=$14340 | eşik=$40000",
-        "timestamp": 1779243128325
-      },
-      "timestamp": 1779243128325
-    },
-    {
-      "id": 2006,
-      "type": "trade_config_update",
-      "data": {
-        "solAmount": 0.015,
-        "slippageBps": 5000,
-        "priorityFeeMicroLamports": 200000,
-        "takeProfitPct": 45
-      },
-      "timestamp": 1779243167852
-    },
-    {
-      "id": 2007,
-      "type": "trade_config_update",
-      "data": {
-        "solAmount": 0.015,
-        "slippageBps": 5000,
-        "priorityFeeMicroLamports": 200000,
-        "takeProfitPct": 45
-      },
-      "timestamp": 1779243168662
-    },
-    {
-      "id": 2008,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "💧 [LP] Reclaim Agent (RCLM) | PumpSwap | 266.0000 SOL ($22414) | TVL ~$44828",
-        "timestamp": 1779243186818
-      },
-      "timestamp": 1779243186818
-    },
-    {
-      "id": 2009,
-      "type": "lp_detected",
-      "data": {
-        "id": "EGYZzqUzZUY6jEwumQHNe6N4GYXqyUSLSYV6mUfYbqwQ-1779243186817",
-        "mintAddress": "EGYZzqUzZUY6jEwumQHNe6N4GYXqyUSLSYV6mUfYbqwQ",
-        "lpMint": "6DpwWqfqi6CiUuEqVEQM5827myYzvE7VJzD4xncX6Wy7",
-        "name": "Reclaim Agent",
-        "symbol": "RCLM",
-        "detectedAt": 1779243186817,
-        "expiresAt": 1779243486817,
-        "liquidityAmount": 266,
-        "liquidityUsd": 22413.981741493688,
-        "tvlUsd": 44827.963482987376,
-        "platform": "PumpSwap",
-        "jupiterUrl": "https://jup.ag/swap/SOL-EGYZzqUzZUY6jEwumQHNe6N4GYXqyUSLSYV6mUfYbqwQ",
-        "dexscreenerUrl": "https://dexscreener.com/solana/EGYZzqUzZUY6jEwumQHNe6N4GYXqyUSLSYV6mUfYbqwQ",
-        "pumpfunUrl": "https://pump.fun/EGYZzqUzZUY6jEwumQHNe6N4GYXqyUSLSYV6mUfYbqwQ"
-      },
-      "timestamp": 1779243186819
-    },
-    {
-      "id": 2010,
-      "type": "server_log",
-      "data": {
-        "level": "info",
-        "message": "📲 Telegram bildirimi gönderildi.",
-        "timestamp": 1779243187402
-      },
-      "timestamp": 1779243187402
-    },
     {
       "id": 2011,
       "type": "server_log",
@@ -2406,6 +2292,129 @@
         "timestamp": 1779252531677
       },
       "timestamp": 1779252531677
+    },
+    {
+      "id": 2202,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] PROJECT FTO COIN (PFO) | PumpSwap | 50.0000 SOL ($4201) | TVL ~$8402",
+        "timestamp": 1779252554532
+      },
+      "timestamp": 1779252554532
+    },
+    {
+      "id": 2203,
+      "type": "lp_detected",
+      "data": {
+        "id": "7XHWt98fAb4gdiePyMYyjsJrnMhMTDyADG3DmZWxCNg2-1779252554532",
+        "mintAddress": "7XHWt98fAb4gdiePyMYyjsJrnMhMTDyADG3DmZWxCNg2",
+        "lpMint": "Fe3G9at2m8gbZHmF7VUNcTNkG2ZHfLD7JEZR6Z5F368G",
+        "name": "PROJECT FTO COIN",
+        "symbol": "PFO",
+        "detectedAt": 1779252554532,
+        "expiresAt": 1779252854532,
+        "liquidityAmount": 50,
+        "liquidityUsd": 4200.862724301523,
+        "tvlUsd": 8401.725448603045,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-7XHWt98fAb4gdiePyMYyjsJrnMhMTDyADG3DmZWxCNg2",
+        "dexscreenerUrl": "https://dexscreener.com/solana/7XHWt98fAb4gdiePyMYyjsJrnMhMTDyADG3DmZWxCNg2",
+        "pumpfunUrl": "https://pump.fun/7XHWt98fAb4gdiePyMYyjsJrnMhMTDyADG3DmZWxCNg2"
+      },
+      "timestamp": 1779252554534
+    },
+    {
+      "id": 2204,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | PFO | TVL=$8402 | eşik=$40000",
+        "timestamp": 1779252554536
+      },
+      "timestamp": 1779252554536
+    },
+    {
+      "id": 2205,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Chinese Oil Asset Reserve (COAR) | PumpSwap | 700.0000 SOL ($58812) | TVL ~$117624",
+        "timestamp": 1779252579798
+      },
+      "timestamp": 1779252579798
+    },
+    {
+      "id": 2206,
+      "type": "lp_detected",
+      "data": {
+        "id": "7cVttyijSh3ZMQMkBfuSDs1tfQaowhg1Fwc8LLujkqoz-1779252579798",
+        "mintAddress": "7cVttyijSh3ZMQMkBfuSDs1tfQaowhg1Fwc8LLujkqoz",
+        "lpMint": "B9x4GU8iRVJvBcxkBDWkvKDBt4dkedjdJY6WFN4m8goa",
+        "name": "Chinese Oil Asset Reserve",
+        "symbol": "COAR",
+        "detectedAt": 1779252579798,
+        "expiresAt": 1779252879798,
+        "liquidityAmount": 700,
+        "liquidityUsd": 58812.07814022132,
+        "tvlUsd": 117624.15628044264,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-7cVttyijSh3ZMQMkBfuSDs1tfQaowhg1Fwc8LLujkqoz",
+        "dexscreenerUrl": "https://dexscreener.com/solana/7cVttyijSh3ZMQMkBfuSDs1tfQaowhg1Fwc8LLujkqoz",
+        "pumpfunUrl": "https://pump.fun/7cVttyijSh3ZMQMkBfuSDs1tfQaowhg1Fwc8LLujkqoz"
+      },
+      "timestamp": 1779252579800
+    },
+    {
+      "id": 2207,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "📲 Telegram bildirimi gönderildi.",
+        "timestamp": 1779252580355
+      },
+      "timestamp": 1779252580355
+    },
+    {
+      "id": 2208,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "💧 [LP] Popgion (Popgion) | PumpSwap | 84.9904 SOL ($7141) | TVL ~$14281",
+        "timestamp": 1779252603356
+      },
+      "timestamp": 1779252603356
+    },
+    {
+      "id": 2209,
+      "type": "lp_detected",
+      "data": {
+        "id": "CQkvqgJLCDYSrWns3QNRJeZdoDzGb8sSijPBTmwCTgnk-1779252603356",
+        "mintAddress": "CQkvqgJLCDYSrWns3QNRJeZdoDzGb8sSijPBTmwCTgnk",
+        "lpMint": "5qvoe1R6q8JGheJtxP9Z5HiMEdfGjXUjMJDv2E2zCQv6",
+        "name": "Popgion",
+        "symbol": "Popgion",
+        "detectedAt": 1779252603356,
+        "expiresAt": 1779252903356,
+        "liquidityAmount": 84.990359576,
+        "liquidityUsd": 7140.656669356027,
+        "tvlUsd": 14281.313338712054,
+        "platform": "PumpSwap",
+        "jupiterUrl": "https://jup.ag/swap/SOL-CQkvqgJLCDYSrWns3QNRJeZdoDzGb8sSijPBTmwCTgnk",
+        "dexscreenerUrl": "https://dexscreener.com/solana/CQkvqgJLCDYSrWns3QNRJeZdoDzGb8sSijPBTmwCTgnk",
+        "pumpfunUrl": "https://pump.fun/CQkvqgJLCDYSrWns3QNRJeZdoDzGb8sSijPBTmwCTgnk"
+      },
+      "timestamp": 1779252603358
+    },
+    {
+      "id": 2210,
+      "type": "server_log",
+      "data": {
+        "level": "info",
+        "message": "🚫 [LP] Telegram atlandı | Popgion | TVL=$14281 | eşik=$40000",
+        "timestamp": 1779252603368
+      },
+      "timestamp": 1779252603368
     }
   ]
 }
