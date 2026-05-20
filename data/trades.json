@@ -1,26 +1,27 @@
 {
   "positions": [
     {
-      "id": "pos-CtqBgWcG8uW2ewi7FGR7M4h4mdkRy1qgcFipbhJERiRf-1779215040941",
-      "mintAddress": "CtqBgWcG8uW2ewi7FGR7M4h4mdkRy1qgcFipbhJERiRf",
-      "name": "Strategic American Oil Supply",
-      "symbol": "SAOS",
+      "id": "pos-95vQwbFtsoyrn1A1y45gkesWR6EkMkPq2S9ZJ92ucQbp-1779218126948",
+      "mintAddress": "95vQwbFtsoyrn1A1y45gkesWR6EkMkPq2S9ZJ92ucQbp",
+      "name": "Global Digital Oil Reserve",
+      "symbol": "GDOR",
       "dex": "jupiter",
-      "status": "failed",
-      "buyTimestamp": 1779215040941,
+      "status": "closed",
+      "buyTimestamp": 1779218126948,
       "buySolAmount": 0.015,
-      "error": "Jupiter quote 400: {\"error\":\"Cannot compute other amount threshold, with amount 64688953636 and slippageBps 50000\",\"errorCode\":\"CANNOT_COMPUTE_OTHER_AMOUNT_THRESHOLD\"}"
-    },
-    {
-      "id": "pos-Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m-1779214690639",
-      "mintAddress": "Ftgmpv5Yu6ApGrTiNJA3VtBTP2EB3H5fEFYMsxwhLE2m",
-      "name": "United Global Oil Supply",
-      "symbol": "UGOS",
-      "dex": "jupiter",
-      "status": "failed",
-      "buyTimestamp": 1779214690639,
-      "buySolAmount": 0.015,
-      "error": "Jupiter quote 400: {\"error\":\"Cannot compute other amount threshold, with amount 6406 and slippageBps 50000\",\"errorCode\":\"CANNOT_COMPUTE_OTHER_AMOUNT_THRESHOLD\"}"
+      "buyTokenAmount": 59816.411073,
+      "buyPriceSol": 2.5076730166398623e-7,
+      "buyTxSignature": "57DdwAr9cWz83GcRbnXzcTn2vkHN7zknXRJtv6D9TdurLMaFH9cnuwcPVjsnLsHedBAP3gwknqYLf3ExYsfXprKU",
+      "currentPriceUsd": 0.00006150946135555118,
+      "unrealizedPnlSol": 0.027290519831292617,
+      "unrealizedPnlPct": 181.93679887528413,
+      "error": "TX hata: {\"InstructionError\":[3,{\"Custom\":1}]}",
+      "sellTimestamp": 1779218434434,
+      "sellSolAmount": 0.041050072,
+      "sellPriceSol": 6.862677192368237e-7,
+      "sellTxSignature": "dAz4BZS94vCmnyRacBKTutrSY21eXDkFcFrmDkH2bNBNKbTWckn1HUUXqaG9pxks5uX6DboyGgGw8sQj2ptxSYF",
+      "pnlSol": 0.026050072,
+      "pnlPct": 173.66714666666667
     }
   ],
   "config": {
