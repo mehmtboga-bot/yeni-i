@@ -96,34 +96,75 @@ function formatTime(ts: number) {
     .join(":");
 }
 
+// ---- localStorage yardımcıları ----
+function loadMintedTokens(): MintedToken[] {
+  try {
+    const raw = localStorage.getItem("mintedTokens");
+    if (!raw) return [];
+    const now = Date.now();
+    const tokens = (JSON.parse(raw) as MintedToken[]).filter((t) => t.expiresAt > now);
+    return tokens.slice(0, MAX_MINTED_TOKENS);
+  } catch {
+    return [];
+  }
+}
+
+function loadLpLogs(): LPDetection[] {
+  try {
+    const raw = localStorage.getItem("lpLogs");
+    if (!raw) return [];
+    const now = Date.now();
+    const logs = (JSON.parse(raw) as LPDetection[]).filter((l) => l.expiresAt > now);
+    return logs.slice(0, MAX_LP_LOGS);
+  } catch {
+    return [];
+  }
+}
+
+function loadPositions(): Position[] {
+  try {
+    const raw = localStorage.getItem("positions");
+    if (!raw) return [];
+    return (JSON.parse(raw) as Position[]);
+  } catch {
+    return [];
+  }
+}
+
+function loadServerLogs(): ServerLog[] {
+  try {
+    const raw = localStorage.getItem("serverLogs");
+    if (!raw) return [];
+    return (JSON.parse(raw) as ServerLog[]);
+  } catch {
+    return [];
+  }
+}
+
+function loadTradeConfig(): TradeConfig {
+  try {
+    const raw = localStorage.getItem("tradeConfig");
+    if (!raw) return DEFAULT_CONFIG;
+    return JSON.parse(raw) as TradeConfig;
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [isConnected, setIsConnected] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState("");
-  const [mintedTokens, setMintedTokens] = useState<MintedToken[]>(() => {
-    try {
-      const raw = localStorage.getItem("mintedTokens");
-      if (!raw) return [];
-      const now = Date.now();
-      return (JSON.parse(raw) as MintedToken[]).filter((t) => t.expiresAt > now).slice(0, MAX_MINTED_TOKENS);
-    } catch { return []; }
-  });
-  const [lpLogs, setLpLogs] = useState<LPDetection[]>(() => {
-    try {
-      const raw = localStorage.getItem("lpLogs");
-      if (!raw) return [];
-      const now = Date.now();
-      return (JSON.parse(raw) as LPDetection[]).filter((l) => l.expiresAt > now).slice(0, MAX_LP_LOGS);
-    } catch { return []; }
-  });
+  const [mintedTokens, setMintedTokens] = useState<MintedToken[]>(loadMintedTokens);
+  const [lpLogs, setLpLogs] = useState<LPDetection[]>(loadLpLogs);
   const [newTokenId, setNewTokenId] = useState<string | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [lastPublicKey, setLastPublicKey] = useState<string | null>(null);
-  const [serverLogs, setServerLogs] = useState<ServerLog[]>([]);
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [tradeConfig, setTradeConfig] = useState<TradeConfig>(DEFAULT_CONFIG);
+  const [serverLogs, setServerLogs] = useState<ServerLog[]>(loadServerLogs);
+  const [positions, setPositions] = useState<Position[]>(loadPositions);
+  const [tradeConfig, setTradeConfig] = useState<TradeConfig>(loadTradeConfig);
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
@@ -227,6 +268,7 @@ export default function Home() {
           setSolPriceUsd(msg.data.solPriceUsd);
         }
         try { localStorage.setItem("positions", JSON.stringify(msg.data.positions)); } catch {}
+        try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data.config)); } catch {}
       } else if (msg.type === "position_update") {
         const updated = msg.data;
         setPositions((prev) => {
@@ -519,4 +561,3 @@ export default function Home() {
     </div>
   );
 }
-
