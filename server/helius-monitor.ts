@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import { secrets } from "./secrets-loader";
+import { RugpullDetector } from "./rugpull-detector";
 
 const HELIUS_API_KEY = secrets.HELIUS_API_KEY;
 
@@ -41,7 +42,7 @@ async function sendTelegramNotification(message: string): Promise<void> {
   }
 }
 
-// ─── Rate Limiter ─────────────────────────────────────────────────────────────
+// ─── Rate Limiter ────────────────────────────────────────────────────────
 class RateLimiter {
   private queue: Array<() => void> = [];
   private tokens: number;
@@ -83,12 +84,14 @@ class RateLimiter {
   }
 }
 
-// ─── Sabitler ─────────────────────────────────────────────────────────────────
+// ─── Sabitler ──────────────────────────────────────────────────────────
 const PUMPSWAP = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
 const WSOL     = "So11111111111111111111111111111111111111112";
 
 // CreatePool log'unun tam hali — swap/remove/claim'de kesinlikle görünmez
 const LP_LOG_PATTERN   = "Program log: Instruction: CreatePool";
+// RemoveLiquidity log'u
+const REMOVE_LP_PATTERN = "Program log: Instruction: RemoveLiquidity";
 // Ek kontrol: PumpSwap programının invoke satırı (derinlik 1)
 const PUMPSWAP_INVOKE  = `Program ${PUMPSWAP} invoke [1]`;
 
@@ -105,13 +108,14 @@ interface TokenMetadata {
 }
 
 /**
- * Sadece LP oluşturma (CreatePool) olaylarını dinler.
- * Swap / remove / fee-claim gibi diğer PumpSwap işlemleri
- * herhangi bir HTTP çağrısı tetiklemeden log seviyesinde atlanır.
+ * Helius Monitor — LP oluşturma + Rugpull tespiti
+ * - CreatePool → lp_detected event
+ * - RemoveLiquidity → rugpull_detected event (lpTokenAmountIn > 0)
  */
 export class HeliusMonitor {
   private dexWebSocket: WebSocket | null = null;
   private processedDexSignatures: Set<string> = new Set();
+  private rugpullDetector = new RugpullDetector();
 
   private reconnectTimeoutDex: NodeJS.Timeout | null = null;
   private heartbeatInterval: NodeJS.Timeout | null   = null;
@@ -129,7 +133,7 @@ export class HeliusMonitor {
   async start() {
     if (this.isRunning) { console.log("⚠️ Monitor zaten çalışıyor"); return; }
     this.isRunning = true;
-    console.log("🚀 Helius Monitor başlatılıyor (PumpSwap — sadece CreatePool)...");
+    console.log("🚀 Helius Monitor başlatılıyor (PumpSwap LP + Rugpull Detection)...");
     this.eventEmitter("monitoring_state", { isMonitoring: true });
 
     await this.fetchSolPriceOnce();
@@ -209,22 +213,20 @@ export class HeliusMonitor {
       `📡 <b>Sistem Aktif — Taranıyor</b>\n\n` +
       `🕐 <b>Saat:</b> ${now}\n` +
       `✅ Bağlantı canlı (Public RPC → WS | Helius → HTTP)\n` +
-      `🔍 Yalnızca PumpSwap LP oluşturmaları izleniyor\n\n` +
-      `<i>LP tespit edildiği anda bildirim alacaksınız.</i>`
+      `🔍 PumpSwap LP oluşturmaları + Rugpull Detection izleniyor\n\n` +
+      `<i>LP tespit edildiği anda ve rugpull sinyali alındığında bildirim alacaksınız.</i>`
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
   // WebSocket — PumpSwap logsSubscribe
-  // Public RPC üzerinden dinlenir → Helius kredisi yok.
-  // Sadece CreatePool logları içeren TX'ler işlenir;
-  // swap / remove / claim / diğerleri sıfır HTTP çağrısıyla atlanır.
-  // ═══════════════════════════════════════════════════════════════════════════
+  // CreatePool + RemoveLiquidity dinleme
+  // ═══════════════════════════════════════════════════════════════
   private connectDex() {
     this.dexWebSocket = new WebSocket(WS_URL);
 
     this.dexWebSocket.on("open", () => {
-      console.log("✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)");
+      console.log("✅ [WS] DEX WebSocket bağlandı (PumpSwap LP + Rugpull Detection)");
       this.dexWebSocket?.send(JSON.stringify({
         jsonrpc: "2.0",
         id: 100,
@@ -250,14 +252,12 @@ export class HeliusMonitor {
         const signature: string | undefined = value.signature;
         if (!logs || !signature) return;
 
-        // ── LP filtresi (çift kontrol) ───────────────────────────────────────
-        // 1. PumpSwap programının doğrudan (depth=1) çağrıldığını doğrula
-        // 2. Tam "CreatePool" talimat logunu ara
-        // Bu iki koşul yalnızca yeni havuz oluşturma TX'lerinde aynı anda bulunur.
-        // Swap, RemoveLiquidity, CollectFees vb. işlemlerde bulunmaz → sıfır HTTP çağrısı.
+        // ── Tip belirle ───────────────────────────────────────
         const hasInvoke     = logs.includes(PUMPSWAP_INVOKE);
         const hasCreatePool = logs.some((l) => l === LP_LOG_PATTERN);
-        if (!hasInvoke || !hasCreatePool) return;
+        const hasRemoveLP   = logs.some((l) => l === REMOVE_LP_PATTERN);
+
+        if (!hasInvoke) return; // PumpSwap değil
 
         // Tekrar işleme koruması
         if (this.processedDexSignatures.has(signature)) return;
@@ -267,7 +267,14 @@ export class HeliusMonitor {
           if (first) this.processedDexSignatures.delete(first);
         }
 
-        await this.handleDexLP(signature);
+        // ── Türe göre işle ───────────────────────────────────────
+        if (hasCreatePool) {
+          // LP oluşturma
+          await this.handleDexLP(signature);
+        } else if (hasRemoveLP) {
+          // 🚨 Rugpull tespiti
+          await this.handleRemoveLiquidity(signature);
+        }
       } catch (err) {
         console.error("❌ [WS] Mesaj hatası:", err);
       }
@@ -346,6 +353,80 @@ export class HeliusMonitor {
       );
     } catch (err) {
       console.error("❌ [WS] DEX LP hatası:", err);
+    }
+  }
+
+  // 🚨 Rugpull (RemoveLiquidity) İşleme
+  private async handleRemoveLiquidity(signature: string) {
+    try {
+      let meta: any = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        await this.rateLimiter.acquire();
+        const res = await fetch(HTTP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0", id: 1,
+            method: "getTransaction",
+            params: [
+              signature,
+              { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
+            ],
+          }),
+        });
+        const data = await res.json();
+        meta = data.result?.meta;
+        if (meta) break;
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 1500));
+      }
+
+      if (!meta) return;
+
+      const { tokenMint, lpMint } = await this.extractMintsFromDexTx(signature);
+      if (!tokenMint) return;
+
+      const metadata = await this.fetchTokenMetadata(tokenMint);
+      if (!metadata) return;
+
+      // RugpullDetector ile analiz et
+      const rugpullData = await this.rugpullDetector.analyzeRemoveLiquidity(
+        signature,
+        meta,
+        tokenMint,
+        lpMint,
+        metadata
+      );
+
+      if (!rugpullData) return; // Rugpull değil
+
+      // 🚨 RUGPULL TESPİT EDİLDİ
+      console.error(`🚨 RUGPULL DETECTED: ${rugpullData.symbol}`);
+
+      // Event emit et → routes.ts acil satış tetikler
+      this.eventEmitter("rugpull_detected", {
+        tokenMint: rugpullData.tokenMint,
+        lpMint: rugpullData.lpMint,
+        name: rugpullData.name,
+        symbol: rugpullData.symbol,
+        lpTokenAmountIn: rugpullData.lpTokenAmountIn,
+        solAmountOut: rugpullData.solAmountOut,
+        rugpullConfidence: rugpullData.rugpullConfidence,
+        txSignature: rugpullData.txSignature,
+        detectedAt: Date.now(),
+      });
+
+      // Telegram alertı
+      sendTelegramNotification(
+        `🚨 <b>RUGPULL DETECTED!</b>\n\n` +
+        `🪙 <b>Token:</b> ${rugpullData.name} (${rugpullData.symbol})\n` +
+        `💧 <b>LP Token In:</b> ${rugpullData.lpTokenAmountIn.toFixed(4)}\n` +
+        `💰 <b>SOL Out:</b> ${(rugpullData.solAmountOut ?? 0).toFixed(4)}\n` +
+        `🎯 <b>Confidence:</b> ${rugpullData.rugpullConfidence}\n\n` +
+        `⚠️ <b>Acil satış başlatıldı!</b>\n` +
+        `📋 <code>${rugpullData.txSignature}</code>`
+      );
+    } catch (err) {
+      console.error("❌ RemoveLiquidity işleme hatası:", err);
     }
   }
 
@@ -448,9 +529,9 @@ export class HeliusMonitor {
     } catch { return null; }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
   // Stop
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
   stop() {
     if (!this.isRunning) { console.log("⚠️ Monitor zaten durdurulmuş"); return; }
     console.log("🛑 Helius Monitor durduruluyor...");
@@ -467,6 +548,7 @@ export class HeliusMonitor {
     }
 
     this.processedDexSignatures.clear();
+    this.rugpullDetector.clear();
     this.rateLimiter.destroy();
 
     this.eventEmitter("monitoring_state", { isMonitoring: false });

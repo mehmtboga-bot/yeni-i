@@ -19,6 +19,7 @@ const ALLOWED_FILES = [
   "server/storage.ts",
   "server/jupiter-trader.ts",
   "server/trade-store.ts",
+  "server/rugpull-detector.ts",
   "shared/schema.ts",
   "data/secrets.json",
 ];
@@ -193,6 +194,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastToClients({ type: "mint_detected", data });
     } else if (event === "lp_detected") {
       broadcastToClients({ type: "lp_detected", data });
+    } else if (event === "rugpull_detected") {
+      // 🚨 RUGPULL SİNYALİ: Acil satış başlat
+      broadcastToClients({ type: "rugpull_detected", data });
+      handleRugpullEmergencySell(data);
     } else if (event === "connection_status") {
       broadcastToClients({ type: "connection_status", data });
     } else if (event === "monitoring_state") {
@@ -201,6 +206,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastToClients({ type: "error", data });
     }
   });
+
+  // 🚨 Rugpull acil satış işlevi
+  const handleRugpullEmergencySell = (rugpullData: any) => {
+    const { tokenMint, symbol, name } = rugpullData;
+    console.error(`🚨 ACIL SATIŞ TETIKLENIYOR: ${symbol} (${name})`);
+
+    // Tüm açık pozisyonları kontrol et
+    const positions = tradeStore.getAll();
+    const affectedPositions = positions.filter((pos) => pos.mintAddress === tokenMint && pos.status === "open");
+
+    for (const position of affectedPositions) {
+      console.error(`💸 ACIL SATIŞ: ${position.symbol} | Position ID: ${position.id}`);
+      trader.sell(position.id).catch((err) => {
+        console.error(`❌ Acil satış hatası (${position.symbol}):`, err);
+      });
+    }
+  };
 
   monitor.start();
 
