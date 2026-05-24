@@ -6,8 +6,9 @@ import { LPLogTable } from "@/components/LPLogTable";
 import { WalletBalance } from "@/components/WalletBalance";
 import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
+import { AutoTraderPanel } from "@/components/AutoTraderPanel";
 import { Badge } from "@/components/ui/badge";
-import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig } from "@shared/schema";
+import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig, AutoTraderConfig } from "@shared/schema";
 import type { ServerLog } from "@/components/LogPanel";
 
 const MAX_MINTED_TOKENS = 7;
@@ -24,10 +25,19 @@ const DEFAULT_CONFIG: TradeConfig = {
   takeProfitPct: 0,
 };
 
-// StoredEvent type (server tarafından gelen event)
+const DEFAULT_AUTO_TRADER_CONFIG: AutoTraderConfig = {
+  enabled: false,
+  solAmountPerTrade: 0.1,
+  maxTokensHeld: 5,
+  holdDurationMs: 60000,
+  profitTargetPct: 50,
+  stopLossPct: 20,
+  slippageBps: 5000,
+  priorityFeeMicroLamports: 1000000,
+};
+
 type StoredEvent = { id: number; type: string; data: any; timestamp: number };
 
-// ---- Geometrik şekil ikonları ----
 function TriangleIcon({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
@@ -78,7 +88,6 @@ function PlusIcon({ active }: { active: boolean }) {
   );
 }
 
-// ---- Log satır rengi ----
 const levelStyle: Record<ServerLog["level"], string> = {
   info:  "text-emerald-400",
   warn:  "text-yellow-400",
@@ -96,7 +105,6 @@ function formatTime(ts: number) {
     .join(":");
 }
 
-// ---- localStorage yardımcıları ----
 function loadMintedTokens(): MintedToken[] {
   try {
     const raw = localStorage.getItem("mintedTokens");
@@ -151,6 +159,16 @@ function loadTradeConfig(): TradeConfig {
   }
 }
 
+function loadAutoTraderConfig(): AutoTraderConfig {
+  try {
+    const raw = localStorage.getItem("autoTraderConfig");
+    if (!raw) return DEFAULT_AUTO_TRADER_CONFIG;
+    return JSON.parse(raw) as AutoTraderConfig;
+  } catch {
+    return DEFAULT_AUTO_TRADER_CONFIG;
+  }
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [isConnected, setIsConnected] = useState(false);
@@ -165,6 +183,8 @@ export default function Home() {
   const [serverLogs, setServerLogs] = useState<ServerLog[]>(loadServerLogs);
   const [positions, setPositions] = useState<Position[]>(loadPositions);
   const [tradeConfig, setTradeConfig] = useState<TradeConfig>(loadTradeConfig);
+  const [autoTraderConfig, setAutoTraderConfig] = useState<AutoTraderConfig>(loadAutoTraderConfig);
+  const [autoTraderRunning, setAutoTraderRunning] = useState(false);
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
@@ -207,6 +227,18 @@ export default function Home() {
     }
   };
 
+  const handleAutoTraderConfigUpdate = (cfg: Partial<AutoTraderConfig>) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "auto_trader_config_update", data: cfg }));
+    }
+  };
+
+  const handleAutoTraderToggle = (enabled: boolean) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "auto_trader_toggle", data: { enabled } }));
+    }
+  };
+
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host || "localhost:5000";
@@ -214,7 +246,6 @@ export default function Home() {
     let wsInstance: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout;
 
-    // Ortak mesaj işleme fonksiyonu
     const handleIncomingMessage = (msg: StoredEvent) => {
       if (!msg || typeof msg.type !== "string") return;
 
@@ -262,6 +293,8 @@ export default function Home() {
       } else if (msg.type === "positions_snapshot") {
         setPositions(msg.data.positions);
         setTradeConfig(msg.data.config);
+        setAutoTraderConfig(msg.data.autoTraderConfig || DEFAULT_AUTO_TRADER_CONFIG);
+        setAutoTraderRunning(msg.data.autoTraderRunning || false);
         setTraderPublicKey(msg.data.traderPublicKey);
         setTraderReady(msg.data.traderReady);
         if (typeof msg.data.solPriceUsd === "number" && msg.data.solPriceUsd > 0) {
@@ -269,6 +302,7 @@ export default function Home() {
         }
         try { localStorage.setItem("positions", JSON.stringify(msg.data.positions)); } catch {}
         try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data.config)); } catch {}
+        try { localStorage.setItem("autoTraderConfig", JSON.stringify(msg.data.autoTraderConfig || DEFAULT_AUTO_TRADER_CONFIG)); } catch {}
       } else if (msg.type === "position_update") {
         const updated = msg.data;
         setPositions((prev) => {
@@ -281,9 +315,13 @@ export default function Home() {
       } else if (msg.type === "trade_config_update") {
         setTradeConfig(msg.data);
         try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data)); } catch {}
+      } else if (msg.type === "auto_trader_config_update") {
+        setAutoTraderConfig(msg.data);
+        try { localStorage.setItem("autoTraderConfig", JSON.stringify(msg.data)); } catch {}
+      } else if (msg.type === "auto_trader_state") {
+        setAutoTraderRunning(msg.data.running);
       }
 
-      // Gelen event id'sini sakla
       try {
         const last = Number(localStorage.getItem("lastEventId") || "0");
         if (typeof msg.id === "number" && msg.id > last) {
@@ -293,7 +331,6 @@ export default function Home() {
     };
 
     const connect = async () => {
-      // 1) Missed events al
       const lastSeen = Number(localStorage.getItem("lastEventId") || "0") || 0;
       try {
         const resp = await fetch(`/api/events?afterId=${lastSeen}`);
@@ -308,7 +345,6 @@ export default function Home() {
         console.warn("events fetch hatası:", err);
       }
 
-      // 2) WS bağlan
       wsInstance = new WebSocket(wsUrl);
       setWs(wsInstance);
 
@@ -321,7 +357,7 @@ export default function Home() {
         try {
           const message: StoredEvent = JSON.parse(event.data);
           handleIncomingMessage(message);
-        } catch { /* ignore */ }
+        } catch { }
       };
 
       wsInstance.onerror = () => { setIsConnected(false); setConnectionMessage("Bağlantı hatası"); };
@@ -348,7 +384,6 @@ export default function Home() {
     };
   }, []);
 
-  // Konsol sekmesine geçince en alta kaydır
   useEffect(() => {
     if (activeTab === "console") {
       setTimeout(() => logBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
@@ -356,7 +391,6 @@ export default function Home() {
   }, [activeTab, serverLogs]);
 
   const lockedLogs = lpLogs.filter((l) => l.isLocked);
-  // Dinamik fiyat: solPriceUsd server'dan geliyor, fallback: 87
   const displayPrice = solPriceUsd > 0 ? solPriceUsd : 87;
   const openPositionCount = positions.filter((p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell").length;
 
@@ -375,12 +409,9 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* ===== HEADER ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-card-border backdrop-blur-sm bg-card/95 shrink-0">
         <div className="px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-
-            {/* Sol: Logo + Başlık */}
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-chart-2 flex items-center justify-center shrink-0">
                 <Coins className="h-5 w-5 text-primary-foreground" />
@@ -398,7 +429,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Orta: Sekme Butonları */}
             <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-1">
               {TABS.map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -426,7 +456,6 @@ export default function Home() {
               })}
             </div>
 
-            {/* Sağ: Bağlantı durumu */}
             <ConnectionStatus
               isConnected={isConnected}
               message={connectionMessage}
@@ -437,10 +466,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ===== İÇERİK ===== */}
       <div className="flex-1 min-h-0 overflow-hidden">
-
-        {/* ▲ KONSOL SEKMESİ */}
         <div className={`h-full flex-col bg-zinc-950 ${activeTab === "console" ? "flex" : "hidden"}`}>
           <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-800 bg-zinc-900 shrink-0">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -471,10 +497,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ■ DASHBOARD SEKMESİ */}
         <div className={`h-full overflow-y-auto ${activeTab === "dashboard" ? "block" : "hidden"}`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-            {/* Cüzdan */}
             <WalletBalance
               onGetBalance={handleGetBalance}
               balance={walletBalance}
@@ -482,9 +506,7 @@ export default function Home() {
               setWalletBalance={setWalletBalance}
             />
 
-            {/* Ana grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Sol: LP Tespitleri */}
               <div className="lg:col-span-2">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <Droplet className="h-5 w-5 text-chart-4" />
@@ -508,38 +530,45 @@ export default function Home() {
                 />
               </div>
 
-              {/* Sağ: Yeni Mintler */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Coins className="h-5 w-5 text-primary" />
-                  <h2 className="text-base font-semibold text-foreground">Yeni Mintler</h2>
-                  <Badge variant="secondary" data-testid="badge-mint-count">{mintedTokens.length}/{MAX_MINTED_TOKENS}</Badge>
+              <div className="space-y-6">
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Coins className="h-5 w-5 text-primary" />
+                    <h2 className="text-base font-semibold text-foreground">Yeni Mintler</h2>
+                    <Badge variant="secondary" data-testid="badge-mint-count">{mintedTokens.length}/{MAX_MINTED_TOKENS}</Badge>
+                  </div>
+                  {mintedTokens.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground" data-testid="text-mint-empty">
+                      <Coins className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Yeni mint bekleniyor...</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {mintedTokens.map((token) => (
+                        <MintedTokenCard
+                          key={token.id}
+                          token={token}
+                          isNew={token.id === newTokenId}
+                          traderReady={traderReady}
+                          hasOpenPosition={activeBuyMints.has(token.mintAddress)}
+                          onBuy={handleBuy}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {mintedTokens.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground" data-testid="text-mint-empty">
-                    <Coins className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">Yeni mint bekleniyor...</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {mintedTokens.map((token) => (
-                      <MintedTokenCard
-                        key={token.id}
-                        token={token}
-                        isNew={token.id === newTokenId}
-                        traderReady={traderReady}
-                        hasOpenPosition={activeBuyMints.has(token.mintAddress)}
-                        onBuy={handleBuy}
-                      />
-                    ))}
-                  </div>
-                )}
+
+                <AutoTraderPanel
+                  config={autoTraderConfig}
+                  isRunning={autoTraderRunning}
+                  onConfigUpdate={handleAutoTraderConfigUpdate}
+                  onToggle={handleAutoTraderToggle}
+                />
               </div>
             </div>
           </div>
         </div>
 
-        {/* + TRADE SEKMESİ */}
         <div className={`h-full overflow-y-auto ${activeTab === "trade" ? "block" : "hidden"}`}>
           <TradePanel
             positions={positions}
@@ -553,7 +582,6 @@ export default function Home() {
           />
         </div>
 
-        {/* ● DOSYALAR SEKMESİ */}
         <div className={`h-full ${activeTab === "files" ? "block" : "hidden"}`}>
           <FileEditor />
         </div>
