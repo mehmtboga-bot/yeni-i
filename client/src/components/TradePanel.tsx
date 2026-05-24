@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Position, TradeConfig } from "@shared/schema";
+import { TradingRecordsTable } from "@/components/TradingRecordsTable";
+import type { Position, TradeConfig, TradeRecord } from "@shared/schema";
 
 type Filter = "all" | "open" | "closed";
 
@@ -15,6 +16,7 @@ interface TradePanelProps {
   traderPublicKey?: string;
   traderReady: boolean;
   solPriceUsd: number;
+  tradingRecords?: TradeRecord[];
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
@@ -60,6 +62,7 @@ export function TradePanel({
   traderPublicKey,
   traderReady,
   solPriceUsd,
+  tradingRecords = [],
   onSell,
   onDelete,
   onUpdateConfig,
@@ -232,6 +235,21 @@ export function TradePanel({
           ))}
         </div>
       )}
+
+      {/* Trading Records Tablosu */}
+      {tradingRecords && tradingRecords.length > 0 && (
+        <div className="mt-8 pt-6 border-t border-card-border">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-chart-3" />
+            İşlem Geçmişi
+          </h2>
+          <TradingRecordsTable
+            records={tradingRecords}
+            solPrice={solPriceUsd}
+            emptyMessage="Henüz kapatılan işlem yok"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -280,13 +298,11 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
             <span className="font-semibold text-sm" data-testid="text-pos-name">{p.name}</span>
             <span className="text-xs text-muted-foreground">{p.symbol}</span>
             <StatusBadge status={p.status} />
-            {/* DEX rozeti */}
             {p.dex && (
               <Badge className={`text-[10px] ${p.dex === "pumpswap" ? "bg-orange-500/15 text-orange-400 border border-orange-500/30" : "bg-primary/15 text-primary border border-primary/30"}`}>
                 {p.dex === "pumpswap" ? "PumpSwap" : "Jupiter"}
               </Badge>
             )}
-            {/* Kar/Zarar yüzdesi — büyük ve belirgin */}
             {profitPct !== null && (
               <Badge
                 className={`text-xs gap-1 font-bold ${
