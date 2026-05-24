@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Position, TradeConfig } from "@shared/schema";
+import { AutoTraderPanel } from "@/components/AutoTraderPanel";
+import type { Position, TradeConfig, AutoTraderConfig } from "@shared/schema";
 
 type Filter = "all" | "open" | "closed";
 
@@ -18,6 +19,10 @@ interface TradePanelProps {
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
+  autoTraderConfig?: AutoTraderConfig;
+  autoTraderRunning?: boolean;
+  onAutoTraderConfigUpdate?: (cfg: Partial<AutoTraderConfig>) => void;
+  onAutoTraderToggle?: (enabled: boolean) => void;
 }
 
 const formatUsd = (n?: number) => {
@@ -63,6 +68,10 @@ export function TradePanel({
   onSell,
   onDelete,
   onUpdateConfig,
+  autoTraderConfig,
+  autoTraderRunning = false,
+  onAutoTraderConfigUpdate,
+  onAutoTraderToggle,
 }: TradePanelProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -206,6 +215,16 @@ export function TradePanel({
           )}
         </Card>
       </div>
+
+      {/* Otomatik Trading */}
+      {autoTraderConfig && onAutoTraderConfigUpdate && onAutoTraderToggle && (
+        <AutoTraderPanel
+          config={autoTraderConfig}
+          isRunning={autoTraderRunning}
+          onConfigUpdate={onAutoTraderConfigUpdate}
+          onToggle={onAutoTraderToggle}
+        />
+      )}
 
       {/* Filtre */}
       <div className="flex items-center gap-2 flex-wrap">
