@@ -235,7 +235,7 @@ export default function Home() {
 
   const handleAutoTraderToggle = (enabled: boolean) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "auto_trader_toggle", data: { enabled } }));
+      ws.send(JSON.stringify({ type: "toggle_auto_trader", data: { enabled } }));
     }
   };
 
