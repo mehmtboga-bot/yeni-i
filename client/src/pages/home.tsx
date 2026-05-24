@@ -7,7 +7,7 @@ import { WalletBalance } from "@/components/WalletBalance";
 import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
 import { Badge } from "@/components/ui/badge";
-import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig } from "@shared/schema";
+import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig, AutoTraderConfig } from "@shared/schema";
 import type { ServerLog } from "@/components/LogPanel";
 
 const MAX_MINTED_TOKENS = 7;
@@ -22,6 +22,17 @@ const DEFAULT_CONFIG: TradeConfig = {
   slippageBps: 5000,
   priorityFeeMicroLamports: 200_000,
   takeProfitPct: 0,
+};
+
+const DEFAULT_AUTO_TRADER_CONFIG: AutoTraderConfig = {
+  enabled: false,
+  solAmountPerTrade: 0.1,
+  maxTokensHeld: 5,
+  holdDurationMs: 60_000,
+  profitTargetPct: 50,
+  stopLossPct: 20,
+  slippageBps: 5000,
+  priorityFeeMicroLamports: 1_000_000,
 };
 
 // StoredEvent type (server tarafından gelen event)
@@ -168,6 +179,8 @@ export default function Home() {
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
+  const [autoTraderConfig, setAutoTraderConfig] = useState<AutoTraderConfig>(DEFAULT_AUTO_TRADER_CONFIG);
+  const [autoTraderRunning, setAutoTraderRunning] = useState(false);
   const logIdRef = useRef(0);
   const logBottomRef = useRef<HTMLDivElement>(null);
 
@@ -204,6 +217,18 @@ export default function Home() {
   const handleConfigUpdate = (cfg: Partial<TradeConfig>) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "trade_config_update", data: cfg }));
+    }
+  };
+
+  const handleAutoTraderConfigUpdate = (cfg: Partial<AutoTraderConfig>) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "auto_trader_config_update", data: cfg }));
+    }
+  };
+
+  const handleAutoTraderToggle = (enabled: boolean) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "auto_trader_toggle", data: { enabled } }));
     }
   };
 
@@ -267,6 +292,12 @@ export default function Home() {
         if (typeof msg.data.solPriceUsd === "number" && msg.data.solPriceUsd > 0) {
           setSolPriceUsd(msg.data.solPriceUsd);
         }
+        if (msg.data.autoTraderConfig) {
+          setAutoTraderConfig(msg.data.autoTraderConfig);
+        }
+        if (typeof msg.data.autoTraderRunning === "boolean") {
+          setAutoTraderRunning(msg.data.autoTraderRunning);
+        }
         try { localStorage.setItem("positions", JSON.stringify(msg.data.positions)); } catch {}
         try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data.config)); } catch {}
       } else if (msg.type === "position_update") {
@@ -281,6 +312,11 @@ export default function Home() {
       } else if (msg.type === "trade_config_update") {
         setTradeConfig(msg.data);
         try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data)); } catch {}
+      } else if (msg.type === "auto_trader_config_update") {
+        setAutoTraderConfig(msg.data);
+      } else if (msg.type === "auto_trader_state") {
+        if (msg.data.config) setAutoTraderConfig(msg.data.config);
+        if (typeof msg.data.isRunning === "boolean") setAutoTraderRunning(msg.data.isRunning);
       }
 
       // Gelen event id'sini sakla
@@ -550,6 +586,10 @@ export default function Home() {
             onSell={handleSell}
             onDelete={handleDeletePosition}
             onUpdateConfig={handleConfigUpdate}
+            autoTraderConfig={autoTraderConfig}
+            autoTraderRunning={autoTraderRunning}
+            onAutoTraderConfigUpdate={handleAutoTraderConfigUpdate}
+            onAutoTraderToggle={handleAutoTraderToggle}
           />
         </div>
 
