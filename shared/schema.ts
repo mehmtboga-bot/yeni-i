@@ -69,6 +69,44 @@ export const tradeConfigSchema = z.object({
 
 export type TradeConfig = z.infer<typeof tradeConfigSchema>;
 
+export const autoTraderConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  solAmountPerTrade: z.number().min(0.0001).default(0.1),
+  maxTokensHeld: z.number().min(1).max(100).default(5),
+  holdDurationMs: z.number().min(10000).default(60000),
+  profitTargetPct: z.number().min(0).default(50),
+  stopLossPct: z.number().min(0).default(20),
+  slippageBps: z.number().min(50).max(1_000_000).default(5000),
+  priorityFeeMicroLamports: z.number().min(0).max(100_000_000).default(1000000),
+});
+
+export type AutoTraderConfig = z.infer<typeof autoTraderConfigSchema>;
+
+export const autoTradeRecordSchema = z.object({
+  id: z.string(),
+  mintAddress: z.string(),
+  tokenName: z.string(),
+  tokenSymbol: z.string(),
+  status: z.enum(["pending", "active", "sold", "failed"]),
+  detectedAt: z.number(),
+  buyTimestamp: z.number().optional(),
+  sellTimestamp: z.number().optional(),
+  buyAmountSol: z.number(),
+  buyTokenAmount: z.number().optional(),
+  buyPrice: z.number().optional(),
+  sellPrice: z.number().optional(),
+  sellAmountSol: z.number().optional(),
+  currentPrice: z.number().optional(),
+  pnlSol: z.number().optional(),
+  pnlPct: z.number().optional(),
+  holdDurationMs: z.number().optional(),
+  buyTxSignature: z.string().optional(),
+  sellTxSignature: z.string().optional(),
+  error: z.string().optional(),
+});
+
+export type AutoTradeRecord = z.infer<typeof autoTradeRecordSchema>;
+
 export const wsMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mint_detected"), data: mintedTokenSchema }),
   z.object({ type: z.literal("lp_detected"), data: lpDetectionSchema }),
@@ -99,6 +137,16 @@ export const wsMessageSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("position_update"), data: positionSchema }),
   z.object({ type: z.literal("trade_config_update"), data: tradeConfigSchema }),
+  z.object({
+    type: z.literal("auto_trader_status"),
+    data: z.object({
+      config: autoTraderConfigSchema,
+      records: z.array(autoTradeRecordSchema),
+      isRunning: z.boolean(),
+    }),
+  }),
+  z.object({ type: z.literal("auto_trader_config_update"), data: autoTraderConfigSchema }),
+  z.object({ type: z.literal("auto_trade_record_update"), data: autoTradeRecordSchema }),
 ]);
 
 export type WSMessage = z.infer<typeof wsMessageSchema>;
