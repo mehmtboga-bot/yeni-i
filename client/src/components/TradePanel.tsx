@@ -5,29 +5,46 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Position, TradeConfig } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Position, TradeConfig, AutoTraderConfig, AutoTradeRecord } from "@shared/schema";
+import { AutoTraderPanel } from "@/components/AutoTraderPanel";
+import { AutoTraderRecordsTable } from "@/components/AutoTraderRecordsTable";
 
 type Filter = "all" | "open" | "closed";
 
 interface TradePanelProps {
   positions: Position[];
   config: TradeConfig;
+  autoTraderConfig: AutoTraderConfig;
+  autoTraderRecords: AutoTradeRecord[];
+  autoTraderRunning: boolean;
   traderPublicKey?: string;
   traderReady: boolean;
   solPriceUsd: number;
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
+  onAutoTraderConfigUpdate: (cfg: Partial<AutoTraderConfig>) => void;
+  onAutoTraderToggle: (enabled: boolean) => void;
 }
 
 const formatUsd = (n?: number) => {
   if (n === undefined || n === null || Number.isNaN(n) || n <= 0) return "—";
   if (n >= 1) return `$${n.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
   if (n >= 0.01) return `$${n.toFixed(4)}`;
-  if (n >= 0.0001) return `$${n.toFixed(6)}`;
-  const log = Math.floor(Math.log10(n));
-  const decimals = Math.min(18, Math.abs(log) + 4);
-  return `$${n.toFixed(decimals).replace(/0+$/, "").replace(/\.$/, "")}`;
+  return `$${n.toFixed(6)}`;
+};
+
+const formatCompact = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toFixed(2);
+};
+
+const formatPrice = (n?: number) => {
+  if (!n) return "—";
+  if (n < 0.00001) return n.toExponential(2);
+  return n.toFixed(6);
 };
 
 const truncate = (addr?: string) => addr ? `${addr.slice(0, 4)}...${addr.slice(-4)}` : "—";
@@ -38,31 +55,20 @@ const formatTime = (ts?: number) =>
 const formatNumber = (n?: number, digits = 4) =>
   n === undefined || n === null || Number.isNaN(n) ? "—" : n.toLocaleString("tr-TR", { maximumFractionDigits: digits });
 
-const formatPrice = (n?: number) => {
-  if (n === undefined || n === null || Number.isNaN(n) || n <= 0) return "—";
-  if (n >= 0.001) return n.toFixed(6);
-  const log = Math.floor(Math.log10(n));
-  const decimals = Math.min(18, Math.abs(log) + 4);
-  return n.toFixed(decimals).replace(/0+$/, "").replace(/\.$/, "");
-};
-
-const formatCompact = (n?: number) => {
-  if (n === undefined || n === null || Number.isNaN(n)) return "—";
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(2)}K`;
-  return n.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
-};
-
 export function TradePanel({
   positions,
   config,
+  autoTraderConfig,
+  autoTraderRecords,
+  autoTraderRunning,
   traderPublicKey,
   traderReady,
   solPriceUsd,
   onSell,
   onDelete,
   onUpdateConfig,
+  onAutoTraderConfigUpdate,
+  onAutoTraderToggle,
 }: TradePanelProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -108,130 +114,162 @@ export function TradePanel({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* Üst Bilgi */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Cüzdan kartı */}
-        <Card className="p-4 space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Wallet className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-semibold">Trader Cüzdanı</h2>
-            {traderReady ? (
-              <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/40">Aktif</Badge>
-            ) : (
-              <Badge className="bg-destructive/15 text-destructive border border-destructive/40">Devre Dışı</Badge>
-            )}
-          </div>
-          {traderReady && traderPublicKey ? (
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs font-mono text-muted-foreground bg-muted px-2 py-1.5 rounded-md truncate" data-testid="text-trader-pubkey">
-                {traderPublicKey}
-              </code>
-              <Button size="icon" variant="ghost" onClick={() => copyAddress(traderPublicKey, "pubkey")} className="h-8 w-8 shrink-0">
-                {copiedId === "pubkey" ? <Check className="h-4 w-4 text-chart-4" /> : <Copy className="h-4 w-4" />}
+      {/* Tab Seçimi */}
+      <Tabs defaultValue="manual" className="w-full">
+        <TabsList className="grid w-full grid-cols-2" data-testid="tabs-trade-mode">
+          <TabsTrigger value="manual" data-testid="tab-manual-trade">
+            💳 Manuel Trading
+          </TabsTrigger>
+          <TabsTrigger value="auto" data-testid="tab-auto-trade">
+            🤖 Otomatik Trading
+          </TabsTrigger>
+        </TabsList>
+
+        {/* MANUEL TRADİNG TAB */}
+        <TabsContent value="manual" className="space-y-6">
+          {/* Üst Bilgi */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Cüzdan kartı */}
+            <Card className="p-4 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Wallet className="h-5 w-5 text-primary" />
+                <h2 className="text-base font-semibold">Trader Cüzdanı</h2>
+                {traderReady ? (
+                  <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/40">Aktif</Badge>
+                ) : (
+                  <Badge className="bg-destructive/15 text-destructive border border-destructive/40">Devre Dışı</Badge>
+                )}
+              </div>
+              {traderReady && traderPublicKey ? (
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs font-mono text-muted-foreground bg-muted px-2 py-1.5 rounded-md truncate" data-testid="text-trader-pubkey">
+                    {traderPublicKey}
+                  </code>
+                  <Button size="icon" variant="ghost" onClick={() => copyAddress(traderPublicKey, "pubkey")} className="h-8 w-8 shrink-0">
+                    {copiedId === "pubkey" ? <Check className="h-4 w-4 text-chart-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                  <span>TRADER_PRIVATE_KEY tanımlı değil. Dosyalar sekmesinden ekleyebilirsin.</span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <Stat label="Açık Pozisyon" value={stats.openCount} color="text-primary" />
+                <Stat label="Kapanan" value={stats.closedCount} color="text-chart-2" />
+                <Stat
+                  label="Toplam Yatırım"
+                  value={`${stats.totalSpent.toFixed(4)} SOL`}
+                  sub={solPriceUsd > 0 ? formatUsd(stats.totalSpent * solPriceUsd) : undefined}
+                  color="text-chart-4"
+                />
+                <Stat
+                  label="Realize PnL"
+                  value={`${stats.realized >= 0 ? "+" : ""}${stats.realized.toFixed(4)} SOL`}
+                  sub={solPriceUsd > 0 ? `${stats.realized >= 0 ? "+" : ""}${formatUsd(Math.abs(stats.realized) * solPriceUsd)}` : undefined}
+                  color={stats.realized >= 0 ? "text-emerald-400" : "text-destructive"}
+                />
+              </div>
+            </Card>
+
+            {/* Ayarlar kartı */}
+            <Card className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-chart-2" />
+                <h2 className="text-base font-semibold">Trade Ayarları</h2>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="sol-amount" className="text-xs">İşlem Başına SOL</Label>
+                  <Input id="sol-amount" type="number" step="0.01" min="0.0001" value={solAmountInput}
+                    onChange={(e) => setSolAmountInput(e.target.value)} data-testid="input-sol-amount" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="slippage" className="text-xs">Slippage (bps)</Label>
+                  <Input id="slippage" type="number" step="1000" min="50" value={slippageInput}
+                    onChange={(e) => setSlippageInput(e.target.value)} data-testid="input-slippage" />
+                  <p className="text-[10px] text-muted-foreground">
+                    {Math.floor(parseInt(slippageInput || "0") / 100)}%
+                    {parseInt(slippageInput || "0") > 9900 && (
+                      <span className="text-amber-400 ml-1">· Jup: max %99</span>
+                    )}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="priority" className="text-xs">Priority Fee (µLamports)</Label>
+                  <Input id="priority" type="number" step="1000000" min="0" value={priorityInput}
+                    onChange={(e) => setPriorityInput(e.target.value)} data-testid="input-priority" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="take-profit" className="text-xs flex items-center gap-1">
+                    <Target className="h-3 w-3 text-emerald-400" />
+                    Kar Hedefi (%)
+                  </Label>
+                  <Input id="take-profit" type="number" step="5" min="0" max="10000" value={takeProfitInput}
+                    onChange={(e) => setTakeProfitInput(e.target.value)} data-testid="input-take-profit"
+                    className={parseFloat(takeProfitInput) > 0 ? "border-emerald-500/50 text-emerald-400" : ""} />
+                  <p className="text-[10px] text-muted-foreground">
+                    {parseFloat(takeProfitInput) > 0 ? `+%${takeProfitInput}'de otomatik sat` : "0 = devre dışı"}
+                  </p>
+                </div>
+              </div>
+              <Button onClick={saveConfig} className="w-full" data-testid="button-save-config">
+                Ayarları Kaydet
               </Button>
+              {takeProfitPct > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1.5">
+                  <Target className="h-3.5 w-3.5 shrink-0" />
+                  Kar hedefi aktif: +%{takeProfitPct}'ye ulaşınca otomatik satış
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Filtre */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base font-semibold mr-2">Pozisyonlar</h2>
+            {(["all", "open", "closed"] as Filter[]).map((f) => (
+              <Button key={f} variant={filter === f ? "default" : "outline"} size="sm"
+                onClick={() => setFilter(f)} data-testid={`button-filter-${f}`}>
+                {f === "all" ? "Tümü" : f === "open" ? `Açık (${stats.openCount})` : `Kapanan (${stats.closedCount})`}
+              </Button>
+            ))}
+          </div>
+
+          {/* Pozisyon listesi */}
+          {filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Wallet className="h-10 w-10 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">Henüz pozisyon yok. Dashboard'daki "Jup Al" veya "Pump Al" ile işlem başlat.</p>
             </div>
           ) : (
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-              <span>TRADER_PRIVATE_KEY tanımlı değil. Dosyalar sekmesinden ekleyebilirsin.</span>
+            <div className="space-y-2">
+              {filtered.map((p) => (
+                <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} />
+              ))}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3 pt-1">
-            <Stat label="Açık Pozisyon" value={stats.openCount} color="text-primary" />
-            <Stat label="Kapanan" value={stats.closedCount} color="text-chart-2" />
-            <Stat
-              label="Toplam Yatırım"
-              value={`${stats.totalSpent.toFixed(4)} SOL`}
-              sub={solPriceUsd > 0 ? formatUsd(stats.totalSpent * solPriceUsd) : undefined}
-              color="text-chart-4"
-            />
-            <Stat
-              label="Realize PnL"
-              value={`${stats.realized >= 0 ? "+" : ""}${stats.realized.toFixed(4)} SOL`}
-              sub={solPriceUsd > 0 ? `${stats.realized >= 0 ? "+" : ""}${formatUsd(Math.abs(stats.realized) * solPriceUsd)}` : undefined}
-              color={stats.realized >= 0 ? "text-emerald-400" : "text-destructive"}
-            />
-          </div>
-        </Card>
+        </TabsContent>
 
-        {/* Ayarlar kartı */}
-        <Card className="p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-chart-2" />
-            <h2 className="text-base font-semibold">Trade Ayarları</h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="sol-amount" className="text-xs">İşlem Başına SOL</Label>
-              <Input id="sol-amount" type="number" step="0.01" min="0.0001" value={solAmountInput}
-                onChange={(e) => setSolAmountInput(e.target.value)} data-testid="input-sol-amount" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="slippage" className="text-xs">Slippage (bps)</Label>
-              <Input id="slippage" type="number" step="1000" min="50" value={slippageInput}
-                onChange={(e) => setSlippageInput(e.target.value)} data-testid="input-slippage" />
-              <p className="text-[10px] text-muted-foreground">
-                {Math.floor(parseInt(slippageInput || "0") / 100)}%
-                {parseInt(slippageInput || "0") > 9900 && (
-                  <span className="text-amber-400 ml-1">· Jup: max %99</span>
-                )}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="priority" className="text-xs">Priority Fee (µLamports)</Label>
-              <Input id="priority" type="number" step="1000000" min="0" value={priorityInput}
-                onChange={(e) => setPriorityInput(e.target.value)} data-testid="input-priority" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="take-profit" className="text-xs flex items-center gap-1">
-                <Target className="h-3 w-3 text-emerald-400" />
-                Kar Hedefi (%)
-              </Label>
-              <Input id="take-profit" type="number" step="5" min="0" max="10000" value={takeProfitInput}
-                onChange={(e) => setTakeProfitInput(e.target.value)} data-testid="input-take-profit"
-                className={parseFloat(takeProfitInput) > 0 ? "border-emerald-500/50 text-emerald-400" : ""} />
-              <p className="text-[10px] text-muted-foreground">
-                {parseFloat(takeProfitInput) > 0 ? `+%${takeProfitInput}'de otomatik sat` : "0 = devre dışı"}
-              </p>
-            </div>
-          </div>
-          <Button onClick={saveConfig} className="w-full" data-testid="button-save-config">
-            Ayarları Kaydet
-          </Button>
-          {takeProfitPct > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1.5">
-              <Target className="h-3.5 w-3.5 shrink-0" />
-              Kar hedefi aktif: +%{takeProfitPct}'ye ulaşınca otomatik satış
-            </div>
-          )}
-        </Card>
-      </div>
+        {/* OTOMATİK TRADİNG TAB */}
+        <TabsContent value="auto" className="space-y-6">
+          {/* Otomatik Trader Ayarları */}
+          <AutoTraderPanel
+            config={autoTraderConfig}
+            isRunning={autoTraderRunning}
+            onConfigUpdate={onAutoTraderConfigUpdate}
+            onToggle={onAutoTraderToggle}
+          />
 
-      {/* Filtre */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="text-base font-semibold mr-2">Pozisyonlar</h2>
-        {(["all", "open", "closed"] as Filter[]).map((f) => (
-          <Button key={f} variant={filter === f ? "default" : "outline"} size="sm"
-            onClick={() => setFilter(f)} data-testid={`button-filter-${f}`}>
-            {f === "all" ? "Tümü" : f === "open" ? `Açık (${stats.openCount})` : `Kapanan (${stats.closedCount})`}
-          </Button>
-        ))}
-      </div>
-
-      {/* Pozisyon listesi */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Wallet className="h-10 w-10 mx-auto mb-2 opacity-40" />
-          <p className="text-sm">Henüz pozisyon yok. Dashboard'daki "Jup Al" veya "Pump Al" ile işlem başlat.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((p) => (
-            <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} />
-          ))}
-        </div>
-      )}
+          {/* Trading Kayıtları */}
+          <AutoTraderRecordsTable
+            records={autoTraderRecords}
+            solPriceUsd={solPriceUsd}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
