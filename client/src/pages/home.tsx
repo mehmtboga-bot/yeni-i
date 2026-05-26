@@ -558,28 +558,30 @@ export default function Home() {
                   )}
                 </div>
 
-                <AutoTraderPanel
-                  config={autoTraderConfig}
-                  isRunning={autoTraderRunning}
-                  onConfigUpdate={handleAutoTraderConfigUpdate}
-                  onToggle={handleAutoTraderToggle}
-                />
               </div>
             </div>
           </div>
         </div>
 
         <div className={`h-full overflow-y-auto ${activeTab === "trade" ? "block" : "hidden"}`}>
-          <TradePanel
-            positions={positions}
-            config={tradeConfig}
-            traderPublicKey={traderPublicKey}
-            traderReady={traderReady}
-            solPriceUsd={solPriceUsd}
-            onSell={handleSell}
-            onDelete={handleDeletePosition}
-            onUpdateConfig={handleConfigUpdate}
-          />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+            <TradePanel
+              positions={positions}
+              config={tradeConfig}
+              traderPublicKey={traderPublicKey}
+              traderReady={traderReady}
+              solPriceUsd={solPriceUsd}
+              onSell={handleSell}
+              onDelete={handleDeletePosition}
+              onUpdateConfig={handleConfigUpdate}
+            />
+            <AutoTraderPanel
+              config={autoTraderConfig}
+              isRunning={autoTraderRunning}
+              onConfigUpdate={handleAutoTraderConfigUpdate}
+              onToggle={handleAutoTraderToggle}
+            />
+          </div>
         </div>
 
         <div className={`h-full ${activeTab === "files" ? "block" : "hidden"}`}>
