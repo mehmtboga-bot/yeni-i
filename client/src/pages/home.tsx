@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Coins, Droplet, Lock } from "lucide-react";
+import { Bot, Coins, Droplet, Lock } from "lucide-react";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { MintedTokenCard } from "@/components/MintedTokenCard";
 import { LPLogTable } from "@/components/LPLogTable";
@@ -8,6 +8,13 @@ import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
 import { AutoTraderPanel } from "@/components/AutoTraderPanel";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig, AutoTraderConfig } from "@shared/schema";
 import type { ServerLog } from "@/components/LogPanel";
 
@@ -171,6 +178,7 @@ function loadAutoTraderConfig(): AutoTraderConfig {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [autoTraderOpen, setAutoTraderOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState("");
   const [mintedTokens, setMintedTokens] = useState<MintedToken[]>(loadMintedTokens);
@@ -456,12 +464,31 @@ export default function Home() {
               })}
             </div>
 
-            <ConnectionStatus
-              isConnected={isConnected}
-              message={connectionMessage}
-              isMonitoring={isMonitoring}
-              onToggleMonitoring={toggleMonitoring}
-            />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAutoTraderOpen(true)}
+                data-testid="button-open-auto-trader"
+                className={`gap-1.5 text-xs font-medium transition-colors ${
+                  autoTraderConfig.enabled
+                    ? "border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Bot className="h-4 w-4" />
+                <span className="hidden sm:inline">Auto Trader</span>
+                {autoTraderConfig.enabled && (
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                )}
+              </Button>
+              <ConnectionStatus
+                isConnected={isConnected}
+                message={connectionMessage}
+                isMonitoring={isMonitoring}
+                onToggleMonitoring={toggleMonitoring}
+              />
+            </div>
           </div>
         </div>
       </header>
@@ -575,12 +602,24 @@ export default function Home() {
               onDelete={handleDeletePosition}
               onUpdateConfig={handleConfigUpdate}
             />
-            <AutoTraderPanel
-              config={autoTraderConfig}
-              isRunning={autoTraderRunning}
-              onConfigUpdate={handleAutoTraderConfigUpdate}
-              onToggle={handleAutoTraderToggle}
-            />
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setAutoTraderOpen(true)}
+                data-testid="button-open-auto-trader-trade-tab"
+                className={`gap-2 px-6 py-5 text-sm font-medium transition-colors ${
+                  autoTraderConfig.enabled
+                    ? "border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Bot className="h-5 w-5" />
+                🤖 Otomatik Trading Panelini Aç
+                {autoTraderConfig.enabled && (
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -588,6 +627,35 @@ export default function Home() {
           <FileEditor />
         </div>
       </div>
+
+      <Dialog open={autoTraderOpen} onOpenChange={setAutoTraderOpen}>
+        <DialogContent
+          className="max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          data-testid="dialog-auto-trader"
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Bot className="h-5 w-5 text-chart-3" />
+              Otomatik Trading
+              {autoTraderConfig.enabled ? (
+                <Badge className="ml-1 bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 text-xs">
+                  {autoTraderRunning ? "🟢 Çalışıyor" : "⏸️ Durduruldu"}
+                </Badge>
+              ) : (
+                <Badge className="ml-1 bg-muted text-muted-foreground border border-muted-foreground/30 text-xs">
+                  ⚪ Devre Dışı
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <AutoTraderPanel
+            config={autoTraderConfig}
+            isRunning={autoTraderRunning}
+            onConfigUpdate={handleAutoTraderConfigUpdate}
+            onToggle={handleAutoTraderToggle}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
