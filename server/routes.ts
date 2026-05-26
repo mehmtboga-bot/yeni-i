@@ -203,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           positions: tradeStore.getAll(),
           config: tradeStore.getConfig(),
           autoTraderConfig: autoTraderConfigStore.getConfig(),
-          autoTraderRunning: autoTraderEngine.isRunning(),
+          autoTraderRunning: autoTraderEngine.getIsRunning(),
           traderPublicKey: trader.getPublicKey(),
           traderReady: trader.isReady(),
           solPriceUsd: monitor.getSolPriceUsd(),
