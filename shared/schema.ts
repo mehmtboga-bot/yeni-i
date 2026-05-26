@@ -69,6 +69,20 @@ export const tradeConfigSchema = z.object({
 
 export type TradeConfig = z.infer<typeof tradeConfigSchema>;
 
+export const autoTraderConfigSchema = z.object({
+  enabled: z.boolean(),
+  solAmountPerTrade: z.number(),
+  maxTokensHeld: z.number(),
+  holdDurationMs: z.number(),
+  profitTargetPct: z.number(),
+  stopLossPct: z.number(),
+  slippageBps: z.number(),
+  priorityFeeMicroLamports: z.number(),
+  minLiquidityUsd: z.number(),
+});
+
+export type AutoTraderConfig = z.infer<typeof autoTraderConfigSchema>;
+
 export const wsMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mint_detected"), data: mintedTokenSchema }),
   z.object({ type: z.literal("lp_detected"), data: lpDetectionSchema }),

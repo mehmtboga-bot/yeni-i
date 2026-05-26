@@ -9,24 +9,26 @@ import path from "path";
 
 export interface AutoTraderConfig {
   enabled: boolean;
-  solAmountPerTrade: number;      // Her işlem başına SOL (örn: 0.1)
-  maxTokensHeld: number;           // Maksimum tutulacak token sayısı
-  holdDurationMs: number;          // Tutma süresi (ms)
-  profitTargetPct: number;         // Kar hedefi (%)
-  stopLossPct: number;             // Zarar limiti (%)
-  slippageBps: number;             // Slippage (bps)
+  solAmountPerTrade: number;        // Her işlem başına SOL (örn: 0.1)
+  maxTokensHeld: number;            // Maksimum tutulacak token sayısı
+  holdDurationMs: number;           // Tutma süresi (ms)
+  profitTargetPct: number;          // Kar hedefi (%)
+  stopLossPct: number;              // Zarar limiti (%)
+  slippageBps: number;              // Slippage (bps)
   priorityFeeMicroLamports: number; // Priority fee
+  minLiquidityUsd: number;          // Minimum likidite eşiği (USD)
 }
 
 const DEFAULT_CONFIG: AutoTraderConfig = {
   enabled: false,
   solAmountPerTrade: 0.1,
   maxTokensHeld: 5,
-  holdDurationMs: 60000,    // 1 dakika
-  profitTargetPct: 50,      // %50 kar
-  stopLossPct: 20,          // %20 zarar
-  slippageBps: 5000,        // %50 slippage
+  holdDurationMs: 60000,           // 1 dakika
+  profitTargetPct: 50,             // %50 kar
+  stopLossPct: 20,                 // %20 zarar
+  slippageBps: 5000,               // %50 slippage
   priorityFeeMicroLamports: 1_000_000,
+  minLiquidityUsd: 5000,           // Minimum $5,000 likidite
 };
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -78,9 +80,9 @@ export class AutoTraderConfigStore {
     this.config = { ...this.config, ...partial };
     this.saveConfig();
     
-    const status = this.config.enabled ? "✅ AÇIK" : "❌ KAPAL";
+    const status = this.config.enabled ? "✅ AÇIK" : "❌ KAPALI";
     console.log(
-      `🔧 Auto-trader güncellendi [${status}] | SOL/işlem: ${this.config.solAmountPerTrade} | Max token: ${this.config.maxTokensHeld} | Tutma: ${(this.config.holdDurationMs / 1000).toFixed(0)}s`
+      `🔧 Auto-trader güncellendi [${status}] | SOL/işlem: ${this.config.solAmountPerTrade} | Max token: ${this.config.maxTokensHeld} | Tutma: ${(this.config.holdDurationMs / 1000).toFixed(0)}s | Min Likidite: ${this.config.minLiquidityUsd}`
     );
 
     return { ...this.config };

@@ -96,6 +96,15 @@ export class AutoTraderEngine {
       return;
     }
 
+    // Minimum likidite kontrolü
+    const liquidityUsd: number | undefined = lpData.liquidityUsd ?? lpData.tvlUsd;
+    if (config.minLiquidityUsd > 0 && (liquidityUsd === undefined || liquidityUsd < config.minLiquidityUsd)) {
+      console.log(
+        `🚫 [Auto-Trader] Düşük likidite — ${symbol} atlanıyor | Likidite: ${liquidityUsd?.toFixed(0) ?? "?"} | Eşik: ${config.minLiquidityUsd}`
+      );
+      return;
+    }
+
     // Max token kontrol
     const activeCount = Array.from(this.records.values()).filter(
       (r) => r.status === "active" || r.status === "pending"

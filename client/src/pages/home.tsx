@@ -41,6 +41,7 @@ const DEFAULT_AUTO_TRADER_CONFIG: AutoTraderConfig = {
   stopLossPct: 20,
   slippageBps: 5000,
   priorityFeeMicroLamports: 1000000,
+  minLiquidityUsd: 5000,
 };
 
 type StoredEvent = { id: number; type: string; data: any; timestamp: number };

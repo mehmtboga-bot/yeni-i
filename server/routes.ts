@@ -340,7 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (Object.keys(partial).length) trader.updateConfig(partial as any);
         } else if (message.type === "auto_trader_config_update") {
           // Otomatik trader konfigürasyonu güncelle
-          const { solAmountPerTrade, maxTokensHeld, holdDurationMs, profitTargetPct, stopLossPct, slippageBps, priorityFeeMicroLamports, enabled } = message.data || {};
+          const { solAmountPerTrade, maxTokensHeld, holdDurationMs, profitTargetPct, stopLossPct, slippageBps, priorityFeeMicroLamports, minLiquidityUsd, enabled } = message.data || {};
           const partial: Record<string, any> = {};
           if (typeof solAmountPerTrade === "number" && solAmountPerTrade > 0) partial.solAmountPerTrade = solAmountPerTrade;
           if (typeof maxTokensHeld === "number" && maxTokensHeld > 0) partial.maxTokensHeld = maxTokensHeld;
@@ -349,6 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (typeof stopLossPct === "number" && stopLossPct >= 0) partial.stopLossPct = stopLossPct;
           if (typeof slippageBps === "number" && slippageBps >= 50) partial.slippageBps = slippageBps;
           if (typeof priorityFeeMicroLamports === "number" && priorityFeeMicroLamports >= 0) partial.priorityFeeMicroLamports = priorityFeeMicroLamports;
+          if (typeof minLiquidityUsd === "number" && minLiquidityUsd >= 0) partial.minLiquidityUsd = minLiquidityUsd;
           if (typeof enabled === "boolean") {
             if (enabled) {
               autoTraderEngine.start();

@@ -28,6 +28,7 @@ export function AutoTraderPanel({
   const [stopLossInput, setStopLossInput] = useState(String(config.stopLossPct));
   const [slippageInput, setSlippageInput] = useState(String(config.slippageBps));
   const [priorityInput, setPriorityInput] = useState(String(config.priorityFeeMicroLamports));
+  const [minLiquidityInput, setMinLiquidityInput] = useState(String(config.minLiquidityUsd ?? 5000));
 
   const saveConfig = () => {
     const partial: Partial<AutoTraderConfig> = {};
@@ -53,6 +54,9 @@ export function AutoTraderPanel({
     const priority = parseInt(priorityInput, 10);
     if (!Number.isNaN(priority) && priority >= 0) partial.priorityFeeMicroLamports = priority;
 
+    const minLiquidity = parseFloat(minLiquidityInput);
+    if (!Number.isNaN(minLiquidity) && minLiquidity >= 0) partial.minLiquidityUsd = minLiquidity;
+
     if (Object.keys(partial).length > 0) {
       onConfigUpdate(partial);
     }
@@ -66,6 +70,7 @@ export function AutoTraderPanel({
     setStopLossInput("20");
     setSlippageInput("5000");
     setPriorityInput("1000000");
+    setMinLiquidityInput("5000");
   };
 
   return (
@@ -254,8 +259,8 @@ export function AutoTraderPanel({
             </p>
           </div>
 
-          {/* Satır 4: Priority Fee */}
-          <div className="space-y-2 md:col-span-2">
+          {/* Satır 4: Priority Fee & Min Liquidity */}
+          <div className="space-y-2">
             <Label htmlFor="auto-priority" className="text-sm font-medium">
               ⚡ Priority Fee (µLamports)
             </Label>
@@ -272,6 +277,28 @@ export function AutoTraderPanel({
             />
             <p className="text-xs text-muted-foreground">
               İşlem hızı için ödenen ek ücret
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="auto-min-liquidity" className="text-sm font-medium">
+              💧 Min Likidite (USD)
+            </Label>
+            <Input
+              id="auto-min-liquidity"
+              type="number"
+              step="500"
+              min="0"
+              value={minLiquidityInput}
+              onChange={(e) => setMinLiquidityInput(e.target.value)}
+              disabled={isRunning}
+              data-testid="input-auto-min-liquidity"
+              className="font-mono"
+            />
+            <p className="text-xs text-muted-foreground">
+              {parseFloat(minLiquidityInput) === 0
+                ? "Filtre devre dışı — tüm LP'ler işlenir"
+                : `$${Number(minLiquidityInput).toLocaleString()} altı likidite atlanır`}
             </p>
           </div>
         </div>
@@ -321,6 +348,14 @@ export function AutoTraderPanel({
             <p className="text-muted-foreground">Targets</p>
             <p className="font-mono font-semibold">
               +{profitTargetInput}% / -{stopLossInput}%
+            </p>
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <p className="text-muted-foreground">Min Liquidity</p>
+            <p className="font-mono font-semibold">
+              {parseFloat(minLiquidityInput) === 0
+                ? "Devre Dışı"
+                : `$${Number(minLiquidityInput).toLocaleString()}`}
             </p>
           </div>
         </div>
