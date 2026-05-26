@@ -1,228 +1,162 @@
 /**
- * Otomatik Trading Motoru
- * 
- * LP tespit edildiğinde otomatik alım yapan
- * ve tutma süresine göre otomatik satış yapan sistem
+ * Auto Trader Engine
+ * Otomatik alım-satım motoru - LP tespit edildiğinde otomatik işlem yapar
  */
 
-import type { AutoTraderConfig } from "./auto-trader-config";
-import type { AutoTraderConfigStore } from "./auto-trader-config";
-import type { TradeStore } from "./trade-store";
 import type { Position } from "@shared/schema";
+import { AutoTraderConfigStore, type AutoTraderConfig } from "./auto-trader-config";
+import { TradeStore } from "./trade-store";
 
-interface AutoTradeRecord {
+export interface AutoTradeRecord {
   id: string;
   mintAddress: string;
-  tokenName: string;
   tokenSymbol: string;
-  buyTimestamp: number;
-  shouldSellAt: number;  // Satış yapılacak zaman
+  status: "pending" | "bought" | "sold" | "cancelled" | "failed";
+  lpDetectedAt: number;
   buyTxSignature?: string;
-  status: "pending" | "active" | "sold" | "failed";
-  error?: string;
-  buyPriceSol?: number;
-  buyTokenAmount?: number;
-  sellPriceSol?: number;
-  pnlSol?: number;
+  buyPrice?: number;
+  buyAmount?: number;
+  sellTxSignature?: string;
+  sellPrice?: number;
+  pnl?: number;
   pnlPct?: number;
+  reason?: string;
 }
 
-type EventEmitter = (event: string, data: any) => void;
+type Emitter = (event: string, data: any) => void;
 
 export class AutoTraderEngine {
   private configStore: AutoTraderConfigStore;
   private tradeStore: TradeStore;
-  private emit: EventEmitter;
-  
+  private emitter: Emitter;
   private records: Map<string, AutoTradeRecord> = new Map();
-  private isRunning = false;
-  private sellCheckInterval: NodeJS.Timeout | null = null;
-  private processedLPs: Set<string> = new Set();
+  private running = false;
+  private checkInterval: NodeJS.Timeout | null = null;
 
   constructor(
     configStore: AutoTraderConfigStore,
     tradeStore: TradeStore,
-    emit: EventEmitter
+    emitter: Emitter
   ) {
     this.configStore = configStore;
     this.tradeStore = tradeStore;
-    this.emit = emit;
+    this.emitter = emitter;
   }
 
   start() {
-    if (this.isRunning) {
-      console.warn("⚠️ Auto-trader zaten çalışıyor");
+    if (this.running) {
+      console.log("⚠️ Auto-trader zaten çalışıyor");
       return;
     }
-    this.isRunning = true;
-    console.log("🤖 Otomatik Trading Motoru başlatıldı");
-    this.startSellChecker();
+
+    this.running = true;
+    console.log("🚀 Auto-trader başlatıldı");
+
+    // Her 5 saniyede kontrol et
+    this.checkInterval = setInterval(() => this.checkAndExecute(), 5000);
   }
 
   stop() {
-    if (!this.isRunning) {
-      console.warn("⚠️ Auto-trader zaten durdurulmuş");
-      return;
+    this.running = false;
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
     }
-    this.isRunning = false;
-    if (this.sellCheckInterval) {
-      clearInterval(this.sellCheckInterval);
-      this.sellCheckInterval = null;
-    }
-    console.log("🛑 Otomatik Trading Motoru durduruldu");
-  }
-
-  getRecords(): AutoTradeRecord[] {
-    return Array.from(this.records.values());
+    console.log("🛑 Auto-trader durduruldu");
   }
 
   /**
-   * LP tespit edildiğinde çağrılır
+   * LP tespit edildiğinde çağırılır
    */
   async onLPDetected(lpData: any) {
-    const config = this.configStore.getConfig();
-    if (!config.enabled) return;
+    if (!this.configStore.getConfig().enabled) return;
 
     const { mintAddress, name, symbol } = lpData;
-    if (!mintAddress) return;
-
-    // Tekrar işleme koruması
-    if (this.processedLPs.has(mintAddress)) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} zaten işlendi, atlanıyor`);
-      return;
-    }
-
-    // Max token kontrol
-    const activeCount = Array.from(this.records.values()).filter(
-      (r) => r.status === "active" || r.status === "pending"
-    ).length;
-    if (activeCount >= config.maxTokensHeld) {
-      console.warn(
-        `⚠️ [Auto-Trader] Max token sayısına ulaşıldı (${activeCount}/${config.maxTokensHeld}), ${symbol} atlanıyor`
-      );
-      return;
-    }
-
-    this.processedLPs.add(mintAddress);
-    const recordId = `auto-${mintAddress}-${Date.now()}`;
-
-    // Record oluştur
     const record: AutoTradeRecord = {
-      id: recordId,
+      id: `${mintAddress}-${Date.now()}`,
       mintAddress,
-      tokenName: name || "Bilinmiyor",
       tokenSymbol: symbol || "?",
-      buyTimestamp: Date.now(),
-      shouldSellAt: Date.now() + config.holdDurationMs,
       status: "pending",
+      lpDetectedAt: Date.now(),
+      reason: "LP detected",
     };
-    this.records.set(recordId, record);
-    this.emit("auto_trade_record_updated", record);
 
-    console.log(
-      `🤖 [Auto-Trader] İşlem başlatılıyor: ${symbol} | Tutma süresi: ${(config.holdDurationMs / 1000).toFixed(0)}s`
-    );
+    this.records.set(record.id, record);
+    console.log(`📝 Auto-trader kaydı oluşturuldu: ${symbol} (${mintAddress.slice(0, 8)}...)`);
 
-    // Burada manual olarak trader.buy() çağrılacak (routes.ts'de)
-    // Bu sadece kaydı oluşturuyor, gerçek alım routes.ts'de yapılıyor
+    this.emitter("auto_trade_record_updated", record);
   }
 
   /**
-   * Satış zamanı gelmiş işlemleri kontrol et
+   * Periyodik olarak pending satışları kontrol et
    */
-  private startSellChecker() {
-    this.sellCheckInterval = setInterval(() => {
-      this.checkAndSell();
-    }, 5000); // 5 saniyede bir kontrol et
-  }
-
-  private checkAndSell() {
-    if (!this.isRunning) return;
+  private checkAndExecute() {
+    const config = this.configStore.getConfig();
+    if (!config.enabled || !this.running) return;
 
     const now = Date.now();
+
     for (const [recordId, record] of this.records.entries()) {
-      if (record.status !== "active") continue;
-      
-      // Satış zamanı geçmiş mi?
-      if (now >= record.shouldSellAt) {
-        console.log(
-          `⏰ [Auto-Trader] Tutma süresi geçti: ${record.tokenSymbol} (${((now - record.buyTimestamp) / 1000).toFixed(0)}s)`
-        );
-        
-        // İlgili pozisyonu bul
-        const position = this.tradeStore.getByMint(record.mintAddress);
-        if (position && position.status === "open") {
-          this.emit("auto_sell_ready", { positionId: position.id });
-          record.status = "sold";
-          this.emit("auto_trade_record_updated", record);
+      // Satın aldı ve tutma süresi geçti mi?
+      if (record.status === "bought" && record.buyTxSignature && record.buyPrice !== undefined) {
+        const holdTime = now - (record.lpDetectedAt ?? 0);
+
+        if (holdTime > config.holdDurationMs) {
+          console.log(
+            `⏱️ Auto-sell trigger: ${record.tokenSymbol} | Tutma süresi geçti (${(holdTime / 1000).toFixed(0)}s)`
+          );
+          this.emitter("auto_sell_ready", { positionId: record.id, record });
         }
       }
     }
   }
 
   /**
-   * Manuel olarak alım kaydını güncelle (routes.ts tarafından çağrılır)
+   * Satın alma tamamlandığında çağırılır
    */
-  updateRecordAfterBuy(
-    mintAddress: string,
-    buyTxSignature: string,
-    buyPriceSol?: number,
-    buyTokenAmount?: number
-  ) {
-    // mintAddress ile başlayan record'u bul
+  updateRecordAfterBuy(mintAddress: string, txSignature: string, buyPrice: number, buyAmount?: number) {
     for (const [, record] of this.records.entries()) {
       if (record.mintAddress === mintAddress && record.status === "pending") {
-        record.status = "active";
-        record.buyTxSignature = buyTxSignature;
-        record.buyPriceSol = buyPriceSol;
-        record.buyTokenAmount = buyTokenAmount;
-        this.emit("auto_trade_record_updated", record);
-        console.log(
-          `✅ [Auto-Trader] Alım tamamlandı: ${record.tokenSymbol} | TX: ${buyTxSignature.slice(0, 16)}...`
-        );
+        record.status = "bought";
+        record.buyTxSignature = txSignature;
+        record.buyPrice = buyPrice;
+        record.buyAmount = buyAmount;
+        console.log(`✅ Auto-trade satın alındı: ${record.tokenSymbol}`);
+        this.emitter("auto_trade_record_updated", record);
         break;
       }
     }
   }
 
   /**
-   * Satış sonrası record'u güncelle
+   * Satış tamamlandığında çağırılır
    */
   updateRecordAfterSell(
     mintAddress: string,
-    sellTxSignature: string,
-    sellPriceSol?: number,
-    pnlSol?: number,
+    txSignature: string,
+    sellPrice: number,
+    pnl?: number,
     pnlPct?: number
   ) {
     for (const [, record] of this.records.entries()) {
-      if (record.mintAddress === mintAddress && record.status === "sold") {
-        record.sellPriceSol = sellPriceSol;
-        record.pnlSol = pnlSol;
+      if (record.mintAddress === mintAddress && record.status === "bought") {
+        record.status = "sold";
+        record.sellTxSignature = txSignature;
+        record.sellPrice = sellPrice;
+        record.pnl = pnl;
         record.pnlPct = pnlPct;
-        this.emit("auto_trade_record_updated", record);
-        console.log(
-          `✅ [Auto-Trader] Satış tamamlandı: ${record.tokenSymbol} | PnL: ${pnlSol?.toFixed(4) || "?"} SOL (${pnlPct?.toFixed(1) || "?"}%)`
-        );
+        console.log(`✅ Auto-trade satışı tamamlandı: ${record.tokenSymbol} | PnL: ${(pnlPct ?? 0).toFixed(2)}%`);
+        this.emitter("auto_trade_record_updated", record);
         break;
       }
     }
   }
 
-  /**
-   * Hata durumunda record'u güncelle
-   */
-  markRecordFailed(mintAddress: string, error: string) {
-    for (const [, record] of this.records.entries()) {
-      if (record.mintAddress === mintAddress && (record.status === "pending" || record.status === "active")) {
-        record.status = "failed";
-        record.error = error;
-        this.emit("auto_trade_record_updated", record);
-        console.error(
-          `❌ [Auto-Trader] Hata: ${record.tokenSymbol} | ${error}`
-        );
-        break;
-      }
-    }
+  getRecords(): AutoTradeRecord[] {
+    return Array.from(this.records.values()).reverse();
+  }
+
+  isRunning(): boolean {
+    return this.running;
   }
 }
