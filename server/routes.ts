@@ -5,6 +5,8 @@ import { HeliusMonitor } from "./helius-monitor";
 import { JupiterTrader } from "./jupiter-trader";
 import { TradeStore } from "./trade-store";
 import { PositionPricer } from "./position-pricer";
+import { AutoTraderConfigStore } from "./auto-trader-config";
+import { AutoTraderEngine } from "./auto-trader-engine";
 import { saveSecrets } from "./secrets-loader";
 import fs from "fs";
 import path from "path";
@@ -19,6 +21,8 @@ const ALLOWED_FILES = [
   "server/storage.ts",
   "server/jupiter-trader.ts",
   "server/trade-store.ts",
+  "server/auto-trader-config.ts",
+  "server/auto-trader-engine.ts",
   "shared/schema.ts",
   "data/secrets.json",
 ];
@@ -167,6 +171,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const trader = new JupiterTrader(tradeStore, (event, data) => {
     if (event === "position_update") {
       broadcastToClients({ type: "position_update", data });
+      
+      // Auto-trader'a pozisyon güncellemesini bildir
+      if (data.status === "open" && data.buyTxSignature) {
+        autoTraderEngine.updateRecordAfterBuy(
+          data.mintAddress,
+          data.buyTxSignature,
+          data.buyPriceSol,
+          data.buyTokenAmount
+        );
+      }
+      if (data.status === "closed" && data.sellTxSignature) {
+        autoTraderEngine.updateRecordAfterSell(
+          data.mintAddress,
+          data.sellTxSignature,
+          data.sellPriceSol,
+          data.pnlSol,
+          data.pnlPct
+        );
+      }
     } else if (event === "trade_config_update") {
       broadcastToClients({ type: "trade_config_update", data });
     }
@@ -179,6 +202,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           positions: tradeStore.getAll(),
           config: tradeStore.getConfig(),
+          autoTraderConfig: autoTraderConfigStore.getConfig(),
+          autoTraderRunning: autoTraderEngine.isRunning(),
           traderPublicKey: trader.getPublicKey(),
           traderReady: trader.isReady(),
           solPriceUsd: monitor.getSolPriceUsd(),
@@ -188,11 +213,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
   // -------------------------------
 
+  // ---- Auto Trader Kurulum ----
+  const autoTraderConfigStore = new AutoTraderConfigStore();
+  const autoTraderEngine = new AutoTraderEngine(
+    autoTraderConfigStore,
+    tradeStore,
+    (event: string, data: any) => {
+      if (event === "auto_trade_record_updated") {
+        broadcastToClients({ type: "auto_trade_record_updated", data });
+      } else if (event === "auto_sell_ready") {
+        // Otomatik satış yapılacak pozisyon
+        trader.sell(data.positionId).catch((err) => console.error("Auto-sell hatası:", err));
+      }
+    }
+  );
+
+  // Otomatik trader enabled ise başlat
+  if (autoTraderConfigStore.getConfig().enabled) {
+    autoTraderEngine.start();
+  }
+  // ----------------------------
+
   const monitor = new HeliusMonitor((event: string, data: any) => {
     if (event === "mint_detected") {
       broadcastToClients({ type: "mint_detected", data });
     } else if (event === "lp_detected") {
       broadcastToClients({ type: "lp_detected", data });
+      // Otomatik trader'a LP bildirimi gönder
+      autoTraderEngine.onLPDetected(data).catch((err) => console.error("Auto-trader LP hatası:", err));
     } else if (event === "connection_status") {
       broadcastToClients({ type: "connection_status", data });
     } else if (event === "monitoring_state") {
@@ -228,6 +276,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })
     );
     sendPositionsSnapshot(ws);
+
+    // Auto-trader config'i gönder
+    ws.send(
+      JSON.stringify({
+        type: "auto_trader_config_snapshot",
+        data: {
+          config: autoTraderConfigStore.getConfig(),
+          records: autoTraderEngine.getRecords(),
+        },
+      })
+    );
 
     ws.on("message", async (data: Buffer) => {
       try {
@@ -279,6 +338,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (typeof priorityFeeMicroLamports === "number" && priorityFeeMicroLamports >= 0) partial.priorityFeeMicroLamports = priorityFeeMicroLamports;
           if (typeof takeProfitPct === "number" && takeProfitPct >= 0) partial.takeProfitPct = takeProfitPct;
           if (Object.keys(partial).length) trader.updateConfig(partial as any);
+        } else if (message.type === "auto_trader_config_update") {
+          // Otomatik trader konfigürasyonu güncelle
+          const { solAmountPerTrade, maxTokensHeld, holdDurationMs, profitTargetPct, stopLossPct, slippageBps, priorityFeeMicroLamports, enabled } = message.data || {};
+          const partial: Record<string, any> = {};
+          if (typeof solAmountPerTrade === "number" && solAmountPerTrade > 0) partial.solAmountPerTrade = solAmountPerTrade;
+          if (typeof maxTokensHeld === "number" && maxTokensHeld > 0) partial.maxTokensHeld = maxTokensHeld;
+          if (typeof holdDurationMs === "number" && holdDurationMs > 0) partial.holdDurationMs = holdDurationMs;
+          if (typeof profitTargetPct === "number" && profitTargetPct >= 0) partial.profitTargetPct = profitTargetPct;
+          if (typeof stopLossPct === "number" && stopLossPct >= 0) partial.stopLossPct = stopLossPct;
+          if (typeof slippageBps === "number" && slippageBps >= 50) partial.slippageBps = slippageBps;
+          if (typeof priorityFeeMicroLamports === "number" && priorityFeeMicroLamports >= 0) partial.priorityFeeMicroLamports = priorityFeeMicroLamports;
+          if (typeof enabled === "boolean") {
+            if (enabled) {
+              autoTraderEngine.start();
+            } else {
+              autoTraderEngine.stop();
+            }
+            partial.enabled = enabled;
+          }
+          
+          const updatedConfig = autoTraderConfigStore.updateConfig(partial);
+          broadcastToClients({
+            type: "auto_trader_config_updated",
+            data: { config: updatedConfig },
+          });
+        } else if (message.type === "toggle_auto_trader") {
+          // Otomatik trader'i aç/kapat
+          const { enabled } = message.data || {};
+          if (typeof enabled === "boolean") {
+            autoTraderConfigStore.updateConfig({ enabled });
+            if (enabled) {
+              autoTraderEngine.start();
+            } else {
+              autoTraderEngine.stop();
+            }
+            broadcastToClients({
+              type: "auto_trader_config_updated",
+              data: { config: autoTraderConfigStore.getConfig() },
+            });
+          }
         } else if (message.type === "delete_position") {
           const { positionId } = message.data || {};
           if (positionId) {
@@ -300,6 +399,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } else if (message.type === "request_positions") {
           sendPositionsSnapshot(ws);
+        } else if (message.type === "request_auto_trader_status") {
+          ws.send(
+            JSON.stringify({
+              type: "auto_trader_config_snapshot",
+              data: {
+                config: autoTraderConfigStore.getConfig(),
+                records: autoTraderEngine.getRecords(),
+              },
+            })
+          );
         }
       } catch {
         // ignore
@@ -320,8 +429,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     _origError("❌ WebSocket Server hatası:", error);
   });
 
-  process.on("SIGTERM", () => { monitor.stop(); wss.close(); });
-  process.on("SIGINT",  () => { monitor.stop(); wss.close(); });
+  process.on("SIGTERM", () => { monitor.stop(); autoTraderEngine.stop(); wss.close(); });
+  process.on("SIGINT",  () => { monitor.stop(); autoTraderEngine.stop(); wss.close(); });
 
   return httpServer;
 }
