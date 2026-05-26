@@ -72,6 +72,10 @@ export class AutoTraderEngine {
     console.log("🛑 Otomatik Trading Motoru durduruldu");
   }
 
+  getIsRunning(): boolean {
+    return this.isRunning;
+  }
+
   getRecords(): AutoTradeRecord[] {
     return Array.from(this.records.values());
   }
