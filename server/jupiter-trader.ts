@@ -224,8 +224,8 @@ export class JupiterTrader {
   }
 
   // ========== JUPITER ALIM ==========
-  async buy(input: { mintAddress: string; name: string; symbol: string }): Promise<Position | null> {
-    const { mintAddress, name, symbol } = input;
+  async buy(input: { mintAddress: string; name: string; symbol: string; solAmount?: number }): Promise<Position | null> {
+    const { mintAddress, name, symbol, solAmount } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
     const existing = this.store.getByMint(mintAddress);
@@ -236,21 +236,22 @@ export class JupiterTrader {
 
     this.inFlight.add(`buy:${mintAddress}`);
     const config = this.store.getConfig();
-    const lamports = Math.floor(config.solAmount * 1e9);
+    const actualSolAmount = solAmount ?? config.solAmount;
+    const lamports = Math.floor(actualSolAmount * 1e9);
     const id = `pos-${mintAddress}-${Date.now()}`;
     let position: Position = {
       id, mintAddress, name, symbol, dex: "jupiter",
-      status: "pending_buy", buyTimestamp: Date.now(), buySolAmount: config.solAmount,
+      status: "pending_buy", buyTimestamp: Date.now(), buySolAmount: actualSolAmount,
     };
     this.updateAndEmit(position);
-    console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${config.solAmount} SOL`);
+    console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL`);
 
     try {
       const result = await this.withRetry(async () => {
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
         const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
-        const pricePerToken = tokensOut > 0 ? config.solAmount / tokensOut : 0;
+        const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
         const sig = await this.swap(quote, config.priorityFeeMicroLamports);
         return { sig, tokensOut, pricePerToken };
       }, `Jupiter Buy ${symbol}`);
@@ -271,8 +272,8 @@ export class JupiterTrader {
   }
 
   // ========== PUMPSWAP ALIM ==========
-  async buyPumpSwap(input: { mintAddress: string; name: string; symbol: string }): Promise<Position | null> {
-    const { mintAddress, name, symbol } = input;
+  async buyPumpSwap(input: { mintAddress: string; name: string; symbol: string; solAmount?: number }): Promise<Position | null> {
+    const { mintAddress, name, symbol, solAmount } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — PumpSwap alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
     const existing = this.store.getByMint(mintAddress);
@@ -283,20 +284,21 @@ export class JupiterTrader {
 
     this.inFlight.add(`buy:${mintAddress}`);
     const config = this.store.getConfig();
+    const actualSolAmount = solAmount ?? config.solAmount;
     const id = `pos-${mintAddress}-${Date.now()}`;
     let position: Position = {
       id, mintAddress, name, symbol, dex: "pumpswap",
-      status: "pending_buy", buyTimestamp: Date.now(), buySolAmount: config.solAmount,
+      status: "pending_buy", buyTimestamp: Date.now(), buySolAmount: actualSolAmount,
     };
     this.updateAndEmit(position);
-    console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${config.solAmount} SOL`);
+    console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${actualSolAmount} SOL`);
 
     const slippagePct = Math.floor(config.slippageBps / 100);
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     try {
       const sig = await this.withRetry(
-        () => this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: config.solAmount, denominatedInSol: true, slippagePct, priorityFeeSol }),
+        () => this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol }),
         `PumpSwap Buy ${symbol}`,
       );
 

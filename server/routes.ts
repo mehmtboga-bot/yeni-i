@@ -226,15 +226,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { mintAddress, name, symbol, dex } = data;
         const nm = name || "Bilinmiyor";
         const sym = symbol || "?";
-        console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"}`);
+        const autoConfig = autoTraderConfigStore.getConfig();
+        const solAmount = autoConfig.solAmountPerTrade;
+        console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
         if (dex === "pumpswap") {
-          trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym })
+          trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
             .catch((err) => {
               console.error("Auto-buy (PumpSwap) hatası:", err);
               autoTraderEngine.markRecordFailed(mintAddress, String(err));
             });
         } else {
-          trader.buy({ mintAddress, name: nm, symbol: sym })
+          trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
             .catch((err) => {
               console.error("Auto-buy hatası:", err);
               autoTraderEngine.markRecordFailed(mintAddress, String(err));
