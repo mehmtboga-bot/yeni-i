@@ -65,6 +65,7 @@ export const tradeConfigSchema = z.object({
   slippageBps: z.number().min(50).max(1_000_000),
   priorityFeeMicroLamports: z.number().min(0).max(100_000_000),
   takeProfitPct: z.number().min(0).max(10000).optional().default(0),
+  stopLossPct: z.number().min(0).max(10000).optional().default(0),
 });
 
 export type TradeConfig = z.infer<typeof tradeConfigSchema>;

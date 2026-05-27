@@ -13,6 +13,8 @@ export class PositionPricer {
 
   // Yanlış fiyat spike'larını filtrele: art arda kaç kez hedef aşıldı
   private aboveThresholdCount: Map<string, number> = new Map();
+  // Stop-loss: art arda kaç kez zarar limitinin altında kaldı
+  private belowStopLossCount: Map<string, number> = new Map();
   // Son bilinen geçerli fiyat (spike tespiti için)
   private lastValidPrice: Map<string, number> = new Map();
   
@@ -168,6 +170,25 @@ export class PositionPricer {
           if (!fresh || fresh.status === "closed") {
             this.autoSellInFlight.delete(pos.id);
           }
+        }
+      }
+
+      // Stop-loss: zarar limitine ulaşınca satış (art arda 2 okuma gerekli)
+      const stopLossPct = config.stopLossPct ?? 0;
+      if (stopLossPct > 0 && unrealizedPnlPct <= -stopLossPct) {
+        const count = (this.belowStopLossCount.get(pos.id) ?? 0) + 1;
+        this.belowStopLossCount.set(pos.id, count);
+
+        if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onAutoSell) {
+          this.autoSellInFlight.add(pos.id);
+          this.belowStopLossCount.delete(pos.id);
+          console.log(`🛑 [Pricer] Stop-loss: ${pos.symbol} ${unrealizedPnlPct.toFixed(1)}%`);
+          this.onAutoSell(pos.id);
+        }
+      } else {
+        // Stop-loss altında değilse — sayacı sıfırla
+        if (this.belowStopLossCount.has(pos.id)) {
+          this.belowStopLossCount.delete(pos.id);
         }
       }
     }
