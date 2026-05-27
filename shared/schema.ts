@@ -80,6 +80,7 @@ export const autoTraderConfigSchema = z.object({
   slippageBps: z.number(),
   priorityFeeMicroLamports: z.number(),
   minLiquidityUsd: z.number(),
+  skipRecentlyTradedSymbols: z.boolean().optional().default(true),
 });
 
 export type AutoTraderConfig = z.infer<typeof autoTraderConfigSchema>;
