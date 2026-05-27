@@ -151,18 +151,56 @@ export class AutoTraderEngine {
     if (!this.isRunning) return;
 
     const now = Date.now();
+    const config = this.configStore.getConfig();
+
     for (const [recordId, record] of this.records.entries()) {
       if (record.status !== "active") continue;
-      
+
       // Satış zamanı geçmiş mi?
       if (now >= record.shouldSellAt) {
-        console.log(
-          `⏰ [Auto-Trader] Tutma süresi geçti: ${record.tokenSymbol} (${((now - record.buyTimestamp) / 1000).toFixed(0)}s)`
-        );
-        
-        // İlgili pozisyonu bul
         const position = this.tradeStore.getByMint(record.mintAddress);
         if (position && position.status === "open") {
+          const unrealizedPnlPct = position.unrealizedPnlPct ?? 0;
+          const elapsedMs = now - record.buyTimestamp;
+          const holdDurationMs = config.holdDurationMs;
+          const isDoubleTimeExceeded = elapsedMs >= holdDurationMs * 2;
+
+          // Tutma süresi 2 katını aştıysa, zarar olarak kapatsin
+          if (isDoubleTimeExceeded) {
+            console.log(
+              `⏱️ [Auto-Trader] Tutma süresi 2 katını aştı: ${record.tokenSymbol} (${(elapsedMs / 1000).toFixed(0)}s) — zarar olarak kapatılıyor`
+            );
+            this.emit("auto_sell_ready", { positionId: position.id, forceClose: true, pnlPct: -100 });
+            record.status = "sold";
+            this.emit("auto_trade_record_updated", record);
+            continue;
+          }
+
+          // Kar >= 2X (100%+) ise, satmadan devam et
+          if (unrealizedPnlPct >= 100) {
+            console.log(
+              `💰 [Auto-Trader] Kar hedefi: ${record.tokenSymbol} +${unrealizedPnlPct.toFixed(1)}% — tutmaya devam`
+            );
+            // shouldSellAt'ı 1 dakika uzat
+            record.shouldSellAt = now + 60000;
+            continue;
+          }
+
+          // Zarar varsa, kapatsin
+          if (unrealizedPnlPct < 0) {
+            console.log(
+              `📉 [Auto-Trader] Zarar: ${record.tokenSymbol} ${unrealizedPnlPct.toFixed(1)}% — kapatılıyor`
+            );
+            this.emit("auto_sell_ready", { positionId: position.id });
+            record.status = "sold";
+            this.emit("auto_trade_record_updated", record);
+            continue;
+          }
+
+          // Kar < 2X ise, normal satış
+          console.log(
+            `⏰ [Auto-Trader] Tutma süresi geçti: ${record.tokenSymbol} (${(elapsedMs / 1000).toFixed(0)}s)`
+          );
           this.emit("auto_sell_ready", { positionId: position.id });
           record.status = "sold";
           this.emit("auto_trade_record_updated", record);
