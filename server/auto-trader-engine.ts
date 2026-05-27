@@ -95,7 +95,7 @@ export class AutoTraderEngine {
     }
 
     // Minimum likidite kontrolü
-    const liquidityUsd: number | undefined = lpData.liquidityUsd ?? lpData.tvlUsd;
+    const liquidityUsd: number | undefined = lpData.tvlUsd ?? lpData.liquidityUsd;
     if (config.minLiquidityUsd > 0 && (liquidityUsd === undefined || liquidityUsd < config.minLiquidityUsd)) {
       console.log(
         `🚫 [Auto-Trader] Düşük likidite — ${symbol} atlanıyor | Likidite: ${liquidityUsd?.toFixed(0) ?? "?"} | Eşik: ${config.minLiquidityUsd}`
