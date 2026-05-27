@@ -10,6 +10,7 @@ const DEFAULT_CONFIG: TradeConfig = {
   slippageBps: 5000,
   priorityFeeMicroLamports: 20_000_000,
   takeProfitPct: 0,
+  stopLossPct: 0,
 };
 
 interface StoreData {
