@@ -17,6 +17,7 @@ export interface AutoTraderConfig {
   slippageBps: number;              // Slippage (bps)
   priorityFeeMicroLamports: number; // Priority fee
   minLiquidityUsd: number;          // Minimum likidite eşiği (USD)
+  skipRecentlyTradedSymbols: boolean; // Son 7 işlemde aynı symbol varsa atla
 }
 
 const DEFAULT_CONFIG: AutoTraderConfig = {
@@ -29,6 +30,7 @@ const DEFAULT_CONFIG: AutoTraderConfig = {
   slippageBps: 5000,               // %50 slippage
   priorityFeeMicroLamports: 1_000_000,
   minLiquidityUsd: 5000,           // Minimum $5,000 likidite
+  skipRecentlyTradedSymbols: true, // Son 7 işlemde aynı symbol varsa atla
 };
 
 const DATA_DIR = path.join(process.cwd(), "data");

@@ -38,6 +38,8 @@ export class AutoTraderEngine {
   private isRunning = false;
   private sellCheckInterval: NodeJS.Timeout | null = null;
   private processedLPs: Set<string> = new Set();
+  private recentlyClosedTrades: Array<{ symbol: string; closedAt: number }> = [];
+  private readonly MAX_RECENT_TRADES = 7;
 
   constructor(
     configStore: AutoTraderConfigStore,
@@ -101,6 +103,17 @@ export class AutoTraderEngine {
         `🚫 [Auto-Trader] Düşük likidite — ${symbol} atlanıyor | Likidite: ${liquidityUsd?.toFixed(0) ?? "?"} | Eşik: ${config.minLiquidityUsd}`
       );
       return;
+    }
+
+    // Son 7 işlemde aynı symbol varsa, almaz
+    if (config.skipRecentlyTradedSymbols) {
+      const isRecentlyTraded = this.recentlyClosedTrades.some((t) => t.symbol === symbol);
+      if (isRecentlyTraded) {
+        console.log(
+          `⏭️ [Auto-Trader] ${symbol} son 7 işlemde var, atlanıyor`
+        );
+        return;
+      }
     }
 
     // Max token kontrol
@@ -234,10 +247,16 @@ export class AutoTraderEngine {
         console.log(
           `✅ [Auto-Trader] Satış tamamlandı: ${record.tokenSymbol} | PnL: ${pnlSol?.toFixed(4) || "?"} SOL (${pnlPct?.toFixed(1) || "?"}%)`
         );
+        // Son 7 işlem kaydına ekle
+        this.recentlyClosedTrades.push({ symbol: record.tokenSymbol, closedAt: Date.now() });
+        if (this.recentlyClosedTrades.length > this.MAX_RECENT_TRADES) {
+          this.recentlyClosedTrades.shift(); // En eski işlemi çıkar
+        }
         break;
       }
     }
   }
+
 
   /**
    * Hata durumunda record'u güncelle
