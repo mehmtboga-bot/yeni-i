@@ -324,9 +324,12 @@ export default function Home() {
       } else if (msg.type === "trade_config_update") {
         setTradeConfig(msg.data);
         try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data)); } catch {}
-      } else if (msg.type === "auto_trader_config_update") {
-        setAutoTraderConfig(msg.data);
-        try { localStorage.setItem("autoTraderConfig", JSON.stringify(msg.data)); } catch {}
+      } else if (msg.type === "auto_trader_config_update" || msg.type === "auto_trader_config_updated") {
+        // Sunucu "auto_trader_config_updated" (geçmiş zaman) gönderir;
+        // her iki varyantı da destekle.
+        const cfgData = msg.data?.config ?? msg.data;
+        setAutoTraderConfig(cfgData);
+        try { localStorage.setItem("autoTraderConfig", JSON.stringify(cfgData)); } catch {}
       } else if (msg.type === "auto_trader_state") {
         setAutoTraderRunning(msg.data.running);
       }
