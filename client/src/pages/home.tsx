@@ -295,7 +295,7 @@ export default function Home() {
               message: msg.data.message,
               timestamp: msg.data.timestamp,
             },
-          ].slice(-300);
+          ].slice(-50);
           try { localStorage.setItem("serverLogs", JSON.stringify(next)); } catch {}
           return next;
         });

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface ServerLog {
@@ -13,6 +13,7 @@ interface LogPanelProps {
   open: boolean;
   logs: ServerLog[];
   onClose: () => void;
+  onClear: () => void;
 }
 
 const levelStyle: Record<ServerLog["level"], string> = {
@@ -35,7 +36,7 @@ function formatTime(ts: number) {
   return `${h}:${m}:${s}`;
 }
 
-export function LogPanel({ open, logs, onClose }: LogPanelProps) {
+export function LogPanel({ open, logs, onClose, onClear }: LogPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Yeni log gelince en alta kaydır
@@ -77,15 +78,27 @@ export function LogPanel({ open, logs, onClose }: LogPanelProps) {
               ({logs.length} satır)
             </span>
           </div>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={onClose}
-            className="h-7 w-7 text-zinc-400 hover:text-zinc-100"
-            data-testid="button-close-log-panel"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={onClear}
+              className="h-7 w-7 text-zinc-400 hover:text-zinc-100"
+              title="Logları temizle"
+              data-testid="button-clear-log-panel"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={onClose}
+              className="h-7 w-7 text-zinc-400 hover:text-zinc-100"
+              data-testid="button-close-log-panel"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Log alanı */}
