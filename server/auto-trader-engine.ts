@@ -51,7 +51,6 @@ export class AutoTraderEngine {
 
   start() {
     if (this.isRunning) {
-      console.warn("⚠️ Auto-trader zaten çalışıyor");
       return;
     }
     this.isRunning = true;
@@ -61,7 +60,6 @@ export class AutoTraderEngine {
 
   stop() {
     if (!this.isRunning) {
-      console.warn("⚠️ Auto-trader zaten durdurulmuş");
       return;
     }
     this.isRunning = false;
