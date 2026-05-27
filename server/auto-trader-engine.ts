@@ -144,7 +144,7 @@ export class AutoTraderEngine {
   private startSellChecker() {
     this.sellCheckInterval = setInterval(() => {
       this.checkAndSell();
-    }, 5000); // 5 saniyede bir kontrol et
+    }, 1000); // 1 saniyede bir kontrol et
   }
 
   private checkAndSell() {
@@ -187,9 +187,14 @@ export class AutoTraderEngine {
         record.buyTxSignature = buyTxSignature;
         record.buyPriceSol = buyPriceSol;
         record.buyTokenAmount = buyTokenAmount;
+
+        // Satış zamanını alım onaylandığında yeniden hesapla
+        const config = this.configStore.getConfig();
+        record.shouldSellAt = Date.now() + config.holdDurationMs;
+
         this.emit("auto_trade_record_updated", record);
         console.log(
-          `✅ [Auto-Trader] Alım tamamlandı: ${record.tokenSymbol} | TX: ${buyTxSignature.slice(0, 16)}...`
+          `✅ [Auto-Trader] Alım tamamlandı: ${record.tokenSymbol} | TX: ${buyTxSignature.slice(0, 16)}... | Satış: ${(config.holdDurationMs / 1000).toFixed(0)}s sonra`
         );
         break;
       }
