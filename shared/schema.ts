@@ -56,6 +56,7 @@ export const positionSchema = z.object({
   unrealizedPnlSol: z.number().optional(),
   unrealizedPnlPct: z.number().optional(),
   error: z.string().optional(),
+  autoSellAt: z.number().optional(),  // Auto-trader satış zamanı (timestamp)
 });
 
 export type Position = z.infer<typeof positionSchema>;

@@ -245,6 +245,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (event === "auto_sell_ready") {
         // Otomatik satış yapılacak pozisyon
         trader.sell(data.positionId).catch((err) => console.error("Auto-sell hatası:", err));
+      } else if (event === "auto_sell_at_updated") {
+        // Position'a autoSellAt bilgisini ekle ve yayınla
+        const { mintAddress, autoSellAt } = data as { mintAddress: string; autoSellAt: number };
+        const pos = tradeStore.getByMint(mintAddress);
+        if (pos) {
+          const updated = { ...pos, autoSellAt };
+          tradeStore.upsert(updated);
+          broadcastToClients({ type: "position_update", data: updated });
+        }
       }
     }
   );
