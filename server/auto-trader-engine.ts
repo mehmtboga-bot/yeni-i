@@ -193,12 +193,26 @@ export class AutoTraderEngine {
         record.shouldSellAt = Date.now() + config.holdDurationMs;
 
         this.emit("auto_trade_record_updated", record);
+        // Position'a autoSellAt bilgisini ekle
+        this.emit("auto_sell_at_updated", { mintAddress, autoSellAt: record.shouldSellAt });
         console.log(
           `✅ [Auto-Trader] Alım tamamlandı: ${record.tokenSymbol} | TX: ${buyTxSignature.slice(0, 16)}... | Satış: ${(config.holdDurationMs / 1000).toFixed(0)}s sonra`
         );
         break;
       }
     }
+  }
+
+  /**
+   * Belirli bir mintAddress için shouldSellAt değerini döndür
+   */
+  getShouldSellAt(mintAddress: string): number | undefined {
+    for (const [, record] of this.records.entries()) {
+      if (record.mintAddress === mintAddress && (record.status === "active" || record.status === "pending")) {
+        return record.shouldSellAt;
+      }
+    }
+    return undefined;
   }
 
   /**

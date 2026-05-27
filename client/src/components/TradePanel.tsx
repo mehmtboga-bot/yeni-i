@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -282,6 +282,25 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
   const profitPositive = (profitPct ?? 0) >= 0;
   const nearTarget = takeProfitPct > 0 && isOpen && profitPct !== null && profitPct >= takeProfitPct * 0.8;
 
+  // Auto-sell countdown
+  const [autoSellSecsLeft, setAutoSellSecsLeft] = useState<number | null>(() => {
+    if (!p.autoSellAt) return null;
+    return Math.max(0, Math.floor((p.autoSellAt - Date.now()) / 1000));
+  });
+
+  useEffect(() => {
+    if (!p.autoSellAt) {
+      setAutoSellSecsLeft(null);
+      return;
+    }
+    const update = () => {
+      setAutoSellSecsLeft(Math.max(0, Math.floor((p.autoSellAt! - Date.now()) / 1000)));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [p.autoSellAt]);
+
   return (
     <div
       className={`bg-card border rounded-lg p-3 ${
@@ -317,6 +336,23 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                 {profitPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                 {profitPositive ? "+" : ""}{profitPct.toFixed(1)}%
                 {nearTarget && takeProfitPct > 0 && ` → %${takeProfitPct}`}
+              </Badge>
+            )}
+            {autoSellSecsLeft !== null && isOpen && (
+              <Badge
+                className={`text-xs gap-1 font-bold font-mono ${
+                  autoSellSecsLeft === 0
+                    ? "bg-orange-500/20 text-orange-300 border border-orange-400/60 animate-pulse"
+                    : autoSellSecsLeft <= 10
+                    ? "bg-red-500/20 text-red-300 border border-red-400/60 animate-pulse"
+                    : autoSellSecsLeft <= 30
+                    ? "bg-orange-500/15 text-orange-400 border border-orange-500/40"
+                    : "bg-amber-500/15 text-amber-400 border border-amber-500/40"
+                }`}
+                title="Auto-trader otomatik satış zamanı"
+              >
+                <Timer className="h-3 w-3" />
+                {autoSellSecsLeft === 0 ? "Satış Bekleniyor" : `Satışa Kalan: ${autoSellSecsLeft}s`}
               </Badge>
             )}
             <span className="text-[10px] text-muted-foreground ml-auto">{formatTime(p.buyTimestamp)}</span>
