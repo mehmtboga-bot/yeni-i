@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Settings, Play, Square, AlertCircle, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,20 @@ export function AutoTraderPanel({
   const [slippageInput, setSlippageInput] = useState(String(config.slippageBps));
   const [priorityInput, setPriorityInput] = useState(String(config.priorityFeeMicroLamports));
   const [minLiquidityInput, setMinLiquidityInput] = useState(String(config.minLiquidityUsd ?? 5000));
+
+  // Sunucudan gelen config değiştiğinde (positions_snapshot veya auto_trader_config_update)
+  // input state'lerini güncelle — böylece sayfa yenilemesinde veya yeniden bağlanmada
+  // sunucunun kalıcı olarak sakladığı ayarlar panele yansır.
+  useEffect(() => {
+    setSolAmountInput(String(config.solAmountPerTrade));
+    setMaxTokensInput(String(config.maxTokensHeld));
+    setHoldDurationInput(String(config.holdDurationMs / 1000));
+    setProfitTargetInput(String(config.profitTargetPct));
+    setStopLossInput(String(config.stopLossPct));
+    setSlippageInput(String(config.slippageBps));
+    setPriorityInput(String(config.priorityFeeMicroLamports));
+    setMinLiquidityInput(String(config.minLiquidityUsd ?? 5000));
+  }, [config]);
 
   const saveConfig = () => {
     const partial: Partial<AutoTraderConfig> = {};
