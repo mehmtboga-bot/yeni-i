@@ -356,13 +356,14 @@ export class JupiterTrader {
 
     // Token bakiyesini retry ile çek (indexer gecikmesi olabilir)
     const fetchBalanceWithRetry = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
-      for (let attempt = 0; attempt < 5; attempt++) {
+      for (let attempt = 0; attempt < 2; attempt++) {
         if (attempt > 0) await new Promise((r) => setTimeout(r, 1500 * attempt));
         const bal = await this.getTokenBalance(pos.mintAddress);
         if (bal && bal.uiAmount > 0) return bal;
-        console.warn(`⏳ [Satış] Bakiye henüz yok (deneme ${attempt + 1}/5)...`);
+        console.warn(`⏳ [Satış] Bakiye henüz yok (deneme ${attempt + 1}/2)...`);
       }
-      throw new Error(`Cüzdanda ${pos.symbol} bakiyesi bulunamadı (5 deneme)`);
+      // Rug pull — token bakiyesi 2 denemede de bulunamadı
+      throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
     };
 
     try {
@@ -432,6 +433,26 @@ export class JupiterTrader {
       return updated;
     } catch (err) {
       const message = (err as Error).message || String(err);
+
+      // Rug pull tespiti — token bakiyesi bulunamadı, pozisyonu -%100 zararla kapat
+      if (message.includes("RUG_PULL")) {
+        const rugPullLoss = -(pos.buySolAmount ?? 0);
+        updated = {
+          ...pos,
+          status: "closed",
+          sellTimestamp: Date.now(),
+          sellSolAmount: 0,
+          sellPriceSol: 0,
+          pnlSol: rugPullLoss,
+          pnlPct: -100,
+          error: "Rug Pull Detected",
+        };
+        this.updateAndEmit(updated);
+        console.error(`🚨 [Rug Pull] ${pos.symbol} — -%100 zarar olarak kapatıldı`);
+        return updated;
+      }
+
+      // Normal hata işleme
       updated = { ...pos, status: "open", error: message };
       this.updateAndEmit(updated);
       console.error(`❌ [${dexLabel}] SATIŞ hatası ${pos.symbol}:`, message);
