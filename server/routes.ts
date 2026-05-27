@@ -378,6 +378,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               type: "auto_trader_config_updated",
               data: { config: autoTraderConfigStore.getConfig() },
             });
+            broadcastToClients({
+              type: "auto_trader_state",
+              data: { running: autoTraderEngine.getIsRunning() },
+            });
           }
         } else if (message.type === "delete_position") {
           const { positionId } = message.data || {};
