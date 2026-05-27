@@ -221,6 +221,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     (event: string, data: any) => {
       if (event === "auto_trade_record_updated") {
         broadcastToClients({ type: "auto_trade_record_updated", data });
+      } else if (event === "auto_buy_ready") {
+        // Otomatik alım — LP tespit edildi, token satın al
+        const { mintAddress, name, symbol, dex } = data;
+        const nm = name || "Bilinmiyor";
+        const sym = symbol || "?";
+        console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"}`);
+        if (dex === "pumpswap") {
+          trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym })
+            .catch((err) => {
+              console.error("Auto-buy (PumpSwap) hatası:", err);
+              autoTraderEngine.markRecordFailed(mintAddress, String(err));
+            });
+        } else {
+          trader.buy({ mintAddress, name: nm, symbol: sym })
+            .catch((err) => {
+              console.error("Auto-buy hatası:", err);
+              autoTraderEngine.markRecordFailed(mintAddress, String(err));
+            });
+        }
       } else if (event === "auto_sell_ready") {
         // Otomatik satış yapılacak pozisyon
         trader.sell(data.positionId).catch((err) => console.error("Auto-sell hatası:", err));

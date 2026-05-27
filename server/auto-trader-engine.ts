@@ -134,8 +134,8 @@ export class AutoTraderEngine {
       `🤖 [Auto-Trader] İşlem başlatılıyor: ${symbol} | Tutma süresi: ${(config.holdDurationMs / 1000).toFixed(0)}s`
     );
 
-    // Burada manual olarak trader.buy() çağrılacak (routes.ts'de)
-    // Bu sadece kaydı oluşturuyor, gerçek alım routes.ts'de yapılıyor
+    // Alım emri ver — routes.ts bu event'i dinleyip trader.buy() çağırır
+    this.emit("auto_buy_ready", { mintAddress, name, symbol, dex: lpData.dex });
   }
 
   /**
