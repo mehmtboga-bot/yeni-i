@@ -39,6 +39,7 @@ export class AutoTraderEngine {
   private isRunning = false;
   private sellCheckInterval: NodeJS.Timeout | null = null;
   private processedLPs: Set<string> = new Set();
+  private seenTokenSymbols: Set<string> = new Set(); // Daha önce görülen symbol/name kombinasyonları
   private recentlyClosedTrades: Array<{ symbol: string; closedAt: number }> = [];
   private readonly MAX_RECENT_TRADES = 7;
   private liquidityDropInFlight: Set<string> = new Set(); // Likidite kontrolü devam eden kayıtlar
@@ -106,6 +107,16 @@ export class AutoTraderEngine {
       );
       return;
     }
+
+    // Daha önce görülen symbol/name kombinasyonu mu?
+    const tokenKey = `${symbol}:${name}`.toLowerCase();
+    if (this.seenTokenSymbols.has(tokenKey)) {
+      console.log(
+        `⏭️ [Auto-Trader] ${symbol} (${name}) daha önce görüldü, atlanıyor`
+      );
+      return;
+    }
+    this.seenTokenSymbols.add(tokenKey);
 
     // Son 7 işlemde aynı symbol varsa, almaz
     if (config.skipRecentlyTradedSymbols) {
@@ -318,6 +329,9 @@ export class AutoTraderEngine {
         console.log(
           `✅ [Auto-Trader] Satış tamamlandı: ${record.tokenSymbol} | PnL: ${pnlSol?.toFixed(4) || "?"} SOL (${pnlPct?.toFixed(1) || "?"}%)`
         );
+        // Görülen symbol/name kombinasyonlarına ekle (tekrar almamak için)
+        const tokenKey = `${record.tokenSymbol}:${record.tokenName}`.toLowerCase();
+        this.seenTokenSymbols.add(tokenKey);
         // Son 7 işlem kaydına ekle
         this.recentlyClosedTrades.push({ symbol: record.tokenSymbol, closedAt: Date.now() });
         if (this.recentlyClosedTrades.length > this.MAX_RECENT_TRADES) {
