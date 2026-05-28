@@ -493,6 +493,18 @@ export class HeliusMonitor {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // Token son 15 dakikada görüldü mü?
+  // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Token'in son 15 dakikada görülüp görülmediğini kontrol et
+   */
+  isTokenRecentlySkipped(symbol: string): boolean {
+    const lastSeen = this.recentTokenSymbols.get(symbol);
+    if (!lastSeen) return false;
+    return Date.now() - lastSeen < this.RECENT_TOKEN_WINDOW_MS;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Stop
   // ═══════════════════════════════════════════════════════════════════════════
   stop() {
