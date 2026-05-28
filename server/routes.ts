@@ -312,6 +312,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sym = symbol || "?";
         const solAmount = autoConfig.solAmountPerTrade;
 
+        // Auto-trader'a bildir (record tutması için)
+        autoTraderEngine.onLPDetected(data).catch((err) => console.error("Auto-trader LP hatası:", err));
+
+        // Eğer token son 15 dakikada görüldüyse, manuel alım için arayüzde göster ama otomatik alım yapma
+        const isRecentlySkipped = monitor.isTokenRecentlySkipped(sym);
+        if (isRecentlySkipped) {
+          console.log(`⏭️ [Fast-Buy] ${sym} son 15 dakikada görüldü, manuel alım için arayüzde gösteriliyor`);
+          // Otomatik alım yapma, sadece arayüzde göster (zaten token_skipped event'i yayınlanıyor)
+          return;
+        }
+
+        // Yeni token ise direkt alım yap
         console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} (${mintAddress}) | SOL: ${solAmount}`);
 
         if (dex === "pumpswap") {
@@ -325,9 +337,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error("Fast-buy hatası:", err);
             });
         }
-
-        // Auto-trader'a da bildir (record tutması için)
-        autoTraderEngine.onLPDetected(data).catch((err) => console.error("Auto-trader LP hatası:", err));
       }
     } else if (event === "connection_status") {
       broadcastToClients({ type: "connection_status", data });
