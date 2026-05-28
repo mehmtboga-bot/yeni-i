@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Coins, Droplet, Lock, SkipForward } from "lucide-react";
+import { Bot, Coins, Droplet, Lock } from "lucide-react";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { MintedTokenCard } from "@/components/MintedTokenCard";
 import { LPLogTable } from "@/components/LPLogTable";
@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig, AutoTraderConfig, SkippedToken } from "@shared/schema";
+import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig, AutoTraderConfig } from "@shared/schema";
 import type { ServerLog } from "@/components/LogPanel";
 
 const MAX_MINTED_TOKENS = 7;
@@ -197,7 +197,6 @@ export default function Home() {
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
-  const [skippedTokens, setSkippedTokens] = useState<SkippedToken[]>([]);
   const logIdRef = useRef(0);
   const logBottomRef = useRef<HTMLDivElement>(null);
 
@@ -333,10 +332,6 @@ export default function Home() {
         try { localStorage.setItem("autoTraderConfig", JSON.stringify(cfgData)); } catch {}
       } else if (msg.type === "auto_trader_state") {
         setAutoTraderRunning(msg.data.running);
-      } else if (msg.type === "token_skipped") {
-        if (Array.isArray(msg.data?.skippedTokens)) {
-          setSkippedTokens(msg.data.skippedTokens);
-        }
       }
 
       try {
@@ -596,42 +591,6 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-
-                {skippedTokens.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <SkipForward className="h-5 w-5 text-yellow-500" />
-                      <h2 className="text-base font-semibold text-foreground">Atlanan Tokenler</h2>
-                      <Badge variant="secondary" className="bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 text-xs">
-                        {skippedTokens.length}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground ml-auto">Son 15 dk</span>
-                    </div>
-                    <div className="space-y-1.5">
-                      {skippedTokens.map((token) => {
-                        const secondsAgo = Math.floor((Date.now() - token.skippedAt) / 1000);
-                        const timeStr = secondsAgo < 60 ? `${secondsAgo}s önce` : `${Math.floor(secondsAgo / 60)}dk önce`;
-                        return (
-                          <div
-                            key={token.symbol}
-                            className="flex items-center justify-between bg-yellow-500/5 border border-yellow-500/20 rounded-lg px-3 py-2"
-                          >
-                            <div className="flex items-center gap-2">
-                              <SkipForward className="h-3.5 w-3.5 text-yellow-500/70 shrink-0" />
-                              <span className="text-sm font-medium text-foreground">{token.symbol}</span>
-                              {token.count > 1 && (
-                                <Badge className="bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 text-xs px-1.5 py-0">
-                                  ×{token.count}
-                                </Badge>
-                              )}
-                            </div>
-                            <span className="text-xs text-muted-foreground">{timeStr}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
 
               </div>
             </div>
