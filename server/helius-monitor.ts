@@ -114,6 +114,8 @@ export class HeliusMonitor {
   private processedDexSignatures: Set<string> = new Set();
   private recentTokenSymbols: Map<string, number> = new Map(); // symbol → timestamp
   private readonly RECENT_TOKEN_WINDOW_MS = 15 * 60 * 1000; // 15 dakika
+  private skippedTokens: Array<{ symbol: string; skippedAt: number; count: number }> = [];
+  private readonly MAX_SKIPPED_TOKENS = 50;
 
   private reconnectTimeoutDex: NodeJS.Timeout | null = null;
   private heartbeatInterval: NodeJS.Timeout | null   = null;
@@ -307,6 +309,27 @@ export class HeliusMonitor {
       const lastSeen = this.recentTokenSymbols.get(symbol);
       if (lastSeen && Date.now() - lastSeen < this.RECENT_TOKEN_WINDOW_MS) {
         console.log(`⏭️ [LP] ${symbol} son 15 dakikada görüldü, atlanıyor`);
+
+        // Atlanan token'i kaydet
+        const existing = this.skippedTokens.find(t => t.symbol === symbol);
+        if (existing) {
+          existing.count++;
+          existing.skippedAt = Date.now();
+        } else {
+          this.skippedTokens.unshift({ symbol, skippedAt: Date.now(), count: 1 });
+          if (this.skippedTokens.length > this.MAX_SKIPPED_TOKENS) {
+            this.skippedTokens.pop();
+          }
+        }
+
+        // Event yayınla
+        this.eventEmitter("token_skipped", {
+          symbol,
+          skippedAt: Date.now(),
+          reason: "recent_symbol",
+          skippedTokens: this.skippedTokens,
+        });
+
         return;
       }
 
@@ -489,6 +512,7 @@ export class HeliusMonitor {
 
     this.processedDexSignatures.clear();
     this.recentTokenSymbols.clear();
+    this.skippedTokens = [];
     this.rateLimiter.destroy();
 
     this.eventEmitter("monitoring_state", { isMonitoring: false });

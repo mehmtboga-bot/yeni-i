@@ -309,6 +309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastToClients({ type: "monitoring_state", data });
     } else if (event === "error") {
       broadcastToClients({ type: "error", data });
+    } else if (event === "token_skipped") {
+      broadcastToClients({ type: "token_skipped", data });
     }
   });
 
