@@ -24,7 +24,7 @@ const DEFAULT_CONFIG: AutoTraderConfig = {
   enabled: false,
   solAmountPerTrade: 0.1,
   maxTokensHeld: 5,
-  holdDurationMs: 60000,           // 1 dakika
+  holdDurationMs: 5 * 1000,        // 5 saniye
   profitTargetPct: 50,             // %50 kar
   stopLossPct: 20,                 // %20 zarar
   slippageBps: 5000,               // %50 slippage
