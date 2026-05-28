@@ -247,14 +247,12 @@ export class JupiterTrader {
     console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL`);
 
     try {
-      const result = await this.withRetry(async () => {
-        const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
-        const decimals = await this.fetchDecimals(mintAddress);
-        const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
-        const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
-        const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-        return { sig, tokensOut, pricePerToken };
-      }, `Jupiter Buy ${symbol}`);
+      const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+      const decimals = await this.fetchDecimals(mintAddress);
+      const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
+      const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
+      const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+      const result = { sig, tokensOut, pricePerToken };
 
       position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
@@ -297,10 +295,7 @@ export class JupiterTrader {
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     try {
-      const sig = await this.withRetry(
-        () => this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol }),
-        `PumpSwap Buy ${symbol}`,
-      );
+      const sig = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
 
       // Pozisyonu hemen "open" olarak işaretle — bakiye arka planda çekilir
       position = { ...position, status: "open", buyTxSignature: sig };
