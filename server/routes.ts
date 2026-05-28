@@ -301,8 +301,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastToClients({ type: "mint_detected", data });
     } else if (event === "lp_detected") {
       broadcastToClients({ type: "lp_detected", data });
-      // Otomatik trader'a LP bildirimi gönder
-      autoTraderEngine.onLPDetected(data).catch((err) => console.error("Auto-trader LP hatası:", err));
+
+      // Otomatik trader enabled ise direkt alım yap (hızlı)
+      const autoConfig = autoTraderConfigStore.getConfig();
+      if (autoConfig.enabled) {
+        const { mintAddress, name, symbol, dex } = data;
+        const nm = name || "Bilinmiyor";
+        const sym = symbol || "?";
+        const solAmount = autoConfig.solAmountPerTrade;
+
+        console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} (${mintAddress}) | SOL: ${solAmount}`);
+
+        if (dex === "pumpswap") {
+          trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
+            .catch((err) => {
+              console.error("Fast-buy (PumpSwap) hatası:", err);
+            });
+        } else {
+          trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
+            .catch((err) => {
+              console.error("Fast-buy hatası:", err);
+            });
+        }
+
+        // Auto-trader'a da bildir (record tutması için)
+        autoTraderEngine.onLPDetected(data).catch((err) => console.error("Auto-trader LP hatası:", err));
+      }
     } else if (event === "connection_status") {
       broadcastToClients({ type: "connection_status", data });
     } else if (event === "monitoring_state") {
