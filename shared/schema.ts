@@ -85,6 +85,14 @@ export const autoTraderConfigSchema = z.object({
 
 export type AutoTraderConfig = z.infer<typeof autoTraderConfigSchema>;
 
+export const skippedTokenSchema = z.object({
+  symbol: z.string(),
+  skippedAt: z.number(),
+  count: z.number(),
+});
+
+export type SkippedToken = z.infer<typeof skippedTokenSchema>;
+
 export const wsMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mint_detected"), data: mintedTokenSchema }),
   z.object({ type: z.literal("lp_detected"), data: lpDetectionSchema }),
