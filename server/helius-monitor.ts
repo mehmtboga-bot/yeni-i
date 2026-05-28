@@ -112,6 +112,8 @@ interface TokenMetadata {
 export class HeliusMonitor {
   private dexWebSocket: WebSocket | null = null;
   private processedDexSignatures: Set<string> = new Set();
+  private recentTokenSymbols: Map<string, number> = new Map(); // symbol → timestamp
+  private readonly RECENT_TOKEN_WINDOW_MS = 15 * 60 * 1000; // 15 dakika
 
   private reconnectTimeoutDex: NodeJS.Timeout | null = null;
   private heartbeatInterval: NodeJS.Timeout | null   = null;
@@ -300,6 +302,25 @@ export class HeliusMonitor {
 
       const name       = metadata?.name   || "Bilinmiyor";
       const symbol     = metadata?.symbol || "?";
+
+      // Son 15 dakikada çıkan symbol mi?
+      const lastSeen = this.recentTokenSymbols.get(symbol);
+      if (lastSeen && Date.now() - lastSeen < this.RECENT_TOKEN_WINDOW_MS) {
+        console.log(`⏭️ [LP] ${symbol} son 15 dakikada görüldü, atlanıyor`);
+        return;
+      }
+
+      // Symbol'ü kaydet
+      this.recentTokenSymbols.set(symbol, Date.now());
+
+      // Eski symbol'leri temizle (15 dakikadan eski)
+      const cutoff = Date.now() - this.RECENT_TOKEN_WINDOW_MS;
+      for (const [sym, ts] of this.recentTokenSymbols.entries()) {
+        if (ts < cutoff) {
+          this.recentTokenSymbols.delete(sym);
+        }
+      }
+
       const detectedAt = Date.now();
       const expiresAt  = detectedAt + 5 * 60 * 1000;
 
@@ -467,6 +488,7 @@ export class HeliusMonitor {
     }
 
     this.processedDexSignatures.clear();
+    this.recentTokenSymbols.clear();
     this.rateLimiter.destroy();
 
     this.eventEmitter("monitoring_state", { isMonitoring: false });
