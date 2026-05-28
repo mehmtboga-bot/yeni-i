@@ -8,6 +8,7 @@ import { PositionPricer } from "./position-pricer";
 import { AutoTraderConfigStore } from "./auto-trader-config";
 import { AutoTraderEngine } from "./auto-trader-engine";
 import { saveSecrets } from "./secrets-loader";
+import { DexScreenerMonitor } from "./dexscreener-monitor";
 import fs from "fs";
 import path from "path";
 import { EventStore } from "./event-store";
@@ -23,6 +24,7 @@ const ALLOWED_FILES = [
   "server/trade-store.ts",
   "server/auto-trader-config.ts",
   "server/auto-trader-engine.ts",
+  "server/dexscreener-monitor.ts",
   "shared/schema.ts",
   "data/secrets.json",
 ];
@@ -312,6 +314,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   monitor.start();
 
+  // ---- DexScreener Monitor ----
+  const dexScreenerMonitor = new DexScreenerMonitor((event: string, data: any) => {
+    if (event === "dex_token_detected") {
+      // DexScreener'dan yeni token tespit edildi, auto-trader'a gönder
+      autoTraderEngine.onLPDetected({
+        mintAddress: data.address,
+        name: data.name,
+        symbol: data.symbol,
+        dex: "pumpswap",
+        liquidityUsd: data.liquidity,
+      }).catch((err) => console.error("DexScreener token hatası:", err));
+    }
+  });
+
+  dexScreenerMonitor.start();
+  // ----------------------------
+
   // Canlı fiyat güncelleme (açık pozisyonlar için)
   const pricer = new PositionPricer(
     tradeStore,
@@ -496,8 +515,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     _origError("❌ WebSocket Server hatası:", error);
   });
 
-  process.on("SIGTERM", () => { monitor.stop(); autoTraderEngine.stop(); wss.close(); });
-  process.on("SIGINT",  () => { monitor.stop(); autoTraderEngine.stop(); wss.close(); });
+  process.on("SIGTERM", () => { monitor.stop(); autoTraderEngine.stop(); dexScreenerMonitor.stop(); wss.close(); });
+  process.on("SIGINT",  () => { monitor.stop(); autoTraderEngine.stop(); dexScreenerMonitor.stop(); wss.close(); });
 
   return httpServer;
 }
