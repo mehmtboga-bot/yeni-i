@@ -34,6 +34,7 @@ export class AutoTraderEngine {
   private configStore: AutoTraderConfigStore;
   private tradeStore: TradeStore;
   private emit: EventEmitter;
+  private trader: any; // JupiterTrader referansı
   
   private records: Map<string, AutoTradeRecord> = new Map();
   private isRunning = false;
@@ -47,11 +48,13 @@ export class AutoTraderEngine {
   constructor(
     configStore: AutoTraderConfigStore,
     tradeStore: TradeStore,
-    emit: EventEmitter
+    emit: EventEmitter,
+    trader?: any  // JupiterTrader referansı (opsiyonel)
   ) {
     this.configStore = configStore;
     this.tradeStore = tradeStore;
     this.emit = emit;
+    this.trader = trader;
   }
 
   start() {
@@ -171,7 +174,7 @@ export class AutoTraderEngine {
   private startSellChecker() {
     this.sellCheckInterval = setInterval(() => {
       this.checkAndSell();
-    }, 1000); // 1 saniyede bir kontrol et
+    }, 100); // 100ms'de bir kontrol et (daha hızlı)
   }
 
   private checkAndSell() {
@@ -198,11 +201,20 @@ export class AutoTraderEngine {
         console.log(
           `⏰ [Auto-Trader] Tutma süresi geçti: ${record.tokenSymbol} (${((now - record.buyTimestamp) / 1000).toFixed(0)}s)`
         );
-        
+
         // İlgili pozisyonu bul
         const position = this.tradeStore.getByMint(record.mintAddress);
         if (position && position.status === "open") {
-          this.emit("auto_sell_ready", { positionId: position.id });
+          // Direkt satış yap (event zincirini bypass et — daha hızlı)
+          if (this.trader) {
+            this.trader.sell(position.id).catch((err: any) => {
+              console.error("Auto-sell hatası:", err);
+            });
+          } else {
+            // Fallback: trader yoksa event yayınla
+            this.emit("auto_sell_ready", { positionId: position.id });
+          }
+
           record.status = "sold";
           this.emit("auto_trade_record_updated", record);
         }
