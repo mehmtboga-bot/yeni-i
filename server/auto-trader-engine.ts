@@ -129,13 +129,13 @@ export class AutoTraderEngine {
       }
     }
 
-    // Max token kontrol
-    const activeCount = Array.from(this.records.values()).filter(
-      (r) => r.status === "active" || r.status === "pending"
-    ).length;
-    if (activeCount >= config.maxTokensHeld) {
+    // Max token kontrol — trade-store'daki açık pozisyonlara göre
+    const openPositions = this.tradeStore.getAll().filter(
+      (p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell"
+    );
+    if (openPositions.length >= config.maxTokensHeld) {
       console.warn(
-        `⚠️ [Auto-Trader] Max token sayısına ulaşıldı (${activeCount}/${config.maxTokensHeld}), ${symbol} atlanıyor`
+        `⚠️ [Auto-Trader] Max token sayısına ulaşıldı (${openPositions.length}/${config.maxTokensHeld}), ${symbol} atlanıyor`
       );
       return;
     }
