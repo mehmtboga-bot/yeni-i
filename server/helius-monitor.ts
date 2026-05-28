@@ -307,7 +307,7 @@ export class HeliusMonitor {
       const sol    = liquidityAmount ? `${liquidityAmount.toFixed(4)} SOL` : "?";
       const usdStr = liquidityUsd ? ` ($${liquidityUsd.toFixed(0)})` : "";
       const tvlStr = tvlUsd ? ` | TVL ~$${tvlUsd.toFixed(0)}` : "";
-      console.log(`💧 [LP] ${name} (${symbol}) | PumpSwap | ${sol}${usdStr}${tvlStr}`);
+
 
       this.eventEmitter("lp_detected", {
         id: `${tokenMint}-${detectedAt}`,
@@ -324,9 +324,6 @@ export class HeliusMonitor {
 
       const meetsThreshold = (tvlUsd ?? 0) >= MIN_TVL_USD_NOTIFY;
       if (!meetsThreshold) {
-        console.log(
-          `🚫 [LP] Telegram atlandı | ${symbol} | TVL=$${tvlUsd?.toFixed(0) ?? "?"} | eşik=$${MIN_TVL_USD_NOTIFY}`
-        );
         return;
       }
 
