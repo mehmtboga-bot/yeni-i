@@ -39,6 +39,7 @@ export class AutoTraderEngine {
   private isRunning = false;
   private sellCheckInterval: NodeJS.Timeout | null = null;
   private processedLPs: Set<string> = new Set();
+  private seenTokenAddresses: Set<string> = new Set(); // Daha önce görülen token'ler
   private recentlyClosedTrades: Array<{ symbol: string; closedAt: number }> = [];
   private readonly MAX_RECENT_TRADES = 7;
   private liquidityDropInFlight: Set<string> = new Set(); // Likidite kontrolü devam eden kayıtlar
@@ -106,6 +107,15 @@ export class AutoTraderEngine {
       );
       return;
     }
+
+    // Daha önce görülen token mi?
+    if (this.seenTokenAddresses.has(mintAddress)) {
+      console.log(
+        `⏭️ [Auto-Trader] ${symbol} daha önce görüldü, atlanıyor`
+      );
+      return;
+    }
+    this.seenTokenAddresses.add(mintAddress);
 
     // Son 7 işlemde aynı symbol varsa, almaz
     if (config.skipRecentlyTradedSymbols) {
@@ -323,6 +333,8 @@ export class AutoTraderEngine {
         if (this.recentlyClosedTrades.length > this.MAX_RECENT_TRADES) {
           this.recentlyClosedTrades.shift(); // En eski işlemi çıkar
         }
+        // Görülen token'ler listesine ekle (tekrar almamak için)
+        this.seenTokenAddresses.add(record.mintAddress);
         break;
       }
     }
