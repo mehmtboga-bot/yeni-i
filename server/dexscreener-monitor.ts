@@ -7,13 +7,13 @@
  */
 
 const DEX_API_URL =
-  "https://api.dexscreener.com/token-profiles/latest/v1";
+  "https://api.dexscreener.com/latest/dex/tokens";
 
 // Kaç dakika geriye bakılacak
 const LOOKBACK_MS = 12 * 60 * 1000;
 
 // Polling aralığı (ms)
-const POLL_INTERVAL_MS = 60 * 1000; // 1 dakika
+const POLL_INTERVAL_MS = 120 * 1000; // 2 dakika
 
 export interface DexTokenEvent {
   address: string;
@@ -70,7 +70,8 @@ export class DexScreenerMonitor {
         return;
       }
 
-      const items: any[] = await res.json();
+      const data = await res.json();
+      const items: any[] = data?.tokens ?? [];
       if (!Array.isArray(items)) return;
 
       const cutoff = Date.now() - LOOKBACK_MS;
@@ -84,15 +85,14 @@ export class DexScreenerMonitor {
         )
           continue;
 
-        const address: string = item.tokenAddress ?? item.address;
+        const address: string = item.baseToken?.address ?? item.address;
         if (!address) continue;
 
         // Daha önce işlendiyse atla
         if (this.seenAddresses.has(address)) continue;
 
         // Oluşturulma zamanı kontrolü
-        const createdAt: number =
-          item.pairCreatedAt ?? item.createdAt ?? 0;
+        const createdAt: number = item.pairCreatedAt ?? 0;
         if (createdAt > 0 && createdAt < cutoff) continue;
 
         this.seenAddresses.add(address);
@@ -103,11 +103,9 @@ export class DexScreenerMonitor {
           if (first) this.seenAddresses.delete(first);
         }
 
-        const name: string = item.name ?? item.baseToken?.name ?? "Bilinmiyor";
-        const symbol: string =
-          item.symbol ?? item.baseToken?.symbol ?? "?";
-        const liquidity: number =
-          item.liquidity?.usd ?? item.liquidityUsd ?? 0;
+        const name: string = item.baseToken?.name ?? "Bilinmiyor";
+        const symbol: string = item.baseToken?.symbol ?? "?";
+        const liquidity: number = item.liquidity?.usd ?? 0;
 
         const tokenEvent: DexTokenEvent = {
           address,
