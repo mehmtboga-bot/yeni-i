@@ -287,8 +287,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           broadcastToClients({ type: "position_update", data: updated });
         }
       }
-    }
+    },
+    trader  // Direkt satış için trader referansı
   );
+
 
   // Otomatik trader enabled ise başlat
   if (autoTraderConfigStore.getConfig().enabled) {
