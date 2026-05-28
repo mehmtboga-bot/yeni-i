@@ -504,7 +504,10 @@ export default function Home() {
             <span className="text-sm font-mono font-semibold text-zinc-200">Sunucu Logları</span>
             <span className="text-xs text-zinc-500 font-mono">({serverLogs.length} satır)</span>
             <button
-              onClick={() => setServerLogs([])}
+              onClick={() => {
+                setServerLogs([]);
+                try { localStorage.removeItem("serverLogs"); } catch {}
+              }}
               className="ml-auto text-xs hover:text-zinc-300 text-zinc-500 transition-colors"
               title="Logları temizle"
             >
