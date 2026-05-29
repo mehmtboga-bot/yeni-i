@@ -7,6 +7,7 @@ import { WalletBalance } from "@/components/WalletBalance";
 import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
 import { AutoTraderPanel } from "@/components/AutoTraderPanel";
+import { TokenComparisonPanel } from "@/components/TokenComparisonPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -197,6 +198,7 @@ export default function Home() {
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
+  const [duplicateTokens, setDuplicateTokens] = useState<any[]>([]);
   const logIdRef = useRef(0);
   const logBottomRef = useRef<HTMLDivElement>(null);
 
@@ -332,6 +334,8 @@ export default function Home() {
         try { localStorage.setItem("autoTraderConfig", JSON.stringify(cfgData)); } catch {}
       } else if (msg.type === "auto_trader_state") {
         setAutoTraderRunning(msg.data.running);
+      } else if (msg.type === "duplicate_tokens_snapshot") {
+        setDuplicateTokens(msg.data);
       }
 
       try {
@@ -363,6 +367,8 @@ export default function Home() {
       wsInstance.onopen = () => {
         setIsConnected(true);
         setConnectionMessage("");
+        // Duplicate token'leri iste
+        wsInstance?.send(JSON.stringify({ type: "request_duplicate_tokens" }));
       };
 
       wsInstance.onmessage = (event) => {
@@ -539,6 +545,17 @@ export default function Home() {
               lastPublicKey={lastPublicKey}
               setWalletBalance={setWalletBalance}
             />
+
+            {/* Token Karşılaştırması Paneli */}
+            {duplicateTokens.length > 0 && (
+              <TokenComparisonPanel
+                duplicateTokens={duplicateTokens}
+                onSelectToken={(mintAddress, symbol) => {
+                  console.log(`${symbol} (${mintAddress}) seçildi`);
+                  handleBuy(mintAddress, symbol, symbol);
+                }}
+              />
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">

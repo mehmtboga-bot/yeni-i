@@ -11,6 +11,7 @@ import { saveSecrets } from "./secrets-loader";
 import fs from "fs";
 import path from "path";
 import { EventStore } from "./event-store";
+import { TokenAnalyzer } from "./token-analyzer";
 
 const ROOT = process.cwd();
 
@@ -168,6 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ---- Trade store + Jupiter ----
   const tradeStore = new TradeStore();
+  const tokenAnalyzer = new TokenAnalyzer(tradeStore);
   const trader = new JupiterTrader(tradeStore, (event, data) => {
     if (event === "position_update") {
       broadcastToClients({ type: "position_update", data });
@@ -385,6 +387,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })
     );
 
+    // Duplicate token'leri gönder
+    ws.send(
+      JSON.stringify({
+        type: "duplicate_tokens_snapshot",
+        data: tokenAnalyzer.getAllDuplicateTokens(),
+      })
+    );
+
     ws.on("message", async (data: Buffer) => {
       try {
         const message = JSON.parse(data.toString());
@@ -513,6 +523,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               },
             })
           );
+        } else if (message.type === "request_duplicate_tokens") {
+          const duplicates = tokenAnalyzer.getAllDuplicateTokens();
+          ws.send(
+            JSON.stringify({
+              type: "duplicate_tokens_snapshot",
+              data: duplicates,
+            })
+          );
+        } else if (message.type === "request_tokens_by_symbol") {
+          const { symbol } = message.data || {};
+          if (symbol) {
+            const result = tokenAnalyzer.getTokensBySymbol(symbol);
+            ws.send(
+              JSON.stringify({
+                type: "tokens_by_symbol_snapshot",
+                data: result,
+              })
+            );
+          }
         }
       } catch {
         // ignore

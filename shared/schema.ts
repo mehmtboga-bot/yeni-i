@@ -94,6 +94,31 @@ export const skippedTokenSchema = z.object({
 
 export type SkippedToken = z.infer<typeof skippedTokenSchema>;
 
+export const tokenStatsSchema = z.object({
+  mintAddress: z.string(),
+  symbol: z.string(),
+  name: z.string(),
+  riskScore: z.number(),        // 0-100 (düşük = iyi)
+  survivedMinutes: z.number(),  // Kaç dakika hayatta kaldı
+  trades: z.object({
+    total: z.number(),
+    sold: z.number(),
+    winRate: z.number(),   // %
+    avgPnL: z.number(),    // % ortalama PnL
+  }),
+  detectedAt: z.number(),
+});
+
+export type TokenStats = z.infer<typeof tokenStatsSchema>;
+
+export const tokenGroupSchema = z.object({
+  baseSymbol: z.string(),
+  tokens: z.array(lpDetectionSchema),
+  analysis: z.array(tokenStatsSchema),
+});
+
+export type TokenGroup = z.infer<typeof tokenGroupSchema>;
+
 export const wsMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mint_detected"), data: mintedTokenSchema }),
   z.object({ type: z.literal("lp_detected"), data: lpDetectionSchema }),
