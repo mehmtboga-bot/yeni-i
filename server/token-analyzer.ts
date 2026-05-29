@@ -230,8 +230,6 @@ export class TokenAnalyzer {
     // Helius'tan gelen token'ler
     const detectedTokens = this.detectedTokenStore?.getAll() || [];
 
-    console.log(`📊 Token Analyzer: ${positions.length} satın alınan, ${detectedTokens.length} tespit edilen token`);
-
     const grouped = new Map<string, Position[]>();
 
     // Satın alınan token'leri ekle
@@ -279,8 +277,6 @@ export class TokenAnalyzer {
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(dummyPos);
     }
-
-    console.log(`📊 Token Analyzer: ${grouped.size} token analiz ediliyor`);
 
     const result: TokenAnalysis[] = [];
 
@@ -372,7 +368,6 @@ export class TokenAnalyzer {
       });
     }
 
-    console.log(`📊 Token Analyzer: ${result.length} token analiz edildi`);
     return result.sort((a, b) => b.recommendationScore - a.recommendationScore);
   }
 
