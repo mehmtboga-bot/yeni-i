@@ -339,6 +339,7 @@ export default function Home() {
       } else if (msg.type === "token_comparison_snapshot") {
         setTokenComparison(msg.data);
       } else if (msg.type === "token_analysis_snapshot") {
+        console.log("Token analysis snapshot received:", msg.data);
         setTokenAnalysis(msg.data);
       }
 
@@ -371,6 +372,7 @@ export default function Home() {
       wsInstance.onopen = () => {
         setIsConnected(true);
         setConnectionMessage("");
+        console.log("WebSocket connected, requesting token analysis...");
         // Token karşılaştırma iste
         wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
         // Token analiz iste
@@ -617,22 +619,39 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Token Analiz Dashboard */}
-            {tokenAnalysis && (
-              <TokenAnalysisDashboard
-                analysis={tokenAnalysis.analysis}
-                similarGroups={tokenAnalysis.similarGroups}
-                overallStats={tokenAnalysis.overallStats}
-                onRefresh={() => {
-                  if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: "request_token_analysis" }));
-                  }
-                }}
-                onSelectToken={(mintAddress, symbol) => {
-                  handleBuy(mintAddress, symbol, symbol);
-                }}
-              />
-            )}
+            {/* Token Analiz Dashboard - HER ZAMAN GÖSTER (test için) */}
+            {(() => {
+              const dummyAnalysis = tokenAnalysis || {
+                analysis: [],
+                similarGroups: [],
+                overallStats: {
+                  totalTokens: 0,
+                  rugPullCount: 0,
+                  rugPullPercentage: 0,
+                  avgSurvivedMinutes: 0,
+                  avgRugPullRisk: 0,
+                  bestTokens: [],
+                  worstTokens: [],
+                },
+              };
+              return (
+                <TokenAnalysisDashboard
+                  analysis={dummyAnalysis.analysis || []}
+                  similarGroups={dummyAnalysis.similarGroups || []}
+                  overallStats={dummyAnalysis.overallStats}
+                  onRefresh={() => {
+                    console.log("Refresh clicked");
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                      ws.send(JSON.stringify({ type: "request_token_analysis" }));
+                    }
+                  }}
+                  onSelectToken={(mintAddress, symbol) => {
+                    console.log("Token selected:", mintAddress, symbol);
+                    handleBuy(mintAddress, symbol, symbol);
+                  }}
+                />
+              );
+            })()}
           </div>
         </div>
 
