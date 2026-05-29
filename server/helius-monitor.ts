@@ -308,7 +308,7 @@ export class HeliusMonitor {
       // Son 15 dakikada çıkan symbol mi?
       const lastSeen = this.recentTokenSymbols.get(symbol);
       if (lastSeen && Date.now() - lastSeen < this.RECENT_TOKEN_WINDOW_MS) {
-        console.log(`⏭️ [LP] ${symbol} son 15 dakikada görüldü, atlanıyor`);
+        console.log(`⏭️ [LP] ${symbol} son 15 dakikada görüldü, arayüzde gösteriliyor (otomatik alım yapılmayacak)`);
 
         // Atlanan token'i kaydet
         const existing = this.skippedTokens.find(t => t.symbol === symbol);
@@ -322,12 +322,23 @@ export class HeliusMonitor {
           }
         }
 
-        // Event yayınla
-        this.eventEmitter("token_skipped", {
-          symbol,
-          skippedAt: Date.now(),
-          reason: "recent_symbol",
-          skippedTokens: this.skippedTokens,
+        // Atlanan token'i normal token gibi arayüzde göster (isSkipped flag'i ile)
+        const detectedAt = Date.now();
+        const expiresAt  = detectedAt + 5 * 60 * 1000;
+        const { usd: liquidityUsd, tvlUsd } = this.toUsd(liquidityAmount);
+
+        this.eventEmitter("lp_detected", {
+          id: `${tokenMint}-${detectedAt}`,
+          mintAddress: tokenMint,
+          lpMint,
+          name, symbol,
+          detectedAt, expiresAt,
+          liquidityAmount, liquidityUsd, tvlUsd,
+          platform: "PumpSwap",
+          isSkipped: true,
+          jupiterUrl:     `https://jup.ag/swap/SOL-${tokenMint}`,
+          dexscreenerUrl: `https://dexscreener.com/solana/${tokenMint}`,
+          pumpfunUrl:     `https://pump.fun/${tokenMint}`,
         });
 
         return;

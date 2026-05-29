@@ -30,6 +30,7 @@ export const lpDetectionSchema = z.object({
   liquidityAmount: z.number().optional(),
   platform: z.string().optional(),
   lpMint: z.string().optional(),
+  isSkipped: z.boolean().optional(),
 });
 
 export type LPDetection = z.infer<typeof lpDetectionSchema>;

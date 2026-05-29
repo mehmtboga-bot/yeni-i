@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check, Lock, Unlock, Droplet, Zap } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock, Unlock, Droplet, Zap, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CountdownTimer } from "./CountdownTimer";
@@ -55,14 +55,20 @@ export function LPLogTable({
     <div className="space-y-2">
       {filteredLogs.map((log, index) => {
         const inPortfolio = activeBuyMints?.has(log.mintAddress) ?? false;
-        const canBuy = traderReady && !inPortfolio;
+        const canBuy = traderReady && !inPortfolio && !log.isSkipped;
 
         return (
           <div
             key={log.id}
             className={`bg-card border rounded-lg p-3 hover-elevate transition-all ${
               index === 0 ? "animate-in slide-in-from-top-1" : ""
-            } ${log.isLocked ? "border-emerald-500/40 bg-emerald-950/10" : "border-card-border"}`}
+            } ${
+              log.isSkipped
+                ? "border-yellow-500/40 bg-yellow-950/10"
+                : log.isLocked
+                  ? "border-emerald-500/40 bg-emerald-950/10"
+                  : "border-card-border"
+            }`}
             data-testid={`row-lp-${log.id}`}
           >
             <div className="flex flex-col sm:flex-row sm:items-start gap-2">
@@ -72,7 +78,12 @@ export function LPLogTable({
                   <span className="font-semibold text-foreground text-sm" data-testid="text-lp-name">{log.name}</span>
                   <span className="text-sm font-medium text-muted-foreground" data-testid="text-lp-symbol">{log.symbol}</span>
 
-                  {log.isLocked ? (
+                  {log.isSkipped ? (
+                    <Badge className="gap-1 bg-yellow-500/15 text-yellow-400 border border-yellow-500/40 text-xs font-semibold" data-testid="badge-lp-skipped">
+                      <SkipForward className="h-3 w-3" />
+                      Atlandı · 15dk tekrar
+                    </Badge>
+                  ) : log.isLocked ? (
                     <Badge className="gap-1 bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 text-xs font-semibold" data-testid="badge-lp-locked">
                       <Lock className="h-3 w-3" />
                       Kilitli {log.lockDuration && `· ${log.lockDuration}`}
@@ -143,7 +154,15 @@ export function LPLogTable({
                       disabled={!canBuy}
                       onClick={() => onBuy(log.mintAddress, log.name, log.symbol, "jupiter")}
                       data-testid={`button-lp-buy-jup-${log.id}`}
-                      title={!traderReady ? "Trader cüzdanı tanımlı değil" : inPortfolio ? "Portföyde" : "Jupiter ile al"}
+                      title={
+                        log.isSkipped
+                          ? "Otomatik alım atlandı — manuel alım için tıklayın"
+                          : !traderReady
+                            ? "Trader cüzdanı tanımlı değil"
+                            : inPortfolio
+                              ? "Portföyde"
+                              : "Jupiter ile al"
+                      }
                     >
                       <Zap className="h-3 w-3 mr-1" />
                       {inPortfolio ? "Var" : "Jup"}
@@ -155,7 +174,15 @@ export function LPLogTable({
                       disabled={!canBuy}
                       onClick={() => onBuy(log.mintAddress, log.name, log.symbol, "pumpswap")}
                       data-testid={`button-lp-buy-pump-${log.id}`}
-                      title={!traderReady ? "Trader cüzdanı tanımlı değil" : inPortfolio ? "Portföyde" : "PumpSwap ile al"}
+                      title={
+                        log.isSkipped
+                          ? "Otomatik alım atlandı — manuel alım için tıklayın"
+                          : !traderReady
+                            ? "Trader cüzdanı tanımlı değil"
+                            : inPortfolio
+                              ? "Portföyde"
+                              : "PumpSwap ile al"
+                      }
                     >
                       {inPortfolio ? "Var" : "Pump"}
                     </Button>
