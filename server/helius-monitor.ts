@@ -112,7 +112,7 @@ interface TokenMetadata {
 export class HeliusMonitor {
   private dexWebSocket: WebSocket | null = null;
   private processedDexSignatures: Set<string> = new Set();
-  private recentTokenSymbols: Map<string, number> = new Map(); // symbol → timestamp
+  private recentTokenMints: Map<string, number> = new Map(); // mintAddress → timestamp
   private readonly RECENT_TOKEN_WINDOW_MS = 25 * 60 * 1000; // 25 dakika
   private skippedTokens: Array<{ symbol: string; skippedAt: number; count: number }> = [];
   private readonly MAX_SKIPPED_TOKENS = 50;
@@ -305,10 +305,10 @@ export class HeliusMonitor {
       const name       = metadata?.name   || "Bilinmiyor";
       const symbol     = metadata?.symbol || "?";
 
-      // Son 25 dakikada çıkan symbol mi?
-      const lastSeen = this.recentTokenSymbols.get(symbol);
+      // Son 25 dakikada çıkan mint mi?
+      const lastSeen = this.recentTokenMints.get(tokenMint);
       if (lastSeen && Date.now() - lastSeen < this.RECENT_TOKEN_WINDOW_MS) {
-        console.log(`⏭️ [LP] ${symbol} son 25 dakikada görüldü, arayüzde gösteriliyor (otomatik alım yapılmayacak)`);
+        console.log(`⏭️ [LP] ${symbol} (${tokenMint.slice(0, 8)}...) son 25 dakikada görüldü, arayüzde gösteriliyor (otomatik alım yapılmayacak)`);
 
         // Atlanan token'i kaydet
         const existing = this.skippedTokens.find(t => t.symbol === symbol);
@@ -344,14 +344,14 @@ export class HeliusMonitor {
         return;
       }
 
-      // Symbol'ü kaydet
-      this.recentTokenSymbols.set(symbol, Date.now());
+      // Mint'i kaydet
+      this.recentTokenMints.set(tokenMint, Date.now());
 
-      // Eski symbol'leri temizle (25 dakikadan eski)
+      // Eski mint'leri temizle (25 dakikadan eski)
       const cutoff = Date.now() - this.RECENT_TOKEN_WINDOW_MS;
-      for (const [sym, ts] of this.recentTokenSymbols.entries()) {
+      for (const [mint, ts] of this.recentTokenMints.entries()) {
         if (ts < cutoff) {
-          this.recentTokenSymbols.delete(sym);
+          this.recentTokenMints.delete(mint);
         }
       }
 
@@ -509,8 +509,8 @@ export class HeliusMonitor {
   /**
    * Token'in son 15 dakikada görülüp görülmediğini kontrol et
    */
-  isTokenRecentlySkipped(symbol: string): boolean {
-    const lastSeen = this.recentTokenSymbols.get(symbol);
+  isTokenRecentlySkipped(mintAddress: string): boolean {
+    const lastSeen = this.recentTokenMints.get(mintAddress);
     if (!lastSeen) return false;
     return Date.now() - lastSeen < this.RECENT_TOKEN_WINDOW_MS;
   }
@@ -534,7 +534,7 @@ export class HeliusMonitor {
     }
 
     this.processedDexSignatures.clear();
-    this.recentTokenSymbols.clear();
+    this.recentTokenMints.clear();
     this.skippedTokens = [];
     this.rateLimiter.destroy();
 

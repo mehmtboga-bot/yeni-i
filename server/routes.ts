@@ -314,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         autoTraderEngine.onLPDetected(data).catch((err) => console.error("Auto-trader LP hatası:", err));
 
         // Eğer token son 15 dakikada görüldüyse, manuel alım için arayüzde göster ama otomatik alım yapma
-        const isRecentlySkipped = monitor.isTokenRecentlySkipped(sym);
+        const isRecentlySkipped = monitor.isTokenRecentlySkipped(mintAddress);
         if (isRecentlySkipped) {
           console.log(`⏭️ [Fast-Buy] ${sym} son 15 dakikada görüldü, manuel alım için arayüzde gösteriliyor`);
           // Otomatik alım yapma, sadece arayüzde göster (zaten token_skipped event'i yayınlanıyor)
