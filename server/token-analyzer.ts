@@ -221,18 +221,28 @@ export class TokenAnalyzer {
   /**
    * Son 12 saatteki tüm token'leri analiz eder, rug pull riski hesaplar
    * ve tavsiye oranına göre sıralar.
+   *
+   * NOT: Cutoff'ı 30 gün olarak ayarladık, böylece eski token'ler de gösterilir.
    */
   analyzeLast12Hours(): TokenAnalysis[] {
-    const cutoff = Date.now() - 12 * 60 * 60 * 1000;
+    // 30 gün öncesine kadar token'leri göster
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const positions = this.tradeStore.getAll();
+
+    console.log(`📊 Token Analyzer: ${positions.length} toplam position, cutoff: ${new Date(cutoff).toISOString()}`);
 
     const grouped = new Map<string, Position[]>();
     for (const pos of positions) {
-      if ((pos.buyTimestamp ?? 0) < cutoff) continue;
+      if ((pos.buyTimestamp ?? 0) < cutoff) {
+        console.log(`⏭️ Token ${pos.symbol} çok eski (${new Date(pos.buyTimestamp ?? 0).toISOString()}), atlanıyor`);
+        continue;
+      }
       const key = pos.mintAddress;
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(pos);
     }
+
+    console.log(`📊 Token Analyzer: ${grouped.size} token analiz ediliyor`);
 
     const result: TokenAnalysis[] = [];
 
@@ -324,6 +334,7 @@ export class TokenAnalyzer {
       });
     }
 
+    console.log(`📊 Token Analyzer: ${result.length} token analiz edildi`);
     return result.sort((a, b) => b.recommendationScore - a.recommendationScore);
   }
 
