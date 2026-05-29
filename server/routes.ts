@@ -11,8 +11,6 @@ import { saveSecrets } from "./secrets-loader";
 import fs from "fs";
 import path from "path";
 import { EventStore } from "./event-store";
-import { TokenAnalyzer } from "./token-analyzer";
-import { DetectedTokenStore } from "./detected-token-store";
 
 const ROOT = process.cwd();
 
@@ -170,8 +168,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ---- Trade store + Jupiter ----
   const tradeStore = new TradeStore();
-  const detectedTokenStore = new DetectedTokenStore();
-  const tokenAnalyzer = new TokenAnalyzer(tradeStore, detectedTokenStore);
   const trader = new JupiterTrader(tradeStore, (event, data) => {
     if (event === "position_update") {
       broadcastToClients({ type: "position_update", data });
@@ -306,19 +302,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (event === "lp_detected") {
       broadcastToClients({ type: "lp_detected", data });
 
-      // Tespit edilen token'i store'a ekle
-      detectedTokenStore.add({
-        id: data.id,
-        mintAddress: data.mintAddress,
-        name: data.name,
-        symbol: data.symbol,
-        detectedAt: data.detectedAt,
-        liquidityAmount: data.liquidityAmount,
-        liquidityUsd: data.liquidityUsd,
-        tvlUsd: data.tvlUsd,
-        platform: data.platform,
-      });
-
       // Otomatik trader enabled ise direkt alım yap (hızlı)
       const autoConfig = autoTraderConfigStore.getConfig();
       if (autoConfig.enabled) {
@@ -402,17 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })
     );
 
-    // Token analiz snapshot'ı gönder
-    ws.send(
-      JSON.stringify({
-        type: "token_analysis_snapshot",
-        data: {
-          analysis: tokenAnalyzer.analyzeLast12Hours(),
-          similarGroups: tokenAnalyzer.getSimilarSymbolGroups(),
-          overallStats: tokenAnalyzer.getOverallStats(),
-        },
-      })
-    );
+
 
     ws.on("message", async (data: Buffer) => {
       try {
@@ -539,32 +512,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               data: {
                 config: autoTraderConfigStore.getConfig(),
                 records: autoTraderEngine.getRecords(),
-              },
-            })
-          );
-        } else if (message.type === "request_token_comparison") {
-          const comparison = tokenAnalyzer.getSymbolsWithMultipleTokens();
-          const data = Array.from(comparison.entries()).map(([symbol, tokens]) => ({
-            symbol,
-            tokens,
-            count: tokens.length,
-            bestRecommendation: tokens[0].recommendation,
-            bestRiskScore: tokens[0].riskScore,
-          }));
-          ws.send(
-            JSON.stringify({
-              type: "token_comparison_snapshot",
-              data,
-            })
-          );
-        } else if (message.type === "request_token_analysis") {
-          ws.send(
-            JSON.stringify({
-              type: "token_analysis_snapshot",
-              data: {
-                analysis: tokenAnalyzer.analyzeLast12Hours(),
-                similarGroups: tokenAnalyzer.getSimilarSymbolGroups(),
-                overallStats: tokenAnalyzer.getOverallStats(),
               },
             })
           );
