@@ -226,13 +226,19 @@ export class TokenAnalyzer {
     const cutoff = Date.now() - 12 * 60 * 60 * 1000;
     const positions = this.tradeStore.getAll();
 
+    console.log(`📊 Token Analyzer: ${positions.length} toplam position, cutoff: ${new Date(cutoff).toISOString()}`);
+
     const grouped = new Map<string, Position[]>();
     for (const pos of positions) {
-      if ((pos.buyTimestamp ?? 0) < cutoff) continue;
+      if ((pos.buyTimestamp ?? 0) < cutoff) {
+        continue;
+      }
       const key = pos.mintAddress;
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(pos);
     }
+
+    console.log(`📊 Token Analyzer: ${grouped.size} token analiz ediliyor`);
 
     const result: TokenAnalysis[] = [];
 
@@ -324,6 +330,7 @@ export class TokenAnalyzer {
       });
     }
 
+    console.log(`📊 Token Analyzer: ${result.length} token analiz edildi`);
     return result.sort((a, b) => b.recommendationScore - a.recommendationScore);
   }
 
