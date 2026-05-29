@@ -140,9 +140,22 @@ export class JupiterTrader {
 
     const res = await fetch(url.toString());
     const bodyText = await res.text();
-    if (!res.ok) throw new Error(`Jupiter quote ${res.status}: ${bodyText.slice(0, 200)}`);
-    const json = JSON.parse(bodyText) as QuoteResponse;
-    if (!json?.outAmount || BigInt(json.outAmount) === 0n) throw new Error("Jupiter quote: route bulunamadı");
+    if (!res.ok) {
+      const errorMsg = bodyText || `(boş response)`;
+      const debugInfo = `inputMint=${params.inputMint}, outputMint=${params.outputMint}, amount=${params.amount}, slippage=${clampedSlippage}`;
+      throw new Error(`Jupiter quote ${res.status}: ${errorMsg.slice(0, 200)} | Debug: ${debugInfo}`);
+    }
+
+    let json: QuoteResponse;
+    try {
+      json = JSON.parse(bodyText) as QuoteResponse;
+    } catch (parseErr) {
+      throw new Error(`Jupiter quote JSON parse hatası: ${(parseErr as Error).message} | Response: ${bodyText.slice(0, 200)}`);
+    }
+
+    if (!json?.outAmount || BigInt(json.outAmount) === 0n) {
+      throw new Error(`Jupiter quote: route bulunamadı | outAmount=${json?.outAmount}`);
+    }
     return json;
   }
 
