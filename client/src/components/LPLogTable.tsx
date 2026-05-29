@@ -55,7 +55,7 @@ export function LPLogTable({
     <div className="space-y-2">
       {filteredLogs.map((log, index) => {
         const inPortfolio = activeBuyMints?.has(log.mintAddress) ?? false;
-        const canBuy = traderReady && !inPortfolio && !log.isSkipped;
+        const canBuy = traderReady && !inPortfolio;
 
         return (
           <div
