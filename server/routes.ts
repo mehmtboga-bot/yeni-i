@@ -387,6 +387,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })
     );
 
+    // Token analiz snapshot'ı gönder
+    ws.send(
+      JSON.stringify({
+        type: "token_analysis_snapshot",
+        data: {
+          analysis: tokenAnalyzer.analyzeLast12Hours(),
+          similarGroups: tokenAnalyzer.getSimilarSymbolGroups(),
+          overallStats: tokenAnalyzer.getOverallStats(),
+        },
+      })
+    );
+
     ws.on("message", async (data: Buffer) => {
       try {
         const message = JSON.parse(data.toString());
@@ -528,6 +540,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             JSON.stringify({
               type: "token_comparison_snapshot",
               data,
+            })
+          );
+        } else if (message.type === "request_token_analysis") {
+          ws.send(
+            JSON.stringify({
+              type: "token_analysis_snapshot",
+              data: {
+                analysis: tokenAnalyzer.analyzeLast12Hours(),
+                similarGroups: tokenAnalyzer.getSimilarSymbolGroups(),
+                overallStats: tokenAnalyzer.getOverallStats(),
+              },
             })
           );
         }
