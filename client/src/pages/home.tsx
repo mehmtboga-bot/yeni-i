@@ -7,7 +7,6 @@ import { WalletBalance } from "@/components/WalletBalance";
 import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
 import { AutoTraderPanel } from "@/components/AutoTraderPanel";
-import { TokenComparisonPanel } from "@/components/TokenComparisonPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -198,7 +197,6 @@ export default function Home() {
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
-  const [tokenComparison, setTokenComparison] = useState<any[]>([]);
   const logIdRef = useRef(0);
   const logBottomRef = useRef<HTMLDivElement>(null);
 
@@ -334,8 +332,6 @@ export default function Home() {
         try { localStorage.setItem("autoTraderConfig", JSON.stringify(cfgData)); } catch {}
       } else if (msg.type === "auto_trader_state") {
         setAutoTraderRunning(msg.data.running);
-      } else if (msg.type === "token_comparison_snapshot") {
-        setTokenComparison(msg.data);
       }
 
       try {
@@ -367,8 +363,6 @@ export default function Home() {
       wsInstance.onopen = () => {
         setIsConnected(true);
         setConnectionMessage("");
-        // Token karşılaştırma iste
-        wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
       };
 
       wsInstance.onmessage = (event) => {
@@ -597,16 +591,6 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-
-                {/* Token Karşılaştırma Paneli */}
-                <TokenComparisonPanel
-                  data={tokenComparison}
-                  onRefresh={() => {
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                      ws.send(JSON.stringify({ type: "request_token_comparison" }));
-                    }
-                  }}
-                />
 
               </div>
             </div>
