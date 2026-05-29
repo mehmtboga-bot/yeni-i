@@ -7,6 +7,7 @@ import { WalletBalance } from "@/components/WalletBalance";
 import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
 import { AutoTraderPanel } from "@/components/AutoTraderPanel";
+import { TokenAnalysisPanel } from "@/components/TokenAnalysisPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -197,6 +198,7 @@ export default function Home() {
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
+  const [analysisSummary, setAnalysisSummary] = useState<any>(null);
   const logIdRef = useRef(0);
   const logBottomRef = useRef<HTMLDivElement>(null);
 
@@ -245,6 +247,12 @@ export default function Home() {
   const handleAutoTraderToggle = (enabled: boolean) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "toggle_auto_trader", data: { enabled } }));
+    }
+  };
+
+  const handleRefreshAnalysis = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "request_token_analysis_summary" }));
     }
   };
 
@@ -332,6 +340,8 @@ export default function Home() {
         try { localStorage.setItem("autoTraderConfig", JSON.stringify(cfgData)); } catch {}
       } else if (msg.type === "auto_trader_state") {
         setAutoTraderRunning(msg.data.running);
+      } else if (msg.type === "token_analysis_summary_snapshot") {
+        setAnalysisSummary(msg.data);
       }
 
       try {
@@ -363,6 +373,8 @@ export default function Home() {
       wsInstance.onopen = () => {
         setIsConnected(true);
         setConnectionMessage("");
+        // Token analiz özeti iste
+        wsInstance?.send(JSON.stringify({ type: "request_token_analysis_summary" }));
       };
 
       wsInstance.onmessage = (event) => {
@@ -591,6 +603,11 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+
+                <TokenAnalysisPanel
+                  summary={analysisSummary}
+                  onRefresh={handleRefreshAnalysis}
+                />
 
               </div>
             </div>
