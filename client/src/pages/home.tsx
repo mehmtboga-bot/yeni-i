@@ -7,6 +7,7 @@ import { WalletBalance } from "@/components/WalletBalance";
 import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
 import { AutoTraderPanel } from "@/components/AutoTraderPanel";
+import { TokenAnalysisPanel } from "@/components/TokenAnalysisPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig, AutoTraderConfig } from "@shared/schema";
+import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig, AutoTraderConfig, TokenStats } from "@shared/schema";
 import type { ServerLog } from "@/components/LogPanel";
 
 const MAX_MINTED_TOKENS = 7;
@@ -197,6 +198,11 @@ export default function Home() {
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
+  const [tokenAnalysis, setTokenAnalysis] = useState<{
+    analysis: TokenStats[];
+    topRecommendations: TokenStats[];
+    tokensToAvoid: TokenStats[];
+  } | null>(null);
   const logIdRef = useRef(0);
   const logBottomRef = useRef<HTMLDivElement>(null);
 
@@ -245,6 +251,12 @@ export default function Home() {
   const handleAutoTraderToggle = (enabled: boolean) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "toggle_auto_trader", data: { enabled } }));
+    }
+  };
+
+  const handleRefreshTokenAnalysis = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "request_token_analysis" }));
     }
   };
 
@@ -332,6 +344,8 @@ export default function Home() {
         try { localStorage.setItem("autoTraderConfig", JSON.stringify(cfgData)); } catch {}
       } else if (msg.type === "auto_trader_state") {
         setAutoTraderRunning(msg.data.running);
+      } else if (msg.type === "token_analysis_snapshot") {
+        setTokenAnalysis(msg.data);
       }
 
       try {
@@ -363,6 +377,8 @@ export default function Home() {
       wsInstance.onopen = () => {
         setIsConnected(true);
         setConnectionMessage("");
+        // Token analiz iste
+        wsInstance?.send(JSON.stringify({ type: "request_token_analysis" }));
       };
 
       wsInstance.onmessage = (event) => {
@@ -594,6 +610,14 @@ export default function Home() {
 
               </div>
             </div>
+
+            {/* Token Analiz Paneli */}
+            <TokenAnalysisPanel
+              topRecommendations={tokenAnalysis?.topRecommendations}
+              tokensToAvoid={tokenAnalysis?.tokensToAvoid}
+              allAnalysis={tokenAnalysis?.analysis}
+              onRefresh={handleRefreshTokenAnalysis}
+            />
           </div>
         </div>
 

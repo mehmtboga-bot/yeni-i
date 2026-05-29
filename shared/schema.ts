@@ -94,6 +94,26 @@ export const skippedTokenSchema = z.object({
 
 export type SkippedToken = z.infer<typeof skippedTokenSchema>;
 
+export const tokenStatsSchema = z.object({
+  symbol: z.string(),
+  mintAddress: z.string(),
+  detectedAt: z.number(),
+  rugPullDetected: z.boolean(),
+  rugPullTime: z.number().optional(),
+  survivedMinutes: z.number(),
+  trades: z.object({
+    bought: z.number(),
+    sold: z.number(),
+    failed: z.number(),
+    avgPnL: z.number(),
+    winRate: z.number(),
+  }),
+  riskScore: z.number(),
+  recommendation: z.enum(["BUY", "AVOID", "CAUTION"]),
+});
+
+export type TokenStats = z.infer<typeof tokenStatsSchema>;
+
 export const wsMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mint_detected"), data: mintedTokenSchema }),
   z.object({ type: z.literal("lp_detected"), data: lpDetectionSchema }),

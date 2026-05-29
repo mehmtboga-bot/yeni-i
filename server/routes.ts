@@ -11,6 +11,7 @@ import { saveSecrets } from "./secrets-loader";
 import fs from "fs";
 import path from "path";
 import { EventStore } from "./event-store";
+import { TokenAnalyzer } from "./token-analyzer";
 
 const ROOT = process.cwd();
 
@@ -168,6 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ---- Trade store + Jupiter ----
   const tradeStore = new TradeStore();
+  const tokenAnalyzer = new TokenAnalyzer(eventStore, tradeStore);
   const trader = new JupiterTrader(tradeStore, (event, data) => {
     if (event === "position_update") {
       broadcastToClients({ type: "position_update", data });
@@ -510,6 +512,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               data: {
                 config: autoTraderConfigStore.getConfig(),
                 records: autoTraderEngine.getRecords(),
+              },
+            })
+          );
+        } else if (message.type === "request_token_analysis") {
+          const analysis = tokenAnalyzer.analyzeLast12Hours();
+          ws.send(
+            JSON.stringify({
+              type: "token_analysis_snapshot",
+              data: {
+                analysis,
+                topRecommendations: tokenAnalyzer.getTopRecommendations(5),
+                tokensToAvoid: tokenAnalyzer.getTokensToAvoid(5),
               },
             })
           );
