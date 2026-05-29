@@ -7,6 +7,7 @@
  */
 
 import type { TradeStore } from "./trade-store";
+import type { DetectedTokenStore } from "./detected-token-store";
 import type { Position } from "@shared/schema";
 
 export interface TokenStats {
@@ -49,11 +50,10 @@ export interface TokenAnalysis {
 }
 
 export class TokenAnalyzer {
-  private tradeStore: TradeStore;
-
-  constructor(tradeStore: TradeStore) {
-    this.tradeStore = tradeStore;
-  }
+  constructor(
+    private tradeStore: TradeStore,
+    private detectedTokenStore?: DetectedTokenStore
+  ) {}
 
   /**
    * Tüm pozisyonları analiz ederek TokenStats listesi döndürür
@@ -219,20 +219,68 @@ export class TokenAnalyzer {
   // ─── Son 12 Saat Analizi ────────────────────────────────────────────────────
 
   /**
-   * Son 12 saatteki tüm token'leri analiz eder, rug pull riski hesaplar
-   * ve tavsiye oranına göre sıralar.
+   * Son 12 saatteki tüm token'leri analiz eder (satın aldıklarım + Helius'tan gelen hepsi)
    */
   analyzeLast12Hours(): TokenAnalysis[] {
     const cutoff = Date.now() - 12 * 60 * 60 * 1000;
+
+    // Satın aldıklarım
     const positions = this.tradeStore.getAll();
 
+    // Helius'tan gelen token'ler
+    const detectedTokens = this.detectedTokenStore?.getAll() || [];
+
+    console.log(`📊 Token Analyzer: ${positions.length} satın alınan, ${detectedTokens.length} tespit edilen token`);
+
     const grouped = new Map<string, Position[]>();
+
+    // Satın alınan token'leri ekle
     for (const pos of positions) {
-      if ((pos.buyTimestamp ?? 0) < cutoff) continue;
+      if ((pos.buyTimestamp ?? 0) < cutoff) {
+        continue;
+      }
       const key = pos.mintAddress;
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(pos);
     }
+
+    // Tespit edilen token'leri ekle (satın alınmamış olanlar)
+    for (const detected of detectedTokens) {
+      if (detected.detectedAt < cutoff) {
+        continue;
+      }
+      const key = detected.mintAddress;
+
+      // Eğer zaten satın aldıysam, atla
+      if (grouped.has(key)) {
+        continue;
+      }
+
+      // Dummy position oluştur (analiz için)
+      const dummyPos: Position = {
+        id: `detected-${detected.mintAddress}`,
+        mintAddress: detected.mintAddress,
+        symbol: detected.symbol,
+        name: detected.name,
+        buyTimestamp: detected.detectedAt,
+        buyPriceSol: 0,
+        buySolAmount: 0,
+        buyTokenAmount: 0,
+        status: "pending_buy",
+        buyTxSignature: "",
+        sellTimestamp: undefined,
+        sellPriceSol: undefined,
+        sellSolAmount: undefined,
+        pnlSol: undefined,
+        pnlPct: undefined,
+        error: undefined,
+      };
+
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(dummyPos);
+    }
+
+    console.log(`📊 Token Analyzer: ${grouped.size} token analiz ediliyor`);
 
     const result: TokenAnalysis[] = [];
 
@@ -324,6 +372,7 @@ export class TokenAnalyzer {
       });
     }
 
+    console.log(`📊 Token Analyzer: ${result.length} token analiz edildi`);
     return result.sort((a, b) => b.recommendationScore - a.recommendationScore);
   }
 
