@@ -12,6 +12,7 @@ import fs from "fs";
 import path from "path";
 import { EventStore } from "./event-store";
 import { TokenAnalyzer } from "./token-analyzer";
+import { DetectedTokenStore } from "./detected-token-store";
 
 const ROOT = process.cwd();
 
@@ -169,7 +170,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ---- Trade store + Jupiter ----
   const tradeStore = new TradeStore();
-  const tokenAnalyzer = new TokenAnalyzer(tradeStore);
+  const detectedTokenStore = new DetectedTokenStore();
+  const tokenAnalyzer = new TokenAnalyzer(tradeStore, detectedTokenStore);
   const trader = new JupiterTrader(tradeStore, (event, data) => {
     if (event === "position_update") {
       broadcastToClients({ type: "position_update", data });
@@ -303,6 +305,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastToClients({ type: "mint_detected", data });
     } else if (event === "lp_detected") {
       broadcastToClients({ type: "lp_detected", data });
+
+      // Tespit edilen token'i store'a ekle
+      detectedTokenStore.add({
+        id: data.id,
+        mintAddress: data.mintAddress,
+        name: data.name,
+        symbol: data.symbol,
+        detectedAt: data.detectedAt,
+        liquidityAmount: data.liquidityAmount,
+        liquidityUsd: data.liquidityUsd,
+        tvlUsd: data.tvlUsd,
+        platform: data.platform,
+      });
 
       // Otomatik trader enabled ise direkt alım yap (hızlı)
       const autoConfig = autoTraderConfigStore.getConfig();
