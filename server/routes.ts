@@ -543,13 +543,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })
           );
         } else if (message.type === "request_token_analysis") {
+          console.log("📊 Token analysis requested");
+          const analysis = tokenAnalyzer.analyzeLast12Hours();
+          const similarGroups = tokenAnalyzer.getSimilarSymbolGroups();
+          const overallStats = tokenAnalyzer.getOverallStats();
+
+          console.log(`📊 Sending analysis: ${analysis.length} tokens, ${similarGroups.length} groups`);
+
           ws.send(
             JSON.stringify({
               type: "token_analysis_snapshot",
               data: {
-                analysis: tokenAnalyzer.analyzeLast12Hours(),
-                similarGroups: tokenAnalyzer.getSimilarSymbolGroups(),
-                overallStats: tokenAnalyzer.getOverallStats(),
+                analysis,
+                similarGroups,
+                overallStats,
               },
             })
           );
