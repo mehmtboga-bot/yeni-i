@@ -124,16 +124,6 @@ export function LPLogTable({
                   </Button>
 
                   <div className="flex gap-1 ml-1">
-                    {log.pumpfunUrl && (
-                      <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs" data-testid="button-lp-pumpfun">
-                        <a href={log.pumpfunUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3 mr-1" />Pump</a>
-                      </Button>
-                    )}
-                    {log.jupiterUrl && (
-                      <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs" data-testid="button-lp-jupiter">
-                        <a href={log.jupiterUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3 mr-1" />Jupiter</a>
-                      </Button>
-                    )}
                     {log.dexscreenerUrl && (
                       <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs" data-testid="button-lp-dex">
                         <a href={log.dexscreenerUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3 mr-1" />Dex</a>
