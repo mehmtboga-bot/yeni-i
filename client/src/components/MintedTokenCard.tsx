@@ -29,7 +29,6 @@ export function MintedTokenCard({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const jupiterUrl = `https://jup.ag/swap/SOL-${token.mintAddress}`;
   const dexscreenerUrl = `https://dexscreener.com/solana/${token.mintAddress}`;
   const canBuy = traderReady && !hasOpenPosition;
 
@@ -107,11 +106,6 @@ export function MintedTokenCard({
               </Button>
             </>
           )}
-          <Button size="sm" variant="outline" asChild className="flex-1 min-w-[70px]" data-testid="button-jupiter">
-            <a href={jupiterUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />Jupiter
-            </a>
-          </Button>
           <Button size="sm" variant="outline" asChild className="flex-1 min-w-[70px]" data-testid="button-dexscreener">
             <a href={dexscreenerUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="h-3.5 w-3.5 mr-1.5" />Dex
