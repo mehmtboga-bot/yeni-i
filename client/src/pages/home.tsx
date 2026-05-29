@@ -8,6 +8,7 @@ import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
 import { AutoTraderPanel } from "@/components/AutoTraderPanel";
 import { TokenComparisonPanel } from "@/components/TokenComparisonPanel";
+import { TokenAnalysisDashboard } from "@/components/TokenAnalysisDashboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -199,6 +200,7 @@ export default function Home() {
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
   const [tokenComparison, setTokenComparison] = useState<any[]>([]);
+  const [tokenAnalysis, setTokenAnalysis] = useState<any>(null);
   const logIdRef = useRef(0);
   const logBottomRef = useRef<HTMLDivElement>(null);
 
@@ -336,6 +338,8 @@ export default function Home() {
         setAutoTraderRunning(msg.data.running);
       } else if (msg.type === "token_comparison_snapshot") {
         setTokenComparison(msg.data);
+      } else if (msg.type === "token_analysis_snapshot") {
+        setTokenAnalysis(msg.data);
       }
 
       try {
@@ -369,6 +373,8 @@ export default function Home() {
         setConnectionMessage("");
         // Token karşılaştırma iste
         wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
+        // Token analiz iste
+        wsInstance?.send(JSON.stringify({ type: "request_token_analysis" }));
       };
 
       wsInstance.onmessage = (event) => {
@@ -610,6 +616,23 @@ export default function Home() {
 
               </div>
             </div>
+
+            {/* Token Analiz Dashboard */}
+            {tokenAnalysis && (
+              <TokenAnalysisDashboard
+                analysis={tokenAnalysis.analysis}
+                similarGroups={tokenAnalysis.similarGroups}
+                overallStats={tokenAnalysis.overallStats}
+                onRefresh={() => {
+                  if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "request_token_analysis" }));
+                  }
+                }}
+                onSelectToken={(mintAddress, symbol) => {
+                  handleBuy(mintAddress, symbol, symbol);
+                }}
+              />
+            )}
           </div>
         </div>
 

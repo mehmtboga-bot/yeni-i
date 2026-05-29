@@ -3,6 +3,7 @@
  *
  * Kapatılmış pozisyonları analiz ederek aynı isimde token'leri gruplar
  * ve tavsiye oranına göre sıralar.
+ * Son 12 saatteki token'leri analiz ederek rug pull riski hesaplar.
  */
 
 import type { TradeStore } from "./trade-store";
@@ -24,6 +25,27 @@ export interface TokenStats {
   };
   riskScore: number;
   recommendation: "BUY" | "AVOID" | "CAUTION";
+}
+
+export interface TokenAnalysis {
+  mintAddress: string;
+  symbol: string;
+  name: string;
+  detectedAt: number;
+  rugPullDetected: boolean;
+  rugPullTime?: number;
+  rugPullRiskScore: number;
+  survivedMinutes: number;
+  trades: {
+    total: number;
+    bought: number;
+    sold: number;
+    failed: number;
+    winRate: number;
+    avgPnL: number;
+  };
+  recommendation: "BUY" | "CAUTION" | "AVOID";
+  recommendationScore: number;
 }
 
 export class TokenAnalyzer {
@@ -192,5 +214,254 @@ export class TokenAnalyzer {
     }
 
     return result;
+  }
+
+  // ─── Son 12 Saat Analizi ────────────────────────────────────────────────────
+
+  /**
+   * Son 12 saatteki tüm token'leri analiz eder, rug pull riski hesaplar
+   * ve tavsiye oranına göre sıralar.
+   */
+  analyzeLast12Hours(): TokenAnalysis[] {
+    const cutoff = Date.now() - 12 * 60 * 60 * 1000;
+    const positions = this.tradeStore.getAll();
+
+    const grouped = new Map<string, Position[]>();
+    for (const pos of positions) {
+      if ((pos.buyTimestamp ?? 0) < cutoff) continue;
+      const key = pos.mintAddress;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(pos);
+    }
+
+    const result: TokenAnalysis[] = [];
+
+    for (const [mintAddress, posList] of grouped.entries()) {
+      const first = posList[0];
+      const symbol = first.symbol || "?";
+      const name = first.name || "Bilinmiyor";
+      const detectedAt = first.buyTimestamp ?? Date.now();
+
+      const rugPullPos = posList.find(
+        (p) =>
+          p.pnlPct === -100 ||
+          (p.error && p.error.toLowerCase().includes("rug"))
+      );
+      const rugPullDetected = !!rugPullPos;
+      const rugPullTime = rugPullPos?.sellTimestamp;
+
+      const latestTimestamp = posList.reduce((max, p) => {
+        const t = p.sellTimestamp ?? p.buyTimestamp ?? 0;
+        return t > max ? t : max;
+      }, detectedAt);
+      const survivedMinutes = Math.round(
+        (latestTimestamp - detectedAt) / 60_000
+      );
+
+      const bought = posList.filter((p) => p.status !== "failed").length;
+      const sold = posList.filter((p) => p.status === "closed").length;
+      const failed = posList.filter((p) => p.status === "failed").length;
+
+      const closedWithPnl = posList.filter(
+        (p) => p.status === "closed" && typeof p.pnlPct === "number"
+      );
+      const wins = closedWithPnl.filter((p) => (p.pnlPct ?? 0) > 0).length;
+      const winRate =
+        closedWithPnl.length > 0
+          ? Math.round((wins / closedWithPnl.length) * 100)
+          : 0;
+      const avgPnL =
+        closedWithPnl.length > 0
+          ? Math.round(
+              closedWithPnl.reduce((sum, p) => sum + (p.pnlPct ?? 0), 0) /
+                closedWithPnl.length
+            )
+          : 0;
+
+      let rugPullRiskScore = 0;
+      if (rugPullDetected) {
+        rugPullRiskScore = 100;
+      } else if (survivedMinutes < 5) {
+        rugPullRiskScore = 80;
+      } else if (survivedMinutes < 15) {
+        rugPullRiskScore = 60;
+      } else if (survivedMinutes < 60) {
+        rugPullRiskScore = 40;
+      } else if (survivedMinutes >= 240) {
+        rugPullRiskScore = 10;
+      } else {
+        rugPullRiskScore = 20;
+      }
+
+      let recommendationScore = 100 - rugPullRiskScore;
+      if (winRate >= 70) recommendationScore += 10;
+      else if (winRate < 30) recommendationScore -= 10;
+      if (avgPnL >= 30) recommendationScore += 10;
+      else if (avgPnL < -20) recommendationScore -= 10;
+      recommendationScore = Math.max(0, Math.min(100, recommendationScore));
+
+      let recommendation: "BUY" | "CAUTION" | "AVOID";
+      if (recommendationScore >= 70) {
+        recommendation = "BUY";
+      } else if (recommendationScore >= 40) {
+        recommendation = "CAUTION";
+      } else {
+        recommendation = "AVOID";
+      }
+
+      result.push({
+        mintAddress,
+        symbol,
+        name,
+        detectedAt,
+        rugPullDetected,
+        rugPullTime,
+        rugPullRiskScore,
+        survivedMinutes,
+        trades: { total: posList.length, bought, sold, failed, winRate, avgPnL },
+        recommendation,
+        recommendationScore,
+      });
+    }
+
+    return result.sort((a, b) => b.recommendationScore - a.recommendationScore);
+  }
+
+  /**
+   * Aynı/benzer sembol adına sahip token'leri gruplar ve istatistik döndürür.
+   */
+  getSimilarSymbolGroups(): any[] {
+    const allTokens = this.analyzeLast12Hours();
+    const grouped = new Map<string, TokenAnalysis[]>();
+
+    for (const token of allTokens) {
+      if (!grouped.has(token.symbol)) {
+        grouped.set(token.symbol, []);
+      }
+      grouped.get(token.symbol)!.push(token);
+    }
+
+    // Sayısal suffix'i kaldırarak base sembol oluştur
+    const similarGroups = new Map<string, Map<string, TokenAnalysis[]>>();
+    for (const [symbol, tokens] of grouped.entries()) {
+      const baseSymbol = symbol.replace(/\d+$/, "");
+      if (!similarGroups.has(baseSymbol)) {
+        similarGroups.set(baseSymbol, new Map());
+      }
+      similarGroups.get(baseSymbol)!.set(symbol, tokens);
+    }
+
+    const result = Array.from(similarGroups.entries())
+      .map(([baseSymbol, variants]) => {
+        const variantArray = Array.from(variants.entries()).map(
+          ([symbol, tokens]) => {
+            const rugPullCount = tokens.filter((t) => t.rugPullDetected).length;
+            const avgRugPullRisk = Math.round(
+              tokens.reduce((sum, t) => sum + t.rugPullRiskScore, 0) /
+                tokens.length
+            );
+            const avgSurvivedMinutes = Math.round(
+              tokens.reduce((sum, t) => sum + t.survivedMinutes, 0) /
+                tokens.length
+            );
+            return {
+              symbol,
+              count: tokens.length,
+              tokens,
+              bestToken: tokens[0] ?? null,
+              stats: {
+                avgRugPullRisk,
+                avgSurvivedMinutes,
+                rugPullCount,
+                totalCount: tokens.length,
+              },
+            };
+          }
+        );
+
+        variantArray.sort((a, b) => {
+          const aScore = a.bestToken?.recommendationScore ?? 0;
+          const bScore = b.bestToken?.recommendationScore ?? 0;
+          return bScore - aScore;
+        });
+
+        const allTokensInGroup = variantArray.flatMap((v) => v.tokens);
+        const bestOverall = allTokensInGroup[0] ?? null;
+        const rugPullCount = allTokensInGroup.filter(
+          (t) => t.rugPullDetected
+        ).length;
+        const avgRugPullRisk = Math.round(
+          allTokensInGroup.reduce((sum, t) => sum + t.rugPullRiskScore, 0) /
+            allTokensInGroup.length
+        );
+        const avgSurvivedMinutes = Math.round(
+          allTokensInGroup.reduce((sum, t) => sum + t.survivedMinutes, 0) /
+            allTokensInGroup.length
+        );
+        const rugPullPercentage = Math.round(
+          (rugPullCount / allTokensInGroup.length) * 100
+        );
+
+        return {
+          baseSymbol,
+          variants: variantArray,
+          totalCount: allTokensInGroup.length,
+          bestOverall,
+          groupStats: {
+            avgRugPullRisk,
+            avgSurvivedMinutes,
+            rugPullCount,
+            rugPullPercentage,
+          },
+        };
+      })
+      .filter((g) => g.variants.length > 1)
+      .sort((a, b) => {
+        const aScore = a.bestOverall?.recommendationScore ?? 0;
+        const bScore = b.bestOverall?.recommendationScore ?? 0;
+        return bScore - aScore;
+      });
+
+    return result;
+  }
+
+  /**
+   * Son 12 saatteki genel istatistikleri döndürür.
+   */
+  getOverallStats(): any {
+    const allTokens = this.analyzeLast12Hours();
+
+    if (allTokens.length === 0) {
+      return {
+        totalTokens: 0,
+        rugPullCount: 0,
+        rugPullPercentage: 0,
+        avgSurvivedMinutes: 0,
+        avgRugPullRisk: 0,
+        bestTokens: [],
+        worstTokens: [],
+      };
+    }
+
+    const rugPullCount = allTokens.filter((t) => t.rugPullDetected).length;
+    const avgSurvivedMinutes = Math.round(
+      allTokens.reduce((sum, t) => sum + t.survivedMinutes, 0) / allTokens.length
+    );
+    const avgRugPullRisk = Math.round(
+      allTokens.reduce((sum, t) => sum + t.rugPullRiskScore, 0) / allTokens.length
+    );
+    const rugPullPercentage = Math.round(
+      (rugPullCount / allTokens.length) * 100
+    );
+
+    return {
+      totalTokens: allTokens.length,
+      rugPullCount,
+      rugPullPercentage,
+      avgSurvivedMinutes,
+      avgRugPullRisk,
+      bestTokens: allTokens.slice(0, 5),
+      worstTokens: allTokens.slice(-5).reverse(),
+    };
   }
 }
