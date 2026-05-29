@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Coins, Droplet, Lock, BarChart2 } from "lucide-react";
+import { Bot, Coins, Droplet, Lock } from "lucide-react";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { MintedTokenCard } from "@/components/MintedTokenCard";
 import { LPLogTable } from "@/components/LPLogTable";
@@ -8,7 +8,6 @@ import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
 import { AutoTraderPanel } from "@/components/AutoTraderPanel";
 import { TokenComparisonPanel } from "@/components/TokenComparisonPanel";
-import { TokenAnalysisDashboard } from "@/components/TokenAnalysisDashboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +24,7 @@ const MAX_LP_LOGS = 30;
 const MINT_DISPLAY_DURATION = 3 * 60 * 1000;
 const LP_LOG_DURATION = 5 * 60 * 1000;
 
-type Tab = "console" | "dashboard" | "trade" | "files" | "analysis";
+type Tab = "console" | "dashboard" | "trade" | "files";
 
 const DEFAULT_CONFIG: TradeConfig = {
   solAmount: 0.01,
@@ -97,16 +96,6 @@ function PlusIcon({ active }: { active: boolean }) {
     </svg>
   );
 }
-function BarChart2Icon({ active }: { active: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-      <rect x="3" y="12" width="3" height="8" fill={active ? "hsl(var(--primary))" : "none"} stroke={active ? "hsl(var(--primary))" : "currentColor"} strokeWidth="1.8" />
-      <rect x="10" y="6" width="3" height="14" fill={active ? "hsl(var(--primary))" : "none"} stroke={active ? "hsl(var(--primary))" : "currentColor"} strokeWidth="1.8" />
-      <rect x="17" y="3" width="3" height="17" fill={active ? "hsl(var(--primary))" : "none"} stroke={active ? "hsl(var(--primary))" : "currentColor"} strokeWidth="1.8" />
-    </svg>
-  );
-}
-
 const levelStyle: Record<ServerLog["level"], string> = {
   info:  "text-emerald-400",
   warn:  "text-yellow-400",
@@ -209,7 +198,6 @@ export default function Home() {
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
   const [tokenComparison, setTokenComparison] = useState<any[]>([]);
-  const [tokenAnalysis, setTokenAnalysis] = useState<any>(null);
   const logIdRef = useRef(0);
   const logBottomRef = useRef<HTMLDivElement>(null);
 
@@ -347,9 +335,6 @@ export default function Home() {
         setAutoTraderRunning(msg.data.running);
       } else if (msg.type === "token_comparison_snapshot") {
         setTokenComparison(msg.data);
-      } else if (msg.type === "token_analysis_snapshot") {
-        console.log("Token analysis snapshot received:", msg.data);
-        setTokenAnalysis(msg.data);
       }
 
       try {
@@ -381,11 +366,8 @@ export default function Home() {
       wsInstance.onopen = () => {
         setIsConnected(true);
         setConnectionMessage("");
-        console.log("WebSocket connected, requesting token analysis...");
         // Token karşılaştırma iste
         wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
-        // Token analiz iste
-        wsInstance?.send(JSON.stringify({ type: "request_token_analysis" }));
       };
 
       wsInstance.onmessage = (event) => {
@@ -440,7 +422,6 @@ export default function Home() {
     { id: "dashboard", label: "Dashboard", icon: (a) => <SquareIcon  active={a} /> },
     { id: "trade",     label: "Trade",    icon: (a) => <PlusIcon    active={a} /> },
     { id: "files",     label: "Dosyalar", icon: (a) => <CircleIcon   active={a} /> },
-    { id: "analysis",  label: "Analiz",   icon: (a) => <BarChart2Icon active={a} /> },
   ];
 
   return (
@@ -669,43 +650,6 @@ export default function Home() {
           <FileEditor />
         </div>
 
-        {/* Analysis Tab */}
-        <div className={`h-full overflow-y-auto ${activeTab === "analysis" ? "block" : "hidden"}`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            {(() => {
-              const dummyAnalysis = tokenAnalysis || {
-                analysis: [],
-                similarGroups: [],
-                overallStats: {
-                  totalTokens: 0,
-                  rugPullCount: 0,
-                  rugPullPercentage: 0,
-                  avgSurvivedMinutes: 0,
-                  avgRugPullRisk: 0,
-                  bestTokens: [],
-                  worstTokens: [],
-                },
-              };
-              return (
-                <TokenAnalysisDashboard
-                  analysis={dummyAnalysis.analysis || []}
-                  similarGroups={dummyAnalysis.similarGroups || []}
-                  overallStats={dummyAnalysis.overallStats}
-                  onRefresh={() => {
-                    console.log("Refresh clicked");
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                      ws.send(JSON.stringify({ type: "request_token_analysis" }));
-                    }
-                  }}
-                  onSelectToken={(mintAddress, symbol) => {
-                    console.log("Token selected:", mintAddress, symbol);
-                    handleBuy(mintAddress, symbol, symbol);
-                  }}
-                />
-              );
-            })()}
-          </div>
-        </div>
       </div>
 
       <Dialog open={autoTraderOpen} onOpenChange={setAutoTraderOpen}>
