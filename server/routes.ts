@@ -391,12 +391,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const message = JSON.parse(data.toString());
         if (message.type === "toggle_monitoring") {
-          // Monitor her zaman çalışıyor, sadece UI state'ini değiştir
-          const enabled = message.data.enabled;
-          broadcastToClients({
-            type: "monitoring_state",
-            data: { isMonitoring: enabled },
-          });
+          if (message.data.enabled) {
+            monitor.start();
+          } else {
+            monitor.stop();
+          }
         } else if (message.type === "get_balance") {
           const publicKey = message.data.publicKey;
           try {
