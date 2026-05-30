@@ -525,6 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on("close", () => {
       _origLog("👋 Client bağlantısı kesildi");
       clients.delete(ws);
+      // Monitor durmuyor, çalışmaya devam ediyor
     });
 
     ws.on("error", () => {
