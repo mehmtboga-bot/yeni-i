@@ -15,6 +15,7 @@ const FILE_LABELS: Record<string, string> = {
   "server/index.ts":          "index.ts",
   "server/storage.ts":        "storage.ts",
   "shared/schema.ts":         "schema.ts",
+  "data/whitelist.txt":       "whitelist.txt",
 };
 
 const DIR_LABELS: Record<string, string> = {
@@ -23,6 +24,7 @@ const DIR_LABELS: Record<string, string> = {
   "server/index.ts":          "server/",
   "server/storage.ts":        "server/",
   "shared/schema.ts":         "shared/",
+  "data/whitelist.txt":       "data/",
 };
 
 export function FileEditor() {
