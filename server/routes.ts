@@ -16,17 +16,6 @@ import { EventStore } from "./event-store";
 const ROOT = process.cwd();
 
 const ALLOWED_FILES = [
-  "server/helius-monitor.ts",
-  "server/routes.ts",
-  "server/index.ts",
-  "server/storage.ts",
-  "server/jupiter-trader.ts",
-  "server/trade-store.ts",
-  "server/auto-trader-config.ts",
-  "server/auto-trader-engine.ts",
-  "server/whitelist-manager.ts",
-  "shared/schema.ts",
-  "data/secrets.json",
   "data/whitelist.txt",
 ];
 
