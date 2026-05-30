@@ -10,21 +10,11 @@ interface FileEntry {
 }
 
 const FILE_LABELS: Record<string, string> = {
-  "server/helius-monitor.ts": "helius-monitor.ts",
-  "server/routes.ts":         "routes.ts",
-  "server/index.ts":          "index.ts",
-  "server/storage.ts":        "storage.ts",
-  "shared/schema.ts":         "schema.ts",
-  "data/whitelist.txt":       "whitelist.txt",
+  "data/whitelist.txt": "whitelist.txt",
 };
 
 const DIR_LABELS: Record<string, string> = {
-  "server/helius-monitor.ts": "server/",
-  "server/routes.ts":         "server/",
-  "server/index.ts":          "server/",
-  "server/storage.ts":        "server/",
-  "shared/schema.ts":         "shared/",
-  "data/whitelist.txt":       "data/",
+  "data/whitelist.txt": "data/",
 };
 
 export function FileEditor() {
