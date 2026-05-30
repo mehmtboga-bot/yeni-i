@@ -391,11 +391,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const message = JSON.parse(data.toString());
         if (message.type === "toggle_monitoring") {
-          if (message.data.enabled) {
-            monitor.start();
-          } else {
-            monitor.stop();
-          }
+          // Monitor her zaman çalışıyor, sadece UI state'ini değiştir
+          const enabled = message.data.enabled;
+          broadcastToClients({
+            type: "monitoring_state",
+            data: { isMonitoring: enabled },
+          });
         } else if (message.type === "get_balance") {
           const publicKey = message.data.publicKey;
           try {
@@ -524,6 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on("close", () => {
       _origLog("👋 Client bağlantısı kesildi");
       clients.delete(ws);
+      // Monitor durmuyor, çalışmaya devam ediyor
     });
 
     ws.on("error", () => {
