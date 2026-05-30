@@ -8,6 +8,7 @@ import { PositionPricer } from "./position-pricer";
 import { AutoTraderConfigStore } from "./auto-trader-config";
 import { AutoTraderEngine } from "./auto-trader-engine";
 import { saveSecrets } from "./secrets-loader";
+import { WhitelistManager } from "./whitelist-manager";
 import fs from "fs";
 import path from "path";
 import { EventStore } from "./event-store";
@@ -23,8 +24,10 @@ const ALLOWED_FILES = [
   "server/trade-store.ts",
   "server/auto-trader-config.ts",
   "server/auto-trader-engine.ts",
+  "server/whitelist-manager.ts",
   "shared/schema.ts",
   "data/secrets.json",
+  "data/whitelist.txt",
 ];
 
 function safeResolvePath(filePath: string): string | null {
@@ -66,6 +69,8 @@ console.error = (...a) => capture("error", _origError, a);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
+
+  const whitelistManager = new WhitelistManager();
 
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
@@ -123,6 +128,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       fs.writeFileSync(resolved, content, "utf-8");
       _origLog(`📝 Dosya güncellendi: ${filePath}`);
+
+      // Whitelist dosyası güncellenirse, whitelist manager'ı yenile
+      if (filePath === "data/whitelist.txt") {
+        whitelistManager.updateWhitelist(
+          content
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+        );
+      }
+
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -309,6 +325,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const nm = name || "Bilinmiyor";
         const sym = symbol || "?";
         const solAmount = autoConfig.solAmountPerTrade;
+
+        // Whitelist kontrol et
+        if (!whitelistManager.isWhitelisted(sym)) {
+          console.log(`⏭️ [Fast-Buy] ${sym} whitelist'te yok, atlanıyor`);
+          return;
+        }
 
         // Auto-trader'a bildir (record tutması için)
         autoTraderEngine.onLPDetected(data).catch((err) => console.error("Auto-trader LP hatası:", err));
