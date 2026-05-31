@@ -113,7 +113,7 @@ export class HeliusMonitor {
   private dexWebSocket: WebSocket | null = null;
   private processedDexSignatures: Set<string> = new Set();
   private recentTokenSymbols: Map<string, number> = new Map(); // symbol → timestamp
-  private readonly RECENT_TOKEN_WINDOW_MS = 25 * 60 * 1000; // 25 dakika
+  private readonly RECENT_TOKEN_WINDOW_MS = 20 * 60 * 1000; // 20 dakika
   private skippedTokens: Array<{ symbol: string; skippedAt: number; count: number }> = [];
   private readonly MAX_SKIPPED_TOKENS = 50;
 
@@ -305,10 +305,10 @@ export class HeliusMonitor {
       const name       = metadata?.name   || "Bilinmiyor";
       const symbol     = metadata?.symbol || "?";
 
-      // Son 25 dakikada çıkan symbol mi?
+      // Son 20 dakikada çıkan symbol mi?
       const lastSeen = this.recentTokenSymbols.get(symbol);
       if (lastSeen && Date.now() - lastSeen < this.RECENT_TOKEN_WINDOW_MS) {
-        console.log(`⏭️ [LP] ${symbol} son 25 dakikada görüldü, arayüzde gösteriliyor (otomatik alım yapılmayacak)`);
+        console.log(`⏭️ [LP] ${symbol} son 20 dakikada görüldü, arayüzde gösteriliyor (otomatik alım yapılmayacak)`);
 
         // Atlanan token'i kaydet
         const existing = this.skippedTokens.find(t => t.symbol === symbol);
@@ -347,7 +347,7 @@ export class HeliusMonitor {
       // Symbol'ü kaydet
       this.recentTokenSymbols.set(symbol, Date.now());
 
-      // Eski symbol'leri temizle (25 dakikadan eski)
+      // Eski symbol'leri temizle (20 dakikadan eski)
       const cutoff = Date.now() - this.RECENT_TOKEN_WINDOW_MS;
       for (const [sym, ts] of this.recentTokenSymbols.entries()) {
         if (ts < cutoff) {
