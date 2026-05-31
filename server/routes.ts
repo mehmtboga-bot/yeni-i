@@ -195,6 +195,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data.pnlPct
         );
       }
+      // Manuel satış veya rug pull tespiti — auto-trader record'unu kapat
+      if (data.status === "closed") {
+        autoTraderEngine.markRecordClosed(data.mintAddress);
+      }
     } else if (event === "trade_config_update") {
       broadcastToClients({ type: "trade_config_update", data });
     }
@@ -439,7 +443,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (message.type === "sell_token") {
           const { positionId } = message.data || {};
           if (positionId) {
-            trader.sell(positionId).catch((err) => console.error("sell_token hatası:", err));
+            trader.sell(positionId).then((result) => {
+              if (result && result.status === "closed") {
+                // Satış başarılı → auto-trader record'unu kapat
+                const pos = tradeStore.getById(positionId);
+                if (pos) {
+                  autoTraderEngine.markRecordClosed(pos.mintAddress);
+                }
+              }
+            }).catch((err) => console.error("sell_token hatası:", err));
           }
         } else if (message.type === "trade_config_update") {
           const { solAmount, slippageBps, priorityFeeMicroLamports, takeProfitPct } = message.data || {};
