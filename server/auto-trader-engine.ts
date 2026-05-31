@@ -228,15 +228,72 @@ export class AutoTraderEngine {
    */
   private async checkLiquidityDrop(recordId: string, record: AutoTradeRecord): Promise<void> {
     try {
-      const res = await fetch(
-        `https://api.dexscreener.com/latest/dex/tokens/${record.mintAddress}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
-      if (!res.ok) return;
+      let res: Response | null = null;
+      let lastErr: Error | null = null;
+
+      // 3 deneme yap
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          res = await fetch(
+            `https://api.dexscreener.com/latest/dex/tokens/${record.mintAddress}`,
+            { signal: AbortSignal.timeout(10000) }
+          );
+          if (res.ok) break;
+          lastErr = new Error(`HTTP ${res.status}`);
+        } catch (err) {
+          lastErr = err as Error;
+          if (attempt < 3) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+        }
+      }
+
+      if (!res || !res.ok) {
+        // API başarısız → Rug pull olarak kabul et (güvenli)
+        console.warn(
+          `⚠️ [Auto-Trader] DexScreener API başarısız (${lastErr?.message}): ${record.tokenSymbol} rug pull olarak kapatılıyor`
+        );
+        const freshRecord = this.records.get(recordId);
+        if (!freshRecord || freshRecord.status !== "active") return;
+
+        const position = this.tradeStore.getByMint(record.mintAddress);
+        if (position && position.status === "open") {
+          this.emit("auto_sell_ready", {
+            positionId: position.id,
+            forceClose: true,
+            pnlPct: -100,
+            reason: "api_error",
+          });
+          freshRecord.status = "sold";
+          freshRecord.pnlPct = -100;
+          this.emit("auto_trade_record_updated", freshRecord);
+        }
+        return;
+      }
 
       const data = await res.json();
       const pairs: any[] = data?.pairs ?? [];
-      if (pairs.length === 0) return;
+      if (pairs.length === 0) {
+        console.warn(
+          `⚠️ [Auto-Trader] Pair bulunamadı: ${record.tokenSymbol} rug pull olarak kapatılıyor`
+        );
+        const freshRecord = this.records.get(recordId);
+        if (!freshRecord || freshRecord.status !== "active") return;
+
+        const position = this.tradeStore.getByMint(record.mintAddress);
+        if (position && position.status === "open") {
+          this.emit("auto_sell_ready", {
+            positionId: position.id,
+            forceClose: true,
+            pnlPct: -100,
+            reason: "no_pair",
+          });
+          freshRecord.status = "sold";
+          freshRecord.pnlPct = -100;
+          this.emit("auto_trade_record_updated", freshRecord);
+        }
+        return;
+      }
 
       // En yüksek likiditeye sahip pair'i al
       const bestPair = pairs.reduce((best: any, p: any) => {
@@ -245,7 +302,27 @@ export class AutoTraderEngine {
       }, pairs[0]);
 
       const currentLiquidityUsd: number = bestPair?.liquidity?.usd ?? 0;
-      if (currentLiquidityUsd <= 0) return;
+      if (currentLiquidityUsd <= 0) {
+        console.warn(
+          `⚠️ [Auto-Trader] Likidite 0: ${record.tokenSymbol} rug pull olarak kapatılıyor`
+        );
+        const freshRecord = this.records.get(recordId);
+        if (!freshRecord || freshRecord.status !== "active") return;
+
+        const position = this.tradeStore.getByMint(record.mintAddress);
+        if (position && position.status === "open") {
+          this.emit("auto_sell_ready", {
+            positionId: position.id,
+            forceClose: true,
+            pnlPct: -100,
+            reason: "zero_liquidity",
+          });
+          freshRecord.status = "sold";
+          freshRecord.pnlPct = -100;
+          this.emit("auto_trade_record_updated", freshRecord);
+        }
+        return;
+      }
 
       const initialLiq = record.initialLiquidityUsd!;
       const dropPct = ((initialLiq - currentLiquidityUsd) / initialLiq) * 100;
@@ -274,8 +351,11 @@ export class AutoTraderEngine {
           this.emit("auto_trade_record_updated", freshRecord);
         }
       }
-    } catch {
-      // Sessizce devam et — likidite kontrolü kritik değil
+    } catch (err) {
+      console.error(
+        `❌ [Auto-Trader] Likidite kontrolü hatası (${record.tokenSymbol}):`,
+        err instanceof Error ? err.message : String(err)
+      );
     }
   }
 
