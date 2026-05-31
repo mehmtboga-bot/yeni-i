@@ -304,17 +304,52 @@ export class JupiterTrader {
 
       // TX indexer'a yansısın diye arka planda bekle, pozisyonu güncelle (bloklamıyor)
       (async () => {
+        let foundBalance = false;
+
         for (const delay of [2000, 3000, 5000]) {
           await new Promise((r) => setTimeout(r, delay));
-          try {
-            const bal = await this.getTokenBalance(mintAddress);
-            if (bal && bal.uiAmount > 0) {
-              const updated = { ...this.store.getById(position.id)!, buyTokenAmount: bal.uiAmount };
-              this.updateAndEmit(updated);
-              console.log(`🪙 [PumpSwap] Token bakiyesi güncellendi: ${bal.uiAmount.toLocaleString()} ${symbol}`);
-              return;
+
+          // Her delay'de 2 defa deneysin
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              const bal = await this.getTokenBalance(mintAddress);
+              if (bal && bal.uiAmount > 0) {
+                const updated = { ...this.store.getById(position.id)!, buyTokenAmount: bal.uiAmount };
+                this.updateAndEmit(updated);
+                console.log(`🪙 [PumpSwap] Token bakiyesi güncellendi (Deneme ${attempt}): ${bal.uiAmount.toLocaleString()} ${symbol}`);
+                foundBalance = true;
+                return;
+              }
+              console.warn(`⚠️ [PumpSwap] Deneme ${attempt}: Token bakiyesi bulunamadı`);
+            } catch (err) {
+              console.error(`❌ [PumpSwap] Deneme ${attempt} hatası:`, (err as Error).message);
             }
-          } catch { /* sessizce devam et */ }
+
+            // Deneme 1 başarısız olursa, deneme 2'den önce 1 saniye bekle
+            if (attempt === 1) {
+              await new Promise((r) => setTimeout(r, 1000));
+            }
+          }
+        }
+
+        // Tüm denemeler başarısız → Rug pull olarak kapatsın
+        if (!foundBalance) {
+          const pos = this.store.getById(position.id);
+          if (pos && pos.status === "open") {
+            const rugPullLoss = -(pos.buySolAmount ?? 0);
+            const closed = {
+              ...pos,
+              status: "closed" as const,
+              sellTimestamp: Date.now(),
+              sellSolAmount: 0,
+              sellPriceSol: 0,
+              pnlSol: rugPullLoss,
+              pnlPct: -100,
+              error: "Rug Pull - Token Bakiyesi Bulunamadı",
+            };
+            this.updateAndEmit(closed);
+            console.error(`🚨 [PumpSwap] ${symbol} token bakiyesi bulunamadı — rug pull olarak kapatıldı (-100%)`);
+          }
         }
       })();
 
