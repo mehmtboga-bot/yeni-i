@@ -369,6 +369,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Server başladığında kaydedilen durumu kontrol et
+  monitor.checkInitialMonitoringState();
+
   monitor.start();
 
   // Canlı fiyat güncelleme (açık pozisyonlar için)
