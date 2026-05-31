@@ -1,14 +1,11 @@
-import { Activity, WifiOff, Play, Square } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Activity, WifiOff } from "lucide-react";
 
 interface ConnectionStatusProps {
   isConnected: boolean;
   message?: string;
-  isMonitoring: boolean;
-  onToggleMonitoring: () => void;
 }
 
-export function ConnectionStatus({ isConnected, message, isMonitoring, onToggleMonitoring }: ConnectionStatusProps) {
+export function ConnectionStatus({ isConnected, message }: ConnectionStatusProps) {
   return (
     <div className="flex items-center gap-3">
       <div className="flex items-center gap-2">
@@ -31,26 +28,6 @@ export function ConnectionStatus({ isConnected, message, isMonitoring, onToggleM
           </>
         )}
       </div>
-      
-      <Button
-        size="sm"
-        variant={isMonitoring ? "destructive" : "default"}
-        onClick={onToggleMonitoring}
-        className="gap-1.5"
-        data-testid="button-toggle-monitoring"
-      >
-        {isMonitoring ? (
-          <>
-            <Square className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Durdur</span>
-          </>
-        ) : (
-          <>
-            <Play className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Başlat</span>
-          </>
-        )}
-      </Button>
     </div>
   );
 }

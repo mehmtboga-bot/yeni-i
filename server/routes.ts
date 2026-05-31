@@ -412,15 +412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on("message", async (data: Buffer) => {
       try {
         const message = JSON.parse(data.toString());
-        if (message.type === "toggle_monitoring") {
-          const enabled = message.data.enabled;
-          console.log(`🔄 Monitor ${enabled ? "başlatılıyor" : "durduruluyor"}...`);
-          monitor.setMonitoringEnabled(enabled);
-          broadcastToClients({
-            type: "monitoring_state",
-            data: { isMonitoring: enabled },
-          });
-        } else if (message.type === "get_balance") {
+        if (message.type === "get_balance") {
           const publicKey = message.data.publicKey;
           try {
             const balance = await monitor.getWalletBalance(publicKey);
