@@ -294,33 +294,12 @@ export class HeliusMonitor {
     });
 
     this.dexWebSocket.on("message", async (raw: Buffer) => {
+      // Monitor durdurulduysa event'leri işleme
+      if (!this.isRunning) return;
+
       try {
         const msg = JSON.parse(raw.toString());
-        const value = msg?.params?.result?.value;
-        if (!value) return;
-
-        const logs: string[] | undefined = value.logs;
-        const signature: string | undefined = value.signature;
-        if (!logs || !signature) return;
-
-        // ── LP filtresi (çift kontrol) ───────────────────────────────────────
-        // 1. PumpSwap programının doğrudan (depth=1) çağrıldığını doğrula
-        // 2. Tam "CreatePool" talimat logunu ara
-        // Bu iki koşul yalnızca yeni havuz oluşturma TX'lerinde aynı anda bulunur.
-        // Swap, RemoveLiquidity, CollectFees vb. işlemlerde bulunmaz → sıfır HTTP çağrısı.
-        const hasInvoke     = logs.includes(PUMPSWAP_INVOKE);
-        const hasCreatePool = logs.some((l) => l === LP_LOG_PATTERN);
-        if (!hasInvoke || !hasCreatePool) return;
-
-        // Tekrar işleme koruması
-        if (this.processedDexSignatures.has(signature)) return;
-        this.processedDexSignatures.add(signature);
-        if (this.processedDexSignatures.size > 500) {
-          const first = this.processedDexSignatures.values().next().value;
-          if (first) this.processedDexSignatures.delete(first);
-        }
-
-        await this.handleDexLP(signature);
+        await this.onDexMessage(msg);
       } catch (err) {
         console.error("❌ [WS] Mesaj hatası:", err);
       }
@@ -337,6 +316,37 @@ export class HeliusMonitor {
         this.reconnectTimeoutDex = setTimeout(() => this.connectDex(), 3000);
       }
     });
+  }
+
+  private async onDexMessage(msg: any) {
+    // Monitor durdurulduysa event'leri işleme
+    if (!this.isRunning) return;
+
+    const value = msg?.params?.result?.value;
+    if (!value) return;
+
+    const logs: string[] | undefined = value.logs;
+    const signature: string | undefined = value.signature;
+    if (!logs || !signature) return;
+
+    // ── LP filtresi (çift kontrol) ───────────────────────────────────────
+    // 1. PumpSwap programının doğrudan (depth=1) çağrıldığını doğrula
+    // 2. Tam "CreatePool" talimat logunu ara
+    // Bu iki koşul yalnızca yeni havuz oluşturma TX'lerinde aynı anda bulunur.
+    // Swap, RemoveLiquidity, CollectFees vb. işlemlerde bulunmaz → sıfır HTTP çağrısı.
+    const hasInvoke     = logs.includes(PUMPSWAP_INVOKE);
+    const hasCreatePool = logs.some((l) => l === LP_LOG_PATTERN);
+    if (!hasInvoke || !hasCreatePool) return;
+
+    // Tekrar işleme koruması
+    if (this.processedDexSignatures.has(signature)) return;
+    this.processedDexSignatures.add(signature);
+    if (this.processedDexSignatures.size > 500) {
+      const first = this.processedDexSignatures.values().next().value;
+      if (first) this.processedDexSignatures.delete(first);
+    }
+
+    await this.handleDexLP(signature);
   }
 
   private async handleDexLP(signature: string) {
