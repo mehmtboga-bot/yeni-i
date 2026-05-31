@@ -159,6 +159,15 @@ export class HeliusMonitor {
   async start() {
     if (this.isRunning) { console.log("⚠️ Monitor zaten çalışıyor"); return; }
 
+    // Kaydedilen durumu kontrol et
+    const shouldRun = this.loadMonitoringState();
+    if (!shouldRun) {
+      console.log("⏸️ Monitor kapalı durumda başlatılıyor (durumu değiştirmek için Dur/Başlat'ı kullan)");
+      this.isRunning = false;
+      this.eventEmitter("monitoring_state", { isMonitoring: false });
+      return;
+    }
+
     this.isRunning = true;
     console.log("🚀 Helius Monitor başlatılıyor (PumpSwap — sadece CreatePool)...");
     this.eventEmitter("monitoring_state", { isMonitoring: true });
@@ -168,24 +177,12 @@ export class HeliusMonitor {
     this.startHeartbeat();
   }
 
-  // Server başladığında kaydedilen durumu kontrol et
-  checkInitialMonitoringState() {
-    const shouldRun = this.loadMonitoringState();
-    if (!shouldRun) {
-      console.log("⏸️ Monitor kapalı durumda başlatılıyor (durumu değiştirmek için Dur/Başlat'ı kullan)");
-      this.isRunning = false;
-      this.eventEmitter("monitoring_state", { isMonitoring: false });
-    }
-  }
-
   // Monitoring durumunu değiştir ve kalıcı olarak kaydet
-  async setMonitoringEnabled(enabled: boolean) {
+  setMonitoringEnabled(enabled: boolean) {
     this.saveMonitoringState(enabled);
-    if (enabled) {
-      // Monitor'u başlat (isRunning kontrolü start() içinde yapılır)
-      await this.start();
-    } else {
-      // Monitor'u durdur (isRunning kontrolü stop() içinde yapılır)
+    if (enabled && !this.isRunning) {
+      this.start();
+    } else if (!enabled && this.isRunning) {
       this.stop();
     }
   }
