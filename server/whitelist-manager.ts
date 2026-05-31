@@ -10,14 +10,21 @@ function ensureDir() {
 
 export class WhitelistManager {
   private whitelist: Set<string> = new Set();
+  private lastLoadTime: number = 0;
+  private lastFileModTime: number = 0;
 
   constructor() {
-    this.load();
+    this.loadIfNeeded();
   }
 
-  private load() {
+  /**
+   * Dosya değiştirilmişse yeniden yükle, yoksa bellekteki listeyi kullan
+   */
+  private loadIfNeeded() {
     try {
       ensureDir();
+
+      // Dosya var mı kontrol et
       if (!fs.existsSync(WHITELIST_PATH)) {
         // Varsayılan whitelist oluştur
         const defaultList = "PEPE\nDOGE\nSHIB\nFLOKI\n";
@@ -25,6 +32,17 @@ export class WhitelistManager {
         console.log("📝 Whitelist dosyası oluşturuldu: data/whitelist.txt");
       }
 
+      // Dosya değiştirildi mi kontrol et
+      const stats = fs.statSync(WHITELIST_PATH);
+      const fileModTime = stats.mtimeMs;
+
+      // Dosya değiştirilmemişse, bellekteki listeyi kullan
+      if (this.lastLoadTime > 0 && fileModTime === this.lastFileModTime) {
+        console.log(`✅ Whitelist bellekten kullanılıyor (${this.whitelist.size} token)`);
+        return;
+      }
+
+      // Dosya değiştirilmişse, yeniden yükle
       const content = fs.readFileSync(WHITELIST_PATH, "utf-8");
       this.whitelist = new Set(
         content
@@ -32,6 +50,9 @@ export class WhitelistManager {
           .map((line) => line.trim().toUpperCase())
           .filter((line) => line.length > 0)
       );
+
+      this.lastLoadTime = Date.now();
+      this.lastFileModTime = fileModTime;
 
       console.log(`✅ Whitelist yüklendi (${this.whitelist.size} token)`);
     } catch (err) {
@@ -44,6 +65,7 @@ export class WhitelistManager {
    * Token whitelist'te mi?
    */
   isWhitelisted(symbol: string): boolean {
+    this.loadIfNeeded(); // Dosya değiştirilmişse yükle
     return this.whitelist.has(symbol.toUpperCase());
   }
 
@@ -51,6 +73,7 @@ export class WhitelistManager {
    * Whitelist'i al
    */
   getWhitelist(): string[] {
+    this.loadIfNeeded(); // Dosya değiştirilmişse yükle
     return Array.from(this.whitelist).sort();
   }
 
@@ -67,6 +90,12 @@ export class WhitelistManager {
     ensureDir();
     const content = Array.from(this.whitelist).sort().join("\n") + "\n";
     fs.writeFileSync(WHITELIST_PATH, content, "utf-8");
+
+    // Dosya mod zamanını güncelle
+    const stats = fs.statSync(WHITELIST_PATH);
+    this.lastFileModTime = stats.mtimeMs;
+    this.lastLoadTime = Date.now();
+
     console.log(`✅ Whitelist güncellendi (${this.whitelist.size} token)`);
   }
 }
