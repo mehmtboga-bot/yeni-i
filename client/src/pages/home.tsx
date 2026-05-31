@@ -185,7 +185,6 @@ export default function Home() {
   const [mintedTokens, setMintedTokens] = useState<MintedToken[]>(loadMintedTokens);
   const [lpLogs, setLpLogs] = useState<LPDetection[]>(loadLpLogs);
   const [newTokenId, setNewTokenId] = useState<string | null>(null);
-  const [isMonitoring, setIsMonitoring] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [lastPublicKey, setLastPublicKey] = useState<string | null>(null);
@@ -200,13 +199,6 @@ export default function Home() {
   const [tokenComparison, setTokenComparison] = useState<any[]>([]);
   const logIdRef = useRef(0);
   const logBottomRef = useRef<HTMLDivElement>(null);
-
-  const toggleMonitoring = () => {
-    setIsMonitoring((prev) => !prev);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "toggle_monitoring", data: { enabled: !isMonitoring } }));
-    }
-  };
 
   const handleGetBalance = (publicKey: string) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -279,9 +271,6 @@ export default function Home() {
       } else if (msg.type === "connection_status") {
         setIsConnected(msg.data.connected);
         setConnectionMessage(msg.data.message || "");
-        if (msg.data.isMonitoring !== undefined) setIsMonitoring(msg.data.isMonitoring);
-      } else if (msg.type === "monitoring_state") {
-        setIsMonitoring(msg.data.isMonitoring);
       } else if (msg.type === "balance_update") {
         setWalletBalance(msg.data.balance);
         setLastPublicKey(msg.data.publicKey);
@@ -495,8 +484,6 @@ export default function Home() {
               <ConnectionStatus
                 isConnected={isConnected}
                 message={connectionMessage}
-                isMonitoring={isMonitoring}
-                onToggleMonitoring={toggleMonitoring}
               />
             </div>
           </div>
