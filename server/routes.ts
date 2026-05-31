@@ -415,7 +415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (message.type === "toggle_monitoring") {
           const enabled = message.data.enabled;
           console.log(`🔄 Monitor ${enabled ? "başlatılıyor" : "durduruluyor"}...`);
-          if (enabled) { monitor.start(); } else { monitor.stop(); }
+          monitor.setMonitoringEnabled(enabled);
           broadcastToClients({
             type: "monitoring_state",
             data: { isMonitoring: enabled },

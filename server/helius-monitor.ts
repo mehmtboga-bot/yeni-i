@@ -1,4 +1,6 @@
 import WebSocket from "ws";
+import fs from "fs";
+import path from "path";
 import { secrets } from "./secrets-loader";
 
 const HELIUS_API_KEY = secrets.HELIUS_API_KEY;
@@ -125,13 +127,44 @@ export class HeliusMonitor {
   private isRunning = false;
   private solPriceUsd: number = 0;
   private rateLimiter = new RateLimiter(8);
+  private monitoringEnabledFile = path.join(process.cwd(), "data", "monitoring-enabled.json");
 
   constructor(eventEmitter: (event: string, data: any) => void) {
     this.eventEmitter = eventEmitter;
   }
 
+  private loadMonitoringState(): boolean {
+    try {
+      if (fs.existsSync(this.monitoringEnabledFile)) {
+        const data = fs.readFileSync(this.monitoringEnabledFile, "utf-8");
+        const parsed = JSON.parse(data);
+        return parsed.enabled === true;
+      }
+    } catch (err) {
+      console.warn("⚠️ Monitoring durumu yüklenemedi, default true kullanılıyor");
+    }
+    return true; // Default: açık
+  }
+
+  private saveMonitoringState(enabled: boolean) {
+    try {
+      const dir = path.dirname(this.monitoringEnabledFile);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(this.monitoringEnabledFile, JSON.stringify({ enabled }, null, 2), "utf-8");
+    } catch (err) {
+      console.error("❌ Monitoring durumu kaydedilemedi:", err);
+    }
+  }
+
   async start() {
     if (this.isRunning) { console.log("⚠️ Monitor zaten çalışıyor"); return; }
+
+    const shouldRun = this.loadMonitoringState();
+    if (!shouldRun) {
+      console.log("⏸️ Monitor kapalı durumda başlatılıyor (durumu değiştirmek için Dur/Başlat'ı kullan)");
+      this.eventEmitter("monitoring_state", { isMonitoring: false });
+      return;
+    }
 
     this.isRunning = true;
     console.log("🚀 Helius Monitor başlatılıyor (PumpSwap — sadece CreatePool)...");
@@ -140,6 +173,18 @@ export class HeliusMonitor {
     await this.fetchSolPriceOnce();
     this.connectDex();
     this.startHeartbeat();
+  }
+
+  // Monitoring durumunu değiştir ve kalıcı olarak kaydet
+  setMonitoringEnabled(enabled: boolean) {
+    this.saveMonitoringState(enabled);
+    if (enabled) {
+      // Monitor'u başlat (isRunning kontrolü start() içinde yapılır)
+      this.start();
+    } else {
+      // Monitor'u durdur (isRunning kontrolü stop() içinde yapılır)
+      this.stop();
+    }
   }
 
   private async fetchSolPriceOnce(): Promise<void> {
@@ -540,6 +585,7 @@ export class HeliusMonitor {
     this.processedDexSignatures.clear();
     this.recentTokenSymbols.clear();
     this.skippedTokens = [];
+    this.rateLimiter.destroy();
 
     this.eventEmitter("monitoring_state", { isMonitoring: false });
     this.eventEmitter("connection_status", {
