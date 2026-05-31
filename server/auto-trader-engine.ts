@@ -18,7 +18,7 @@ interface AutoTradeRecord {
   buyTimestamp: number;
   shouldSellAt: number;  // Satış yapılacak zaman
   buyTxSignature?: string;
-  status: "pending" | "active" | "sold" | "failed";
+  status: "pending" | "active" | "sold" | "failed" | "closed";
   error?: string;
   buyPriceSol?: number;
   buyTokenAmount?: number;
@@ -26,6 +26,7 @@ interface AutoTradeRecord {
   pnlSol?: number;
   pnlPct?: number;
   initialLiquidityUsd?: number;  // Alındığı sıradaki likidite (USD)
+  closedAt?: number;  // Manuel satış zamanı
 }
 
 type EventEmitter = (event: string, data: any) => void;
@@ -354,6 +355,21 @@ export class AutoTraderEngine {
     }
   }
 
+
+  /**
+   * Record'u kapalı olarak işaretle (manuel satış yapıldı)
+   */
+  markRecordClosed(mintAddress: string) {
+    for (const [, record] of this.records.entries()) {
+      if (record.mintAddress === mintAddress && (record.status === "active" || record.status === "sold")) {
+        record.status = "closed";
+        record.closedAt = Date.now();
+        this.emit("auto_trade_record_updated", record);
+        console.log(`✅ [Auto-Trader] ${record.tokenSymbol} manuel satıldı, record kapatıldı`);
+        break;
+      }
+    }
+  }
 
   /**
    * Hata durumunda record'u güncelle
