@@ -379,8 +379,11 @@ export class HeliusMonitor {
 
       const meetsThreshold = (tvlUsd ?? 0) >= MIN_TVL_USD_NOTIFY;
       if (!meetsThreshold) {
+        // Telegram atlanmadan ÖNCE token'i kaydet (tekrar çıkarsa "tekrar" olarak işaretlensin)
+        this.recentTokenSymbols.set(symbol, Date.now());
+
         console.log(
-          `🚫 [LP] Telegram atlandı | ${symbol} | TVL=$${tvlUsd?.toFixed(0) ?? "?"} | eşik=$${MIN_TVL_USD_NOTIFY}`
+          `🚫 [LP] Telegram atlandı | ${symbol} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | eşik=${MIN_TVL_USD_NOTIFY}`
         );
         return;
       }
