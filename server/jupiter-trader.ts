@@ -34,12 +34,19 @@ interface QuoteResponse {
   contextSlot?: number;
 }
 
+interface CachedQuote {
+  quote: QuoteResponse;
+  timestamp: number;
+}
+
 export class JupiterTrader {
   private store: TradeStore;
   private emit: Emitter;
   private keypair: Keypair | null = null;
   private connection: Connection | null = null;
   private decimalsCache: Map<string, number> = new Map();
+  private quoteCache: Map<string, CachedQuote> = new Map();
+  private readonly QUOTE_CACHE_TTL_MS = 10 * 1000; // 10 saniye
   private inFlight: Set<string> = new Set();
 
   constructor(store: TradeStore, emit: Emitter) {
@@ -127,6 +134,19 @@ export class JupiterTrader {
   private async getQuote(params: {
     inputMint: string; outputMint: string; amount: string; slippageBps: number;
   }): Promise<QuoteResponse> {
+    // Cache key oluştur
+    const cacheKey = `${params.inputMint}-${params.outputMint}-${params.amount}-${params.slippageBps}`;
+
+    // Cache'de var mı kontrol et
+    const cached = this.quoteCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.QUOTE_CACHE_TTL_MS) {
+      console.log(`💾 [Quote Cache] HIT: ${params.inputMint.slice(0, 8)}... → ${params.outputMint.slice(0, 8)}...`);
+      return cached.quote;
+    }
+
+    // Cache'de yok veya süresi doldu → API'den al
+    console.log(`🔄 [Quote Cache] MISS: ${params.inputMint.slice(0, 8)}... → ${params.outputMint.slice(0, 8)}...`);
+
     const url = new URL(JUP_QUOTE);
     url.searchParams.set("inputMint", params.inputMint);
     url.searchParams.set("outputMint", params.outputMint);
@@ -143,8 +163,13 @@ export class JupiterTrader {
     if (!res.ok) throw new Error(`Jupiter quote ${res.status}: ${bodyText.slice(0, 200)}`);
     const json = JSON.parse(bodyText) as QuoteResponse;
     if (!json?.outAmount || BigInt(json.outAmount) === 0n) throw new Error("Jupiter quote: route bulunamadı");
+
+    // Cache'e kaydet
+    this.quoteCache.set(cacheKey, { quote: json, timestamp: Date.now() });
+
     return json;
   }
+
 
   private async swap(quote: QuoteResponse, priorityFeeMicroLamports: number): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
