@@ -349,11 +349,30 @@ export class JupiterTrader {
     const slippagePct = Math.floor(config.slippageBps / 100);
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
-    // Token bakiyesini tek seferde çek
+    // Token bakiyesini 2 defa deneyin
     const fetchBalanceWithRetry = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
-      const bal = await this.getTokenBalance(pos.mintAddress);
-      if (bal && bal.uiAmount > 0) return bal;
-      throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const bal = await this.getTokenBalance(pos.mintAddress);
+          if (bal && bal.uiAmount > 0) {
+            console.log(`🔍 [Satış] Deneme ${attempt}: ${bal.uiAmount.toLocaleString()} ${pos.symbol} bulundu`);
+            return bal;
+          }
+          console.warn(`⚠️ [Satış] Deneme ${attempt}: Token bakiyesi bulunamadı`);
+          if (attempt < 2) {
+            console.log(`⏳ [Satış] 2 saniye bekleniyor...`);
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+        } catch (err) {
+          console.error(`❌ [Satış] Deneme ${attempt} hatası:`, (err as Error).message);
+          if (attempt < 2) {
+            console.log(`⏳ [Satış] 2 saniye bekleniyor...`);
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+        }
+      }
+      // 2 deneme de başarısız → Rug pull
+      throw new Error(`RUG_PULL: 2 deneme sonrası ${pos.symbol} bakiyesi bulunamadı`);
     };
 
     try {
