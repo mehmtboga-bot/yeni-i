@@ -232,13 +232,6 @@ export default function Home() {
     }
   };
 
-  const handleRug = (positionId: string, symbol: string) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      console.log(`🚨 Rug pull: ${symbol}`);
-      ws.send(JSON.stringify({ type: "rug_pull", data: { positionId, symbol } }));
-    }
-  };
-
   const handleConfigUpdate = (cfg: Partial<TradeConfig>) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "trade_config_update", data: cfg }));
@@ -632,7 +625,6 @@ export default function Home() {
               onSell={handleSell}
               onDelete={handleDeletePosition}
               onUpdateConfig={handleConfigUpdate}
-              onRug={handleRug}
             />
             <div className="flex justify-center pt-2">
               <Button
