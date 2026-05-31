@@ -534,6 +534,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
               },
             });
           }
+        } else if (message.type === "rug_pull") {
+          const { positionId, symbol } = message.data || {};
+          if (positionId) {
+            const pos = tradeStore.getById(positionId);
+            if (pos && pos.status === "open") {
+              const rugPullLoss = -(pos.buySolAmount ?? 0);
+              const closed = {
+                ...pos,
+                status: "closed" as const,
+                sellTimestamp: Date.now(),
+                sellSolAmount: 0,
+                sellPriceSol: 0,
+                pnlSol: rugPullLoss,
+                pnlPct: -100,
+                error: "Manuel Rug Pull",
+              };
+              tradeStore.upsert(closed);
+              broadcastToClients({ type: "position_update", data: closed });
+              autoTraderEngine.markRecordClosed(pos.mintAddress);
+              console.log(`🚨 [Rug Pull] ${symbol ?? pos.symbol} manuel olarak -%100 zararla kapatıldı`);
+            }
+          }
         } else if (message.type === "request_positions") {
           sendPositionsSnapshot(ws);
         } else if (message.type === "request_auto_trader_status") {

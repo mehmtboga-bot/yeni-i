@@ -20,6 +20,7 @@ interface TradePanelProps {
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
+  onRug: (positionId: string, symbol: string) => void;
 }
 
 const formatUsd = (n?: number) => {
@@ -66,6 +67,7 @@ export function TradePanel({
   onSell,
   onDelete,
   onUpdateConfig,
+  onRug,
 }: TradePanelProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -231,7 +233,7 @@ export function TradePanel({
         <div className="space-y-2">
           {filtered.map((p) => (
             <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} />
+              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} onRug={onRug} />
           ))}
         </div>
       )}
@@ -272,9 +274,10 @@ interface PositionRowProps {
   onCopy: (addr: string, id: string) => void;
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
+  onRug: (positionId: string, symbol: string) => void;
 }
 
-function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete }: PositionRowProps) {
+function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete, onRug }: PositionRowProps) {
   const isOpen = p.status === "open";
   const isPending = p.status === "pending_buy" || p.status === "pending_sell";
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
@@ -442,9 +445,24 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
 
         <div className="shrink-0 flex gap-2">
           {isOpen && (
-            <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
-              Sat
-            </Button>
+            <>
+              <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
+                Sat
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                onClick={() => {
+                  if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek.`)) {
+                    onRug(p.id, p.symbol);
+                  }
+                }}
+                data-testid={`button-rug-${p.id}`}
+              >
+                🚨 Rug
+              </Button>
+            </>
           )}
           {p.status === "failed" && p.buyTxSignature && (
             <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
