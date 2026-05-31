@@ -104,6 +104,33 @@ export class JupiterTrader {
     return dec;
   }
 
+  private async getTokenBalanceWithRetry(
+    mintAddress: string,
+    symbol: string
+  ): Promise<{ uiAmount: number; raw: string; decimals: number }> {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const bal = await this.getTokenBalance(mintAddress);
+        if (bal && bal.uiAmount > 0) {
+          console.log(`🔍 [Satış] Deneme ${attempt}: ${bal.uiAmount.toLocaleString()} ${symbol} bulundu`);
+          return bal;
+        }
+        console.warn(`⚠️ [Satış] Deneme ${attempt}: Token bakiyesi bulunamadı`);
+        if (attempt < 2) {
+          console.log(`⏳ [Satış] 500ms bekleniyor...`);
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      } catch (err) {
+        console.error(`❌ [Satış] Deneme ${attempt} hatası:`, (err as Error).message);
+        if (attempt < 2) {
+          console.log(`⏳ [Satış] 500ms bekleniyor...`);
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+    }
+    throw new Error(`RUG_PULL: 2 deneme sonrası ${symbol} bakiyesi bulunamadı`);
+  }
+
   private async getTokenBalance(mint: string): Promise<{ uiAmount: number; raw: string; decimals: number } | null> {
     if (!this.keypair || !this.connection) return null;
     try {
@@ -384,18 +411,11 @@ export class JupiterTrader {
     const slippagePct = Math.floor(config.slippageBps / 100);
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
-    // Token bakiyesini tek seferde çek
-    const fetchBalanceWithRetry = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
-      const bal = await this.getTokenBalance(pos.mintAddress);
-      if (bal && bal.uiAmount > 0) return bal;
-      throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
-    };
-
     try {
       if (pos.dex === "pumpswap") {
         // PumpSwap satışı
         const result = await this.withRetry(async () => {
-          const balance = await fetchBalanceWithRetry();
+          const balance = await this.getTokenBalanceWithRetry(pos.mintAddress, pos.symbol);
           console.log(`🔍 [PumpSwap] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
           const sig = await this.pumpSwapTx({
             action: "sell",
@@ -416,8 +436,16 @@ export class JupiterTrader {
         let jupiterOk = false;
         try {
           const result = await this.withRetry(async () => {
-            const balance = await fetchBalanceWithRetry();
+            // Token bakiyesi ve fresh quote'u paralel al (ms içinde)
+            const decimals = await this.fetchDecimals(pos.mintAddress);
+            const estimatedAmount = Math.floor((pos.buyTokenAmount ?? 0) * Math.pow(10, decimals)).toString();
+            const [balance, estimatedQuote] = await Promise.all([
+              this.getTokenBalanceWithRetry(pos.mintAddress, pos.symbol),
+              this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: estimatedAmount, slippageBps: config.slippageBps }),
+            ]);
             if (BigInt(balance.raw) === 0n) throw new Error("Cüzdanda token bakiyesi yok");
+            console.log(`⚡ [Satış] Fresh quote alındı: ${balance.uiAmount.toLocaleString()} ${pos.symbol} → ~${(Number(estimatedQuote.outAmount) / 1e9).toFixed(4)} SOL`);
+            // Gerçek bakiye ile kesin quote al
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
             const solOut = Number(quote.outAmount) / 1e9;
             const sellPriceSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
@@ -445,7 +473,7 @@ export class JupiterTrader {
           // Jupiter route yok → PumpSwap fallback dene
           console.warn(`⚠️ [Jupiter] SATIŞ başarısız, PumpSwap'a geçiliyor: ${(jupErr as Error).message}`);
           const result = await this.withRetry(async () => {
-            const balance = await fetchBalanceWithRetry();
+            const balance = await this.getTokenBalanceWithRetry(pos.mintAddress, pos.symbol);
             console.log(`🔍 [PumpSwap Fallback] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
             const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
             return { sig, tokenAmount: balance.uiAmount };
