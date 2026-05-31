@@ -1,5 +1,8 @@
 import WebSocket from "ws";
 import { secrets } from "./secrets-loader";
+import { WhitelistManager } from "./whitelist-manager";
+
+const whitelistManager = new WhitelistManager();
 
 const HELIUS_API_KEY = secrets.HELIUS_API_KEY;
 
@@ -377,8 +380,11 @@ export class HeliusMonitor {
         pumpfunUrl:     `https://pump.fun/${tokenMint}`,
       });
 
+      // Whitelist'teki token'ler likidite filtresini atla
+      const isWhitelisted = whitelistManager.isWhitelisted(symbol);
       const meetsThreshold = (tvlUsd ?? 0) >= MIN_TVL_USD_NOTIFY;
-      if (!meetsThreshold) {
+
+      if (!meetsThreshold && !isWhitelisted) {
         // Telegram atlanmadan ÖNCE token'i kaydet (tekrar çıkarsa "tekrar" olarak işaretlensin)
         this.recentTokenSymbols.set(symbol, Date.now());
 
@@ -386,6 +392,10 @@ export class HeliusMonitor {
           `🚫 [LP] Telegram atlandı | ${symbol} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | eşik=${MIN_TVL_USD_NOTIFY}`
         );
         return;
+      }
+
+      if (isWhitelisted) {
+        console.log(`✅ [LP] ${symbol} whitelist'te — likidite filtresini atla`);
       }
 
       const usdLine = liquidityUsd ? `\n💵 <b>USD:</b> $${liquidityUsd.toFixed(2)}` : "";
