@@ -314,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Otomatik trader enabled ise direkt alım yap (hızlı)
       const autoConfig = autoTraderConfigStore.getConfig();
       if (autoConfig.enabled) {
-        const { mintAddress, name, symbol, dex } = data;
+        const { mintAddress, name, symbol, dex, tvlUsd } = data;
         const nm = name || "Bilinmiyor";
         const sym = symbol || "?";
         const solAmount = autoConfig.solAmountPerTrade;
@@ -322,6 +322,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Whitelist kontrol et
         if (!whitelistManager.isWhitelisted(sym)) {
           console.log(`⏭️ [Fast-Buy] ${sym} whitelist'te yok, atlanıyor`);
+          return;
+        }
+
+        // Whitelist'teki token'ler likidite eşiğini geçmese bile alınsın
+        const MIN_TVL_FOR_WHITELIST = 0; // Whitelist'teki token'ler için likidite eşiği yok
+        if ((tvlUsd ?? 0) < MIN_TVL_FOR_WHITELIST) {
+          console.log(`⏭️ [Fast-Buy] ${sym} likidite eşiğini geçmedi (TVL=${tvlUsd?.toFixed(0) ?? "?"}), atlanıyor`);
           return;
         }
 
@@ -337,7 +344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Yeni token ise direkt alım yap
-        console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} (${mintAddress}) | SOL: ${solAmount}`);
+        console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} (${mintAddress}) | TVL=${tvlUsd?.toFixed(0) ?? "?"} | SOL: ${solAmount}`);
 
         if (dex === "pumpswap") {
           trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
