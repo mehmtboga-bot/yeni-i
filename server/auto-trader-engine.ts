@@ -120,6 +120,20 @@ export class AutoTraderEngine {
       );
       return;
     }
+
+    // Açık pozisyonlarda aynı symbol varsa, almaz (2 defa alım engelle)
+    const allPositions = this.tradeStore.getAll();
+    const hasOpenPosition = allPositions.some(
+      (p) => (p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell") &&
+             p.symbol === symbol
+    );
+    if (hasOpenPosition) {
+      console.log(
+        `⏭️ [Auto-Trader] ${symbol} açık pozisyonda var, 2 defa alım yapılmayacak`
+      );
+      return;
+    }
+
     this.seenTokenSymbols.add(tokenKey);
 
     // Son 7 işlemde aynı symbol varsa, almaz
