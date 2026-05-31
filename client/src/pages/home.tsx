@@ -202,12 +202,15 @@ export default function Home() {
   const logBottomRef = useRef<HTMLDivElement>(null);
 
   const toggleMonitoring = () => {
-    // Hemen UI state'ini güncelle (optimistic update)
-    setIsMonitoring((prev) => !prev);
+    // Yeni state'i hesapla
+    const newState = !isMonitoring;
 
-    // Server'a gönder
+    // Hemen UI state'ini güncelle (optimistic update)
+    setIsMonitoring(newState);
+
+    // Server'a doğru state'i gönder
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "toggle_monitoring", data: { enabled: !isMonitoring } }));
+      ws.send(JSON.stringify({ type: "toggle_monitoring", data: { enabled: newState } }));
     }
   };
 
