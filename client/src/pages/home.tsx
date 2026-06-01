@@ -222,6 +222,12 @@ export default function Home() {
     }
   };
 
+  const handleMarkRugPull = (positionId: string) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "mark_rug_pull", data: { positionId } }));
+    }
+  };
+
   const handleConfigUpdate = (cfg: Partial<TradeConfig>) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "trade_config_update", data: cfg }));
@@ -609,6 +615,7 @@ export default function Home() {
               solPriceUsd={solPriceUsd}
               onSell={handleSell}
               onDelete={handleDeletePosition}
+              onMarkRugPull={handleMarkRugPull}
               onUpdateConfig={handleConfigUpdate}
             />
             <div className="flex justify-center pt-2">
