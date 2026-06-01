@@ -536,6 +536,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`🚨 [Rug Pull] ${pos.symbol} manuel rug pull olarak kapatıldı (-%100)`);
             }
           }
+        } else if (message.type === "update_position_hold_duration") {
+          // Token'a özel tutma süresi güncelle
+          const { positionId, customHoldDurationMs } = message.data || {};
+          if (positionId && typeof customHoldDurationMs === "number" && customHoldDurationMs > 0) {
+            const pos = tradeStore.getById(positionId);
+            if (pos && (pos.status === "open" || pos.status === "pending_buy" || pos.status === "pending_sell")) {
+              const updated = { ...pos, customHoldDurationMs };
+              tradeStore.upsert(updated);
+              broadcastToClients({ type: "position_update", data: updated });
+              // Auto-trader engine'deki record'u da güncelle
+              autoTraderEngine.updatePositionHoldDuration(pos.mintAddress, customHoldDurationMs);
+              console.log(`⏱️ [Routes] ${pos.symbol} özel tutma süresi: ${(customHoldDurationMs / 1000).toFixed(0)}s`);
+            }
+          }
         } else if (message.type === "delete_position") {
           const { positionId } = message.data || {};
           if (positionId) {

@@ -21,6 +21,7 @@ interface TradePanelProps {
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
+  onUpdateHoldDuration: (positionId: string, customHoldDurationMs: number) => void;
 }
 
 const formatUsd = (n?: number) => {
@@ -68,6 +69,7 @@ export function TradePanel({
   onDelete,
   onMarkRugPull,
   onUpdateConfig,
+  onUpdateHoldDuration,
 }: TradePanelProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -233,7 +235,8 @@ export function TradePanel({
         <div className="space-y-2">
           {filtered.map((p) => (
             <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} onMarkRugPull={onMarkRugPull} />
+              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} onMarkRugPull={onMarkRugPull}
+              onUpdateHoldDuration={onUpdateHoldDuration} />
           ))}
         </div>
       )}
@@ -275,9 +278,10 @@ interface PositionRowProps {
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
+  onUpdateHoldDuration: (positionId: string, customHoldDurationMs: number) => void;
 }
 
-function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete, onMarkRugPull }: PositionRowProps) {
+function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete, onMarkRugPull, onUpdateHoldDuration }: PositionRowProps) {
   const isOpen = p.status === "open";
   const isPending = p.status === "pending_buy" || p.status === "pending_sell";
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
@@ -303,6 +307,28 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [p.autoSellAt]);
+
+  // Per-position hold duration input (saniye cinsinden göster, ms olarak gönder)
+  const [holdSecsInput, setHoldSecsInput] = useState<string>(() =>
+    p.customHoldDurationMs !== undefined ? String(Math.round(p.customHoldDurationMs / 1000)) : ""
+  );
+  const [holdSaved, setHoldSaved] = useState(false);
+
+  // Position'dan gelen customHoldDurationMs değişirse input'u güncelle
+  useEffect(() => {
+    if (p.customHoldDurationMs !== undefined) {
+      setHoldSecsInput(String(Math.round(p.customHoldDurationMs / 1000)));
+    }
+  }, [p.customHoldDurationMs]);
+
+  const saveHoldDuration = () => {
+    const secs = parseInt(holdSecsInput, 10);
+    if (!Number.isNaN(secs) && secs > 0) {
+      onUpdateHoldDuration(p.id, secs * 1000);
+      setHoldSaved(true);
+      setTimeout(() => setHoldSaved(false), 1500);
+    }
+  };
 
   return (
     <div
@@ -442,9 +468,43 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
           {p.error && (
             <div className="text-[11px] text-destructive bg-destructive/10 rounded px-2 py-1">⚠️ {p.error}</div>
           )}
+
+          {/* Per-position hold duration — sadece açık pozisyonlarda göster */}
+          {(isOpen || isPending) && p.autoSellAt !== undefined && (
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              <Timer className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+              <Label className="text-[10px] text-muted-foreground shrink-0">Tutma Süresi (sn):</Label>
+              <Input
+                type="number"
+                min="1"
+                step="10"
+                value={holdSecsInput}
+                onChange={(e) => setHoldSecsInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveHoldDuration()}
+                placeholder="sn"
+                className="h-6 w-20 text-xs px-2 py-0"
+                data-testid={`input-hold-duration-${p.id}`}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className={`h-6 px-2 text-xs ${holdSaved ? "border-emerald-500/50 text-emerald-400" : "border-amber-500/40 text-amber-400 hover:bg-amber-500/10"}`}
+                onClick={saveHoldDuration}
+                data-testid={`button-save-hold-duration-${p.id}`}
+              >
+                {holdSaved ? <Check className="h-3 w-3" /> : "Uygula"}
+              </Button>
+              {p.customHoldDurationMs !== undefined && (
+                <span className="text-[10px] text-amber-400/70">
+                  Özel: {Math.round(p.customHoldDurationMs / 1000)}s
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="shrink-0 flex gap-2">
+
           {isOpen && (
             <>
               <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>

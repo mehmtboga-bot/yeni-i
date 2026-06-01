@@ -324,14 +324,18 @@ export class AutoTraderEngine {
         record.buyTokenAmount = buyTokenAmount;
 
         // Satış zamanını alım onaylandığında yeniden hesapla
+        // Eğer pozisyona özel tutma süresi varsa onu kullan, yoksa global ayarı kullan
         const config = this.configStore.getConfig();
-        record.shouldSellAt = Date.now() + config.holdDurationMs;
+        const position = this.tradeStore.getByMint(mintAddress);
+        const holdMs = position?.customHoldDurationMs ?? config.holdDurationMs;
+        record.shouldSellAt = Date.now() + holdMs;
 
         this.emit("auto_trade_record_updated", record);
         // Position'a autoSellAt bilgisini ekle
         this.emit("auto_sell_at_updated", { mintAddress, autoSellAt: record.shouldSellAt });
+        const usedCustom = position?.customHoldDurationMs !== undefined;
         console.log(
-          `✅ [Auto-Trader] Alım tamamlandı: ${record.tokenSymbol} | TX: ${buyTxSignature.slice(0, 16)}... | Satış: ${(config.holdDurationMs / 1000).toFixed(0)}s sonra`
+          `✅ [Auto-Trader] Alım tamamlandı: ${record.tokenSymbol} | TX: ${buyTxSignature.slice(0, 16)}... | Satış: ${(holdMs / 1000).toFixed(0)}s sonra${usedCustom ? " (özel süre)" : ""}`
         );
         break;
       }
@@ -348,6 +352,24 @@ export class AutoTraderEngine {
       }
     }
     return undefined;
+  }
+
+  /**
+   * Aktif bir pozisyon için özel tutma süresini güncelle ve autoSellAt'ı yeniden hesapla
+   */
+  updatePositionHoldDuration(mintAddress: string, customHoldDurationMs: number) {
+    for (const [, record] of this.records.entries()) {
+      if (record.mintAddress === mintAddress && (record.status === "active" || record.status === "pending")) {
+        // Alım zamanından itibaren yeni süreyi uygula
+        record.shouldSellAt = record.buyTimestamp + customHoldDurationMs;
+        this.emit("auto_trade_record_updated", record);
+        this.emit("auto_sell_at_updated", { mintAddress, autoSellAt: record.shouldSellAt });
+        console.log(
+          `⏱️ [Auto-Trader] ${record.tokenSymbol} tutma süresi güncellendi: ${(customHoldDurationMs / 1000).toFixed(0)}s | Satış: ${new Date(record.shouldSellAt).toLocaleTimeString("tr-TR")}`
+        );
+        break;
+      }
+    }
   }
 
   /**
