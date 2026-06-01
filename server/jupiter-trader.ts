@@ -318,11 +318,36 @@ export class JupiterTrader {
       const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
       const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
       const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-      const result = { sig, tokensOut, pricePerToken };
 
-      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
+      // TX gönderildi — cüzdana token gelene kadar bekle (maks 3 × 5s = 15s)
+      const MAX_BALANCE_ATTEMPTS = 3;
+      const BALANCE_POLL_INTERVAL_MS = 5_000;
+      let confirmedTokenAmount: number | null = null;
+
+      for (let attempt = 1; attempt <= MAX_BALANCE_ATTEMPTS; attempt++) {
+        console.log(`⏳ [Jupiter] Bakiye bekleniyor (${attempt}/${MAX_BALANCE_ATTEMPTS}): ${symbol} — 5s...`);
+        await new Promise((r) => setTimeout(r, BALANCE_POLL_INTERVAL_MS));
+
+        try {
+          const bal = await this.getTokenBalance(mintAddress);
+          if (bal && bal.uiAmount > 0) {
+            confirmedTokenAmount = bal.uiAmount;
+            console.log(`🪙 [Jupiter] Token cüzdana geldi (Deneme ${attempt}): ${bal.uiAmount.toLocaleString()} ${symbol}`);
+            break;
+          }
+          console.warn(`⚠️ [Jupiter] Deneme ${attempt}/${MAX_BALANCE_ATTEMPTS}: ${symbol} bakiyesi henüz yok`);
+        } catch (balErr) {
+          console.error(`❌ [Jupiter] Bakiye sorgu hatası (Deneme ${attempt}):`, (balErr as Error).message);
+        }
+      }
+
+      if (confirmedTokenAmount === null) {
+        throw new Error(`TOKEN_NOT_RECEIVED: ${symbol} — TX gönderildi (${sig.slice(0, 16)}...) ancak ${(MAX_BALANCE_ATTEMPTS * BALANCE_POLL_INTERVAL_MS) / 1000}s içinde cüzdana ulaşmadı`);
+      }
+
+      position = { ...position, status: "open", buyTokenAmount: confirmedTokenAmount, buyPriceSol: pricePerToken, buyTxSignature: sig };
       this.updateAndEmit(position);
-      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
+      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${confirmedTokenAmount.toLocaleString()} token | tx ${sig.slice(0, 16)}...`);
       return position;
     } catch (err) {
       const message = (err as Error).message || String(err);
@@ -336,6 +361,7 @@ export class JupiterTrader {
   }
 
   // ========== PUMPSWAP ALIM ==========
+
   async buyPumpSwap(input: { mintAddress: string; name: string; symbol: string; solAmount?: number }): Promise<Position | null> {
     const { mintAddress, name, symbol, solAmount } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — PumpSwap alım atlandı"); return null; }
