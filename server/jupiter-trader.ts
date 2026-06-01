@@ -318,11 +318,36 @@ export class JupiterTrader {
       const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
       const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
       const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-      const result = { sig, tokensOut, pricePerToken };
 
-      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
+      // TX gönderildi — token'ın cüzdana gelmesini bekle (5s × 5 deneme = 25s)
+      const MAX_BALANCE_ATTEMPTS = 5;
+      const BALANCE_POLL_INTERVAL_MS = 5_000;
+      let confirmedBalance: number | null = null;
+
+      for (let attempt = 1; attempt <= MAX_BALANCE_ATTEMPTS; attempt++) {
+        console.log(`⏳ [Jupiter] Bakiye bekleniyor (${attempt}/${MAX_BALANCE_ATTEMPTS}): ${symbol} | tx ${sig.slice(0, 16)}...`);
+        await new Promise((r) => setTimeout(r, BALANCE_POLL_INTERVAL_MS));
+
+        try {
+          const bal = await this.getTokenBalance(mintAddress);
+          if (bal && bal.uiAmount > 0) {
+            confirmedBalance = bal.uiAmount;
+            console.log(`🪙 [Jupiter] Token bakiyesi onaylandı (Deneme ${attempt}): ${bal.uiAmount.toLocaleString()} ${symbol}`);
+            break;
+          }
+          console.warn(`⚠️ [Jupiter] Deneme ${attempt}/${MAX_BALANCE_ATTEMPTS}: ${symbol} bakiyesi henüz yok`);
+        } catch (balErr) {
+          console.error(`❌ [Jupiter] Bakiye sorgu hatası (Deneme ${attempt}):`, (balErr as Error).message);
+        }
+      }
+
+      if (confirmedBalance === null) {
+        throw new Error(`TOKEN_NOT_RECEIVED: ${symbol} token'ı ${MAX_BALANCE_ATTEMPTS * BALANCE_POLL_INTERVAL_MS / 1000}s içinde cüzdana gelmedi (tx: ${sig.slice(0, 16)}...)`);
+      }
+
+      position = { ...position, status: "open", buyTokenAmount: confirmedBalance, buyPriceSol: pricePerToken, buyTxSignature: sig };
       this.updateAndEmit(position);
-      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
+      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${confirmedBalance.toLocaleString()} token | tx ${sig.slice(0, 16)}...`);
       return position;
     } catch (err) {
       const message = (err as Error).message || String(err);
