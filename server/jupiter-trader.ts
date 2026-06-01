@@ -201,10 +201,23 @@ export class JupiterTrader {
     const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, "base64"));
     tx.sign([this.keypair]);
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 2 });
-    // "processed" commitment en hızlı onay (~400ms) — confirmed (~1.5s) beklemeye gerek yok
-    const latest = await this.connection.getLatestBlockhash("processed");
-    const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
-    if (conf.value.err) throw new Error(`TX hata: ${JSON.stringify(conf.value.err)}`);
+
+    // Confirm'i background'da yap (bloklamıyor)
+    (async () => {
+      try {
+        const latest = await this.connection.getLatestBlockhash("processed");
+        const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+        if (conf.value.err) {
+          console.error(`❌ TX hata (background confirm): ${signature} — ${JSON.stringify(conf.value.err)}`);
+        } else {
+          console.log(`✅ TX confirmed (background): ${signature.slice(0, 16)}...`);
+        }
+      } catch (err) {
+        console.error(`❌ Background confirm hatası: ${(err as Error).message}`);
+      }
+    })();
+
+    // Signature'ı hemen döndür (confirm bitmesini bekleme)
     return signature;
   }
 
@@ -244,9 +257,23 @@ export class JupiterTrader {
     tx.sign([this.keypair]);
 
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
-    const latest = await this.connection.getLatestBlockhash("processed");
-    const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
-    if (conf.value.err) throw new Error(`PumpSwap TX hata: ${JSON.stringify(conf.value.err)}`);
+
+    // Confirm'i background'da yap (bloklamıyor)
+    (async () => {
+      try {
+        const latest = await this.connection.getLatestBlockhash("processed");
+        const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+        if (conf.value.err) {
+          console.error(`❌ PumpSwap TX hata (background confirm): ${signature} — ${JSON.stringify(conf.value.err)}`);
+        } else {
+          console.log(`✅ PumpSwap TX confirmed (background): ${signature.slice(0, 16)}...`);
+        }
+      } catch (err) {
+        console.error(`❌ PumpSwap background confirm hatası: ${(err as Error).message}`);
+      }
+    })();
+
+    // Signature'ı hemen döndür (confirm bitmesini bekleme)
     return signature;
   }
 
@@ -279,10 +306,15 @@ export class JupiterTrader {
     console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL`);
 
     try {
-      const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+      // Quote ve Decimals'ı paralel al
+      const [quote, decimals] = await Promise.all([
+        this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps }),
+        this.fetchDecimals(mintAddress),
+      ]);
+
       // Quote ile swap arası delay (fiyat stabilizasyonu için)
       await new Promise((r) => setTimeout(r, 100));
-      const decimals = await this.fetchDecimals(mintAddress);
+
       const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
       const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
       const sig = await this.swap(quote, config.priorityFeeMicroLamports);
