@@ -324,12 +324,25 @@ export class JupiterTrader {
       this.updateAndEmit(position);
       console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
       return position;
-    } catch (err) {
-      const message = (err as Error).message || String(err);
-      position = { ...position, status: "failed", error: message };
-      this.updateAndEmit(position);
-      console.error(`❌ [Jupiter] ALIM hatası ${symbol}:`, message);
-      return position;
+    } catch (jupErr) {
+      const jupMessage = (jupErr as Error).message || String(jupErr);
+      // Jupiter quote/swap başarısız (TOKEN_NOT_TRADABLE dahil) → PumpSwap fallback dene
+      console.warn(`⚠️ [Jupiter] ALIM başarısız, PumpSwap'a geçiliyor: ${jupMessage}`);
+      try {
+        const slippagePct = Math.floor(config.slippageBps / 100);
+        const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
+        const sig = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
+        position = { ...position, dex: "pumpswap", status: "open", buyTxSignature: sig };
+        this.updateAndEmit(position);
+        console.log(`✅ [PumpSwap Fallback] ALIM tamam: ${symbol} | tx ${sig.slice(0, 16)}...`);
+        return position;
+      } catch (pumpErr) {
+        const message = (pumpErr as Error).message || String(pumpErr);
+        position = { ...position, status: "failed", error: `Jupiter: ${jupMessage} | PumpSwap: ${message}` };
+        this.updateAndEmit(position);
+        console.error(`❌ [PumpSwap Fallback] ALIM hatası ${symbol}:`, message);
+        return position;
+      }
     } finally {
       this.inFlight.delete(`buy:${mintAddress}`);
     }
