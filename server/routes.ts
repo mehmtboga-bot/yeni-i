@@ -343,20 +343,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
 
-        // Yeni token ise direkt alım yap
-        console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} (${mintAddress}) | TVL=${tvlUsd?.toFixed(0) ?? "?"} | SOL: ${solAmount}`);
+        // Yeni token ise 300ms bekle ve sonra direkt alım yap
+        console.log(`⏳ [Fast-Buy] ${sym} 300ms bekleniyor... (${mintAddress})`);
 
-        if (dex === "pumpswap") {
-          trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
-            .catch((err) => {
-              console.error("Fast-buy (PumpSwap) hatası:", err);
-            });
-        } else {
-          trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
-            .catch((err) => {
-              console.error("Fast-buy hatası:", err);
-            });
-        }
+        setTimeout(() => {
+          console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | SOL: ${solAmount}`);
+
+          if (dex === "pumpswap") {
+            trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
+              .catch((err) => {
+                console.error("Fast-buy (PumpSwap) hatası:", err);
+              });
+          } else {
+            trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
+              .catch((err) => {
+                console.error("Fast-buy hatası:", err);
+              });
+          }
+        }, 300);
       }
     } else if (event === "connection_status") {
       broadcastToClients({ type: "connection_status", data });
