@@ -348,6 +348,14 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
   const [holdDurationInput, setHoldDurationInput] = useState<string>(
     p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : ""
   );
+  const [isHalfSelling, setIsHalfSelling] = useState(false);
+
+  // İşlem sunucuya ulaşınca (pending_sell) veya kapanınca loading'i temizle
+  useEffect(() => {
+    if (isHalfSelling && (p.status === "pending_sell" || p.status === "closed" || p.status === "failed")) {
+      setIsHalfSelling(false);
+    }
+  }, [p.status, isHalfSelling]);
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
   const profitPct = isOpen ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
   const profitPositive = (profitPct ?? 0) >= 0;
@@ -425,6 +433,12 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
               >
                 <Timer className="h-3 w-3" />
                 {autoSellSecsLeft === 0 ? "Satış Bekleniyor" : `Satışa Kalan: ${autoSellSecsLeft}s`}
+              </Badge>
+            )}
+            {isHalfSelling && (
+              <Badge className="text-xs gap-1 font-bold bg-amber-500/20 text-amber-300 border border-amber-400/60 animate-pulse">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Yarısını Sat
               </Badge>
             )}
             <span className="text-[10px] text-muted-foreground ml-auto">{formatTime(p.buyTimestamp)}</span>
@@ -539,7 +553,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                   }
                 }}
               >
-                Uygula
+                ✓
               </Button>
               {p.customHoldDurationMs && (
                 <span className="text-[10px] text-violet-400">
@@ -555,6 +569,23 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
             <>
               <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
                 Sat
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                disabled={isHalfSelling}
+                onClick={() => {
+                  setIsHalfSelling(true);
+                  onSell(p.id);
+                }}
+                data-testid={`button-half-sell-${p.id}`}
+              >
+                {isHalfSelling ? (
+                  <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Satılıyor</>
+                ) : (
+                  "½ Sat"
+                )}
               </Button>
               <Button
                 size="sm"
