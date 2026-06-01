@@ -246,12 +246,6 @@ export default function Home() {
     }
   };
 
-  const handleUpdateHoldDuration = (positionId: string, holdDurationMs: number) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "update_position_hold_duration", data: { positionId, holdDurationMs } }));
-    }
-  };
-
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host || "localhost:5000";
@@ -619,12 +613,10 @@ export default function Home() {
               traderPublicKey={traderPublicKey}
               traderReady={traderReady}
               solPriceUsd={solPriceUsd}
-              globalHoldDurationMs={autoTraderConfig.holdDurationMs}
               onSell={handleSell}
               onDelete={handleDeletePosition}
               onMarkRugPull={handleMarkRugPull}
               onUpdateConfig={handleConfigUpdate}
-              onUpdateHoldDuration={handleUpdateHoldDuration}
             />
             <div className="flex justify-center pt-2">
               <Button
