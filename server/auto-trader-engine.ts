@@ -324,14 +324,35 @@ export class AutoTraderEngine {
         record.buyTokenAmount = buyTokenAmount;
 
         // Satış zamanını alım onaylandığında yeniden hesapla
+        // Position'da customHoldDurationMs varsa onu kullan, yoksa global holdDurationMs kullan
         const config = this.configStore.getConfig();
-        record.shouldSellAt = Date.now() + config.holdDurationMs;
+        const position = this.tradeStore.getByMint(mintAddress);
+        const holdMs = position?.customHoldDurationMs ?? config.holdDurationMs;
+        record.shouldSellAt = Date.now() + holdMs;
 
         this.emit("auto_trade_record_updated", record);
         // Position'a autoSellAt bilgisini ekle
         this.emit("auto_sell_at_updated", { mintAddress, autoSellAt: record.shouldSellAt });
         console.log(
-          `✅ [Auto-Trader] Alım tamamlandı: ${record.tokenSymbol} | TX: ${buyTxSignature.slice(0, 16)}... | Satış: ${(config.holdDurationMs / 1000).toFixed(0)}s sonra`
+          `✅ [Auto-Trader] Alım tamamlandı: ${record.tokenSymbol} | TX: ${buyTxSignature.slice(0, 16)}... | Satış: ${(holdMs / 1000).toFixed(0)}s sonra${position?.customHoldDurationMs ? " (özel süre)" : ""}`
+        );
+        break;
+      }
+    }
+  }
+
+  /**
+   * Aktif pozisyon için özel tutma süresini güncelle ve autoSellAt'ı yeniden hesapla
+   */
+  updatePositionHoldDuration(mintAddress: string, holdDurationMs: number) {
+    for (const [, record] of this.records.entries()) {
+      if (record.mintAddress === mintAddress && (record.status === "active" || record.status === "pending")) {
+        const newSellAt = record.buyTimestamp + holdDurationMs;
+        record.shouldSellAt = newSellAt;
+        this.emit("auto_trade_record_updated", record);
+        this.emit("auto_sell_at_updated", { mintAddress, autoSellAt: newSellAt });
+        console.log(
+          `⏱️ [Auto-Trader] ${record.tokenSymbol} özel tutma süresi güncellendi: ${(holdDurationMs / 1000).toFixed(0)}s | Satış: ${new Date(newSellAt).toLocaleTimeString("tr-TR")}`
         );
         break;
       }

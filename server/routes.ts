@@ -557,6 +557,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
               },
             });
           }
+        } else if (message.type === "update_position_hold_duration") {
+          // Token başına özel tutma süresi güncelle
+          const { positionId, holdDurationMs } = message.data || {};
+          if (positionId && typeof holdDurationMs === "number" && holdDurationMs > 0) {
+            const pos = tradeStore.getById(positionId);
+            if (pos && (pos.status === "open" || pos.status === "pending_buy")) {
+              const updated = { ...pos, customHoldDurationMs: holdDurationMs };
+              tradeStore.upsert(updated);
+              broadcastToClients({ type: "position_update", data: updated });
+              // Auto-trader engine'de de güncelle (autoSellAt yeniden hesapla)
+              autoTraderEngine.updatePositionHoldDuration(pos.mintAddress, holdDurationMs);
+              console.log(`⏱️ [Routes] ${pos.symbol} özel tutma süresi: ${(holdDurationMs / 1000).toFixed(0)}s`);
+            }
+          }
         } else if (message.type === "request_positions") {
           sendPositionsSnapshot(ws);
         } else if (message.type === "request_auto_trader_status") {

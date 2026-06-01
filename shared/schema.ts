@@ -58,6 +58,7 @@ export const positionSchema = z.object({
   unrealizedPnlPct: z.number().optional(),
   error: z.string().optional(),
   autoSellAt: z.number().optional(),  // Auto-trader satış zamanı (timestamp)
+  customHoldDurationMs: z.number().optional(),  // Token başına özel tutma süresi (ms)
 });
 
 export type Position = z.infer<typeof positionSchema>;
@@ -124,6 +125,10 @@ export const wsMessageSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("position_update"), data: positionSchema }),
   z.object({ type: z.literal("trade_config_update"), data: tradeConfigSchema }),
+  z.object({
+    type: z.literal("update_position_hold_duration"),
+    data: z.object({ positionId: z.string(), holdDurationMs: z.number() }),
+  }),
 ]);
 
 export type WSMessage = z.infer<typeof wsMessageSchema>;
