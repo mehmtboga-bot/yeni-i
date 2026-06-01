@@ -490,14 +490,50 @@ export class HeliusMonitor {
       const newMints      = post.filter((p: any) => !preMints.has(p.mint) && p.mint !== WSOL);
       const existingMints = post.filter((p: any) =>  preMints.has(p.mint) && p.mint !== WSOL);
 
-      const lpMint =
-        newMints.find((p: any) => p.uiTokenAmount?.amount !== "0")?.mint ??
-        newMints[0]?.mint ??
-        null;
+      // Debug: hangi mint'ler bulundu
+      console.log(
+        `🔍 [LP] ${signature.slice(0, 8)}... | ` +
+        `post=${post.length} pre=${pre.length} | ` +
+        `newMints=${newMints.length} existingMints=${existingMints.length} | ` +
+        `newMints: [${newMints.map((m: any) => `${m.mint?.slice(0, 6)}… dec=${m.uiTokenAmount?.decimals} amt=${m.uiTokenAmount?.amount}`).join(", ")}] | ` +
+        `existingMints: [${existingMints.map((m: any) => `${m.mint?.slice(0, 6)}…`).join(", ")}]`
+      );
 
-      const tokenMint = existingMints.length > 0
-        ? existingMints[0].mint
-        : (newMints.length > 1 ? newMints[1].mint : lpMint);
+      // PumpSwap CreatePool'da genellikle 2 yeni mint oluşur:
+      //   • LP token  → düşük decimals (genellikle 0), düşük raw supply (örn. "1")
+      //   • Token     → yüksek decimals (genellikle 6), yüksek raw supply (örn. milyarlarca)
+      // LP token'ı en düşük raw amount'a sahip mint olarak tanımla;
+      // diğeri gerçek token mint'idir.
+      let lpMint: string | null = null;
+      let tokenMint: string | null = null;
+
+      if (newMints.length >= 2) {
+        // İki veya daha fazla yeni mint var: supply'e göre ayırt et
+        // Daha düşük raw amount → LP token; daha yüksek → gerçek token
+        const sorted = [...newMints].sort((a: any, b: any) => {
+          const aAmt = BigInt(a.uiTokenAmount?.amount || "0");
+          const bAmt = BigInt(b.uiTokenAmount?.amount || "0");
+          return aAmt < bAmt ? -1 : aAmt > bAmt ? 1 : 0;
+        });
+        lpMint    = sorted[0].mint;                      // en düşük supply → LP token
+        tokenMint = sorted[sorted.length - 1].mint;     // en yüksek supply → gerçek token
+      } else if (newMints.length === 1) {
+        // Tek yeni mint: LP token olarak işaretle, token mint'i existingMints'ten al
+        lpMint    = newMints[0].mint;
+        tokenMint = existingMints.length > 0 ? existingMints[0].mint : lpMint;
+      } else {
+        // Hiç yeni mint yok: existingMints'ten al
+        lpMint    = existingMints.length > 0 ? existingMints[0].mint : null;
+        tokenMint = existingMints.length > 1
+          ? existingMints[1].mint
+          : (existingMints.length > 0 ? existingMints[0].mint : null);
+      }
+
+      console.log(
+        `🎯 [LP] ${signature.slice(0, 8)}... | ` +
+        `lpMint=${lpMint?.slice(0, 8) ?? "null"}… | ` +
+        `tokenMint=${tokenMint?.slice(0, 8) ?? "null"}…`
+      );
 
       // Likidite: net WSOL girişi
       let liquidityAmount: number | undefined;
