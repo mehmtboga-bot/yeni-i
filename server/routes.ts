@@ -514,25 +514,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         } else if (message.type === "delete_position") {
+          // Soft-delete: position'ı tamamen silme, status'unu "deleted" yap
           const { positionId } = message.data || {};
           if (positionId) {
             const pos = tradeStore.getById(positionId);
             if (pos && (pos.status === "pending_buy" || pos.status === "pending_sell")) {
               trader.cancel(positionId);
             }
-            tradeStore.delete(positionId);
-            broadcastToClients({
-              type: "positions_snapshot",
-              data: {
-                positions: tradeStore.getAll(),
-                config: tradeStore.getConfig(),
-                autoTraderConfig: autoTraderConfigStore.getConfig(),
-                autoTraderRunning: autoTraderEngine.getIsRunning(),
-                traderPublicKey: trader.getPublicKey(),
-                traderReady: trader.isReady(),
-                solPriceUsd: monitor.getSolPriceUsd(),
-              },
-            });
+            const deleted = tradeStore.delete(positionId);
+            if (deleted) {
+              broadcastToClients({ type: "position_update", data: deleted });
+            }
+          }
+        } else if (message.type === "restore_position") {
+          // Soft-delete'i geri al
+          const { positionId } = message.data || {};
+          if (positionId) {
+            const restored = tradeStore.restore(positionId);
+            if (restored) {
+              broadcastToClients({ type: "position_update", data: restored });
+            }
           }
         } else if (message.type === "request_positions") {
           sendPositionsSnapshot(ws);

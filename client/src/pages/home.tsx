@@ -222,6 +222,12 @@ export default function Home() {
     }
   };
 
+  const handleRestorePosition = (positionId: string) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "restore_position", data: { positionId } }));
+    }
+  };
+
   const handleConfigUpdate = (cfg: Partial<TradeConfig>) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "trade_config_update", data: cfg }));
@@ -609,6 +615,7 @@ export default function Home() {
               solPriceUsd={solPriceUsd}
               onSell={handleSell}
               onDelete={handleDeletePosition}
+              onRestore={handleRestorePosition}
               onUpdateConfig={handleConfigUpdate}
             />
             <div className="flex justify-center pt-2">
