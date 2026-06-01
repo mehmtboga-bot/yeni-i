@@ -237,20 +237,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sym = symbol || "?";
         const autoConfig = autoTraderConfigStore.getConfig();
         const solAmount = autoConfig.solAmountPerTrade;
-        console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
-        if (dex === "pumpswap") {
-          trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
-            .catch((err) => {
-              console.error("Auto-buy (PumpSwap) hatası:", err);
-              autoTraderEngine.markRecordFailed(mintAddress, String(err));
-            });
-        } else {
-          trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
-            .catch((err) => {
-              console.error("Auto-buy hatası:", err);
-              autoTraderEngine.markRecordFailed(mintAddress, String(err));
-            });
-        }
+        console.log(`⏳ [Auto-Trader] ${sym} 500ms bekleniyor... (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
+        setTimeout(() => {
+          console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
+          if (dex === "pumpswap") {
+            trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
+              .catch((err) => {
+                console.error("Auto-buy (PumpSwap) hatası:", err);
+                autoTraderEngine.markRecordFailed(mintAddress, String(err));
+              });
+          } else {
+            trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
+              .catch((err) => {
+                console.error("Auto-buy hatası:", err);
+                autoTraderEngine.markRecordFailed(mintAddress, String(err));
+              });
+          }
+        }, 500);
       } else if (event === "auto_sell_ready") {
         if (data.forceClose) {
           // Likidite düşüşü — token satılmadan zarar olarak kapat (rug pull)
