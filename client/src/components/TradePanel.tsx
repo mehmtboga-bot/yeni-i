@@ -19,6 +19,7 @@ interface TradePanelProps {
   tradingRecords?: TradeRecord[];
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
+  onMarkRugPull: (positionId: string) => void;
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
 }
 
@@ -65,6 +66,7 @@ export function TradePanel({
   tradingRecords = [],
   onSell,
   onDelete,
+  onMarkRugPull,
   onUpdateConfig,
 }: TradePanelProps) {
   const [filter, setFilter] = useState<Filter>("all");
@@ -231,7 +233,7 @@ export function TradePanel({
         <div className="space-y-2">
           {filtered.map((p) => (
             <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} />
+              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} onMarkRugPull={onMarkRugPull} />
           ))}
         </div>
       )}
@@ -272,9 +274,10 @@ interface PositionRowProps {
   onCopy: (addr: string, id: string) => void;
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
+  onMarkRugPull: (positionId: string) => void;
 }
 
-function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete }: PositionRowProps) {
+function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete, onMarkRugPull }: PositionRowProps) {
   const isOpen = p.status === "open";
   const isPending = p.status === "pending_buy" || p.status === "pending_sell";
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
@@ -304,7 +307,8 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
   return (
     <div
       className={`bg-card border rounded-lg p-3 ${
-        p.status === "closed" ? (pnlPositive ? "border-emerald-500/30" : "border-destructive/30")
+        p.status === "closed" && p.error === "Rug Pull" ? "border-red-500/50"
+        : p.status === "closed" ? (pnlPositive ? "border-emerald-500/30" : "border-destructive/30")
         : p.status === "failed" ? "border-destructive/40"
         : isOpen ? "border-primary/40"
         : "border-card-border"
@@ -316,7 +320,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm" data-testid="text-pos-name">{p.name}</span>
             <span className="text-xs text-muted-foreground">{p.symbol}</span>
-            <StatusBadge status={p.status} />
+            <StatusBadge status={p.status} error={p.error} />
             {p.dex && (
               <Badge className={`text-[10px] ${p.dex === "pumpswap" ? "bg-orange-500/15 text-orange-400 border border-orange-500/30" : "bg-primary/15 text-primary border border-primary/30"}`}>
                 {p.dex === "pumpswap" ? "PumpSwap" : "Jupiter"}
@@ -451,8 +455,8 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                 variant="outline"
                 className="border-red-500/50 text-red-400 hover:bg-red-500/10"
                 onClick={() => {
-                  if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek.`)) {
-                    onDelete(p.id);
+                  if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek ve "Kapanan" bölümünde görünecek.`)) {
+                    onMarkRugPull(p.id);
                   }
                 }}
                 data-testid={`button-rug-${p.id}`}
@@ -519,7 +523,14 @@ function Cell({ label, value, sub, highlight }: { label: string; value: string; 
   );
 }
 
-function StatusBadge({ status }: { status: Position["status"] }) {
+function StatusBadge({ status, error }: { status: Position["status"]; error?: string }) {
+  if (status === "closed" && error === "Rug Pull") {
+    return (
+      <Badge className="text-xs bg-red-500/20 text-red-400 border border-red-500/50">
+        🚨 Rug Pull
+      </Badge>
+    );
+  }
   const map: Record<Position["status"], { label: string; cls: string }> = {
     pending_buy:  { label: "Alınıyor",  cls: "bg-primary/15 text-primary border border-primary/40" },
     open:         { label: "Açık",      cls: "bg-chart-4/15 text-chart-4 border border-chart-4/40" },
