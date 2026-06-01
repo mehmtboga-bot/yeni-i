@@ -246,12 +246,20 @@ export default function Home() {
     }
   };
 
+  const handleUpdateHoldDuration = (positionId: string, customHoldDurationMs: number) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "update_position_hold_duration", data: { positionId, customHoldDurationMs } }));
+    }
+  };
+
+
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host || "localhost:5000";
     const wsUrl = `${protocol}//${host}/ws`;
     let wsInstance: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout;
+
 
     const handleIncomingMessage = (msg: StoredEvent) => {
       if (!msg || typeof msg.type !== "string") return;
@@ -316,6 +324,7 @@ export default function Home() {
           try { localStorage.setItem("positions", JSON.stringify(next)); } catch {}
           return next;
         });
+
       } else if (msg.type === "trade_config_update") {
         setTradeConfig(msg.data);
         try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data)); } catch {}
@@ -617,6 +626,7 @@ export default function Home() {
               onDelete={handleDeletePosition}
               onMarkRugPull={handleMarkRugPull}
               onUpdateConfig={handleConfigUpdate}
+              onUpdateHoldDuration={handleUpdateHoldDuration}
             />
             <div className="flex justify-center pt-2">
               <Button
