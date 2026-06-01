@@ -21,8 +21,8 @@ import type { ServerLog } from "@/components/LogPanel";
 
 const MAX_MINTED_TOKENS = 7;
 const MAX_LP_LOGS = 30;
-const MINT_DISPLAY_DURATION = 3 * 60 * 1000;
-const LP_LOG_DURATION = 5 * 60 * 1000;
+const MINT_DISPLAY_DURATION = 30 * 60 * 1000;
+const LP_LOG_DURATION = 60 * 60 * 1000;
 
 type Tab = "console" | "dashboard" | "trade" | "files";
 
@@ -117,8 +117,7 @@ function loadMintedTokens(): MintedToken[] {
   try {
     const raw = localStorage.getItem("mintedTokens");
     if (!raw) return [];
-    const now = Date.now();
-    const tokens = (JSON.parse(raw) as MintedToken[]).filter((t) => t.expiresAt > now);
+    const tokens = JSON.parse(raw) as MintedToken[];
     return tokens.slice(0, MAX_MINTED_TOKENS);
   } catch {
     return [];
@@ -129,8 +128,7 @@ function loadLpLogs(): LPDetection[] {
   try {
     const raw = localStorage.getItem("lpLogs");
     if (!raw) return [];
-    const now = Date.now();
-    const logs = (JSON.parse(raw) as LPDetection[]).filter((l) => l.expiresAt > now);
+    const logs = JSON.parse(raw) as LPDetection[];
     return logs.slice(0, MAX_LP_LOGS);
   } catch {
     return [];
