@@ -325,10 +325,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
 
-        // Whitelist'teki token'ler likidite eşiğini geçmese bile alınsın
-        const MIN_TVL_FOR_WHITELIST = 0; // Whitelist'teki token'ler için likidite eşiği yok
+        // Whitelist'teki token'ler için minimum likidite eşiği
+        const MIN_TVL_FOR_WHITELIST = 1000; // $1000 minimum likidite
         if ((tvlUsd ?? 0) < MIN_TVL_FOR_WHITELIST) {
-          console.log(`⏭️ [Fast-Buy] ${sym} likidite eşiğini geçmedi (TVL=${tvlUsd?.toFixed(0) ?? "?"}), atlanıyor`);
+          console.log(`⏭️ [Fast-Buy] ${sym} likidite eşiğini geçmedi (TVL=${tvlUsd?.toFixed(0) ?? "?"} < ${MIN_TVL_FOR_WHITELIST}), atlanıyor`);
           return;
         }
 
