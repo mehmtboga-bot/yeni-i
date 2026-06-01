@@ -147,6 +147,10 @@ export class AutoTraderEngine {
     this.processedLPs.add(mintAddress);
     const recordId = `auto-${mintAddress}-${Date.now()}`;
 
+    // Özel tutma süresi: lpData'dan gelen customHoldDurationMs (whitelist Bölüm 2) veya global
+    const customHoldDurationMs: number | undefined = lpData.customHoldDurationMs;
+    const holdMs = customHoldDurationMs ?? config.holdDurationMs;
+
     // Record oluştur
     const record: AutoTradeRecord = {
       id: recordId,
@@ -154,7 +158,7 @@ export class AutoTraderEngine {
       tokenName: name || "Bilinmiyor",
       tokenSymbol: symbol || "?",
       buyTimestamp: Date.now(),
-      shouldSellAt: Date.now() + config.holdDurationMs,
+      shouldSellAt: Date.now() + holdMs,
       status: "pending",
       initialLiquidityUsd: liquidityUsd,  // LP'nin başlangıç likidite bilgisini kaydet
     };
@@ -162,7 +166,7 @@ export class AutoTraderEngine {
     this.emit("auto_trade_record_updated", record);
 
     console.log(
-      `🤖 [Auto-Trader] İşlem başlatılıyor: ${symbol} | Tutma süresi: ${(config.holdDurationMs / 1000).toFixed(0)}s`
+      `🤖 [Auto-Trader] İşlem başlatılıyor: ${symbol} | Tutma süresi: ${(holdMs / 1000).toFixed(0)}s${customHoldDurationMs !== undefined ? " (özel süre)" : ""}`
     );
 
     // Alım emri ver — routes.ts bu event'i dinleyip trader.buy() çağırır

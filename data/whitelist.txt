@@ -1,0 +1,11 @@
+# Bölüm 1: Normal tokenler (global hold duration kullanılır)
+PEPE
+DOGE
+SHIB
+FLOKI
+
+---ÖZEL SÜRELİ---
+# Bölüm 2: Özel süreli tokenler (TOKEN:SANIYE formatı)
+# Bu bölümdeki tokenler kendi belirtilen süreleriyle satılır.
+# Örnek: GDOR:300  → 300 saniye (5 dakika) sonra sat
+# Örnek: XYZW:900  → 900 saniye (15 dakika) sonra sat
