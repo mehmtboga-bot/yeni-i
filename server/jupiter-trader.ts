@@ -318,7 +318,15 @@ export class JupiterTrader {
       const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
       const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
       const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-      const result = { sig, tokensOut, pricePerToken };
+
+      // TX'in indexer'a yansıması için bekle, ardından gerçek bakiyeyi doğrula
+      await new Promise((r) => setTimeout(r, 1000));
+      const balanceCheck = await this.getTokenBalance(mintAddress);
+      if (!balanceCheck || balanceCheck.uiAmount <= 0) {
+        throw new Error(`TOKEN_NOT_RECEIVED: TX gönderildi (${sig.slice(0, 16)}...) fakat cüzdanda ${symbol} bakiyesi bulunamadı — alım başarısız sayılıyor`);
+      }
+
+      const result = { sig, tokensOut: balanceCheck.uiAmount, pricePerToken: balanceCheck.uiAmount > 0 ? actualSolAmount / balanceCheck.uiAmount : pricePerToken };
 
       position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
