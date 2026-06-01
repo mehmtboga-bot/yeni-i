@@ -117,8 +117,7 @@ function loadMintedTokens(): MintedToken[] {
   try {
     const raw = localStorage.getItem("mintedTokens");
     if (!raw) return [];
-    const now = Date.now();
-    const tokens = (JSON.parse(raw) as MintedToken[]).filter((t) => t.expiresAt > now);
+    const tokens = JSON.parse(raw) as MintedToken[];
     return tokens.slice(0, MAX_MINTED_TOKENS);
   } catch {
     return [];
@@ -129,8 +128,7 @@ function loadLpLogs(): LPDetection[] {
   try {
     const raw = localStorage.getItem("lpLogs");
     if (!raw) return [];
-    const now = Date.now();
-    const logs = (JSON.parse(raw) as LPDetection[]).filter((l) => l.expiresAt > now);
+    const logs = JSON.parse(raw) as LPDetection[];
     return logs.slice(0, MAX_LP_LOGS);
   } catch {
     return [];
