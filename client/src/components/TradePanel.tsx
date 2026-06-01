@@ -442,9 +442,37 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
 
         <div className="shrink-0 flex gap-2">
           {isOpen && (
-            <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
-              Sat
-            </Button>
+            <>
+              <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
+                Sat
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                onClick={() => {
+                  if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek.`)) {
+                    onDelete(p.id);
+                  }
+                }}
+                data-testid={`button-rug-${p.id}`}
+              >
+                🚨 Rug
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                onClick={() => {
+                  if (confirm(`${p.symbol} işlemini iptal etmek istediğine emin misin?`)) {
+                    onDelete(p.id);
+                  }
+                }}
+                data-testid={`button-cancel-${p.id}`}
+              >
+                ✕ İptal
+              </Button>
+            </>
           )}
           {p.status === "failed" && p.buyTxSignature && (
             <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
@@ -457,20 +485,22 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
               {p.status === "pending_buy" ? "Alınıyor" : "Satılıyor"}
             </Button>
           )}
-          <Button
-            size="icon" variant="ghost"
-            onClick={() => {
-              if (isPending) {
-                if (confirm(`${p.status === "pending_buy" ? "Alım" : "Satış"} iptal edilecek, emin misin?`)) onDelete(p.id);
-              } else {
-                onDelete(p.id);
-              }
-            }}
-            className="h-8 w-8 text-destructive/60 hover:text-destructive"
-            title={isPending ? "İşlemi iptal et" : "Pozisyonu sil"}
-          >
-            ✕
-          </Button>
+          {!isOpen && (
+            <Button
+              size="icon" variant="ghost"
+              onClick={() => {
+                if (isPending) {
+                  if (confirm(`${p.status === "pending_buy" ? "Alım" : "Satış"} iptal edilecek, emin misin?`)) onDelete(p.id);
+                } else {
+                  onDelete(p.id);
+                }
+              }}
+              className="h-8 w-8 text-destructive/60 hover:text-destructive"
+              title={isPending ? "İşlemi iptal et" : "Pozisyonu sil"}
+            >
+              ✕
+            </Button>
+          )}
         </div>
       </div>
     </div>
