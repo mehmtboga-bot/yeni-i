@@ -119,13 +119,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       _origLog(`📝 Dosya güncellendi: ${filePath}`);
 
       // Whitelist dosyası güncellenirse, whitelist manager'ı yenile
+      // Dosya zaten yazıldı — sadece bellekteki listeyi yenile (iki bölümlü format korunur)
       if (filePath === "data/whitelist.txt") {
-        whitelistManager.updateWhitelist(
-          content
-            .split("\n")
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0)
-        );
+        whitelistManager.reloadFromFile();
       }
 
       res.json({ ok: true });
@@ -335,8 +331,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
 
-        // Auto-trader'a bildir (record tutması için)
-        autoTraderEngine.onLPDetected(data).catch((err) => console.error("Auto-trader LP hatası:", err));
+        // Whitelist Bölüm 2: token için özel tutma süresi var mı?
+        const customHoldDurationMs = whitelistManager.getCustomHoldDurationMs(sym);
+        if (customHoldDurationMs !== undefined) {
+          console.log(`⏱️ [Fast-Buy] ${sym} özel tutma süresi: ${(customHoldDurationMs / 1000).toFixed(0)}s (whitelist Bölüm 2)`);
+        }
+
+        // Auto-trader'a bildir (record tutması için) — özel süreyi data'ya ekle
+        autoTraderEngine.onLPDetected({ ...data, customHoldDurationMs }).catch((err) => console.error("Auto-trader LP hatası:", err));
 
         // Eğer token son 15 dakikada görüldüyse, manuel alım için arayüzde göster ama otomatik alım yapma
         const isRecentlySkipped = monitor.isTokenRecentlySkipped(sym);
@@ -350,16 +352,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`⏳ [Fast-Buy] ${sym} 300ms bekleniyor... (${mintAddress})`);
 
         setTimeout(() => {
-          console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | SOL: ${solAmount}`);
+          console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | SOL: ${solAmount}${customHoldDurationMs !== undefined ? ` | Özel süre: ${(customHoldDurationMs / 1000).toFixed(0)}s` : ""}`);
 
+          const buyOpts = { mintAddress, name: nm, symbol: sym, solAmount, customHoldDurationMs };
           if (dex === "pumpswap") {
-            trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
-              .catch((err) => {
+            trader.buyPumpSwap(buyOpts)
+              .then((pos: any) => {
+                if (pos && customHoldDurationMs !== undefined) {
+                  const updated = { ...pos, customHoldDurationMs };
+                  tradeStore.upsert(updated);
+                  broadcastToClients({ type: "position_update", data: updated });
+                }
+              })
+              .catch((err: any) => {
                 console.error("Fast-buy (PumpSwap) hatası:", err);
               });
           } else {
-            trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
-              .catch((err) => {
+            trader.buy(buyOpts)
+              .then((pos: any) => {
+                if (pos && customHoldDurationMs !== undefined) {
+                  const updated = { ...pos, customHoldDurationMs };
+                  tradeStore.upsert(updated);
+                  broadcastToClients({ type: "position_update", data: updated });
+                }
+              })
+              .catch((err: any) => {
                 console.error("Fast-buy hatası:", err);
               });
           }
