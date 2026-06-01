@@ -471,12 +471,26 @@ export class JupiterTrader {
             slippagePct,
             priorityFeeSol,
           });
-          return { sig, tokenAmount: balance.uiAmount };
+          // PumpSwap quote dönmediği için SOL çıktısını alım fiyatı üzerinden tahmin et
+          const sellPriceSol = pos.buyPriceSol ?? 0;
+          const solOut = balance.uiAmount * sellPriceSol;
+          return { sig, tokenAmount: balance.uiAmount, solOut, sellPriceSol };
         }, `PumpSwap Sell ${pos.symbol}`, 1);
 
-        updated = { ...updated, status: "closed", sellTimestamp: Date.now(), sellTxSignature: result.sig };
+        const pnlSol = result.solOut - (pos.buySolAmount ?? 0);
+        const pnlPct = (pos.buySolAmount ?? 0) > 0 ? (pnlSol / pos.buySolAmount!) * 100 : 0;
+        updated = {
+          ...updated,
+          status: "closed",
+          sellTimestamp: Date.now(),
+          sellSolAmount: result.solOut,
+          sellPriceSol: result.sellPriceSol,
+          sellTxSignature: result.sig,
+          pnlSol,
+          pnlPct,
+        };
         this.updateAndEmit(updated);
-        console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | ${result.tokenAmount.toLocaleString()} token | tx ${result.sig.slice(0, 16)}...`);
+        console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | ${result.tokenAmount.toLocaleString()} token | ~${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
       } else {
         // Jupiter satışı — route yoksa PumpSwap'a fallback
         let jupiterOk = false;
@@ -514,11 +528,25 @@ export class JupiterTrader {
             const balance = await fetchBalanceWithRetry();
             console.log(`🔍 [PumpSwap Fallback] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
             const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
-            return { sig, tokenAmount: balance.uiAmount };
+            // PumpSwap quote dönmediği için SOL çıktısını alım fiyatı üzerinden tahmin et
+            const sellPriceSol = pos.buyPriceSol ?? 0;
+            const solOut = balance.uiAmount * sellPriceSol;
+            return { sig, tokenAmount: balance.uiAmount, solOut, sellPriceSol };
           }, `PumpSwap Fallback Sell ${pos.symbol}`, 1);
-          updated = { ...updated, status: "closed", sellTimestamp: Date.now(), sellTxSignature: result.sig };
+          const pnlSol = result.solOut - (pos.buySolAmount ?? 0);
+          const pnlPct = (pos.buySolAmount ?? 0) > 0 ? (pnlSol / pos.buySolAmount!) * 100 : 0;
+          updated = {
+            ...updated,
+            status: "closed",
+            sellTimestamp: Date.now(),
+            sellSolAmount: result.solOut,
+            sellPriceSol: result.sellPriceSol,
+            sellTxSignature: result.sig,
+            pnlSol,
+            pnlPct,
+          };
           this.updateAndEmit(updated);
-          console.log(`✅ [PumpSwap Fallback] SATIŞ tamam: ${pos.symbol} | tx ${result.sig.slice(0, 16)}...`);
+          console.log(`✅ [PumpSwap Fallback] SATIŞ tamam: ${pos.symbol} | ~${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
         }
       }
       return updated;
