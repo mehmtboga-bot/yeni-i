@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer } from "lucide-react";
+import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -19,6 +19,7 @@ interface TradePanelProps {
   tradingRecords?: TradeRecord[];
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
+  onRestore: (positionId: string) => void;
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
 }
 
@@ -65,6 +66,7 @@ export function TradePanel({
   tradingRecords = [],
   onSell,
   onDelete,
+  onRestore,
   onUpdateConfig,
 }: TradePanelProps) {
   const [filter, setFilter] = useState<Filter>("all");
@@ -80,19 +82,24 @@ export function TradePanel({
     setTimeout(() => setCopiedId(null), 1500);
   };
 
+  // Aktif (silinmemiş) pozisyonlar
+  const activePositions = useMemo(() => positions.filter((p) => p.status !== "deleted"), [positions]);
+  // Silinmiş (soft-deleted) pozisyonlar
+  const deletedPositions = useMemo(() => positions.filter((p) => p.status === "deleted"), [positions]);
+
   const filtered = useMemo(() => {
-    if (filter === "open") return positions.filter((p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell");
-    if (filter === "closed") return positions.filter((p) => p.status === "closed" || p.status === "failed");
-    return positions;
-  }, [positions, filter]);
+    if (filter === "open") return activePositions.filter((p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell");
+    if (filter === "closed") return activePositions.filter((p) => p.status === "closed" || p.status === "failed");
+    return activePositions;
+  }, [activePositions, filter]);
 
   const stats = useMemo(() => {
-    const open = positions.filter((p) => p.status === "open" || p.status === "pending_sell");
-    const closed = positions.filter((p) => p.status === "closed");
+    const open = activePositions.filter((p) => p.status === "open" || p.status === "pending_sell");
+    const closed = activePositions.filter((p) => p.status === "closed");
     const totalSpent = open.reduce((s, p) => s + p.buySolAmount, 0);
     const realized = closed.reduce((s, p) => s + (p.pnlSol ?? 0), 0);
     return { openCount: open.length, closedCount: closed.length, totalSpent, realized };
-  }, [positions]);
+  }, [activePositions]);
 
   const saveConfig = () => {
     const sol = parseFloat(solAmountInput);
@@ -231,8 +238,27 @@ export function TradePanel({
         <div className="space-y-2">
           {filtered.map((p) => (
             <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} />
+              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} onRestore={onRestore} />
           ))}
+        </div>
+      )}
+
+      {/* Silinmiş (Arşivlenmiş) Pozisyonlar */}
+      {deletedPositions.length > 0 && (
+        <div className="mt-6 pt-4 border-t border-dashed border-muted-foreground/20">
+          <div className="flex items-center gap-2 mb-3">
+            <Trash2 className="h-4 w-4 text-muted-foreground/50" />
+            <h3 className="text-sm font-medium text-muted-foreground/70">
+              Arşivlenen İşlemler ({deletedPositions.length})
+            </h3>
+            <span className="text-xs text-muted-foreground/50">— Geri getirmek için ↩ butonuna bas</span>
+          </div>
+          <div className="space-y-2">
+            {deletedPositions.map((p) => (
+              <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
+                takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} onRestore={onRestore} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -272,10 +298,12 @@ interface PositionRowProps {
   onCopy: (addr: string, id: string) => void;
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
+  onRestore: (positionId: string) => void;
 }
 
-function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete }: PositionRowProps) {
+function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete, onRestore }: PositionRowProps) {
   const isOpen = p.status === "open";
+  const isDeleted = p.status === "deleted";
   const isPending = p.status === "pending_buy" || p.status === "pending_sell";
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
   const profitPct = isOpen ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
@@ -303,11 +331,13 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
 
   return (
     <div
-      className={`bg-card border rounded-lg p-3 ${
-        p.status === "closed" ? (pnlPositive ? "border-emerald-500/30" : "border-destructive/30")
-        : p.status === "failed" ? "border-destructive/40"
-        : isOpen ? "border-primary/40"
-        : "border-card-border"
+      className={`bg-card border rounded-lg p-3 transition-opacity ${
+        isDeleted
+          ? "border-muted-foreground/20 opacity-50 grayscale"
+          : p.status === "closed" ? (pnlPositive ? "border-emerald-500/30" : "border-destructive/30")
+          : p.status === "failed" ? "border-destructive/40"
+          : isOpen ? "border-primary/40"
+          : "border-card-border"
       }`}
       data-testid={`row-position-${p.id}`}
     >
@@ -441,65 +471,82 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
         </div>
 
         <div className="shrink-0 flex gap-2">
-          {isOpen && (
-            <>
-              <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
-                Sat
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-red-500/50 text-red-400 hover:bg-red-500/10"
-                onClick={() => {
-                  if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek.`)) {
-                    onDelete(p.id);
-                  }
-                }}
-                data-testid={`button-rug-${p.id}`}
-              >
-                🚨 Rug
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
-                onClick={() => {
-                  if (confirm(`${p.symbol} işlemini iptal etmek istediğine emin misin?`)) {
-                    onDelete(p.id);
-                  }
-                }}
-                data-testid={`button-cancel-${p.id}`}
-              >
-                ✕ İptal
-              </Button>
-            </>
-          )}
-          {p.status === "failed" && p.buyTxSignature && (
-            <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
-              Tekrar Sat
-            </Button>
-          )}
-          {isPending && (
-            <Button size="sm" variant="outline" disabled>
-              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              {p.status === "pending_buy" ? "Alınıyor" : "Satılıyor"}
-            </Button>
-          )}
-          {!isOpen && (
+          {isDeleted ? (
+            // Arşivlenmiş pozisyon: sadece geri getir butonu göster
             <Button
-              size="icon" variant="ghost"
-              onClick={() => {
-                if (isPending) {
-                  if (confirm(`${p.status === "pending_buy" ? "Alım" : "Satış"} iptal edilecek, emin misin?`)) onDelete(p.id);
-                } else {
-                  onDelete(p.id);
-                }
-              }}
-              className="h-8 w-8 text-destructive/60 hover:text-destructive"
-              title={isPending ? "İşlemi iptal et" : "Pozisyonu sil"}
+              size="sm"
+              variant="outline"
+              className="border-muted-foreground/40 text-muted-foreground hover:text-foreground hover:border-muted-foreground/70 gap-1.5"
+              onClick={() => onRestore(p.id)}
+              data-testid={`button-restore-${p.id}`}
+              title="Pozisyonu geri getir"
             >
-              ✕
+              <RotateCcw className="h-3.5 w-3.5" />
+              Geri Getir
             </Button>
+          ) : (
+            <>
+              {isOpen && (
+                <>
+                  <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
+                    Sat
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                    onClick={() => {
+                      if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek.`)) {
+                        onDelete(p.id);
+                      }
+                    }}
+                    data-testid={`button-rug-${p.id}`}
+                  >
+                    🚨 Rug
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                    onClick={() => {
+                      if (confirm(`${p.symbol} işlemini iptal etmek istediğine emin misin?`)) {
+                        onDelete(p.id);
+                      }
+                    }}
+                    data-testid={`button-cancel-${p.id}`}
+                  >
+                    ✕ İptal
+                  </Button>
+                </>
+              )}
+              {p.status === "failed" && p.buyTxSignature && (
+                <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
+                  Tekrar Sat
+                </Button>
+              )}
+              {isPending && (
+                <Button size="sm" variant="outline" disabled>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  {p.status === "pending_buy" ? "Alınıyor" : "Satılıyor"}
+                </Button>
+              )}
+              {!isOpen && (
+                <Button
+                  size="icon" variant="ghost"
+                  onClick={() => {
+                    if (isPending) {
+                      if (confirm(`${p.status === "pending_buy" ? "Alım" : "Satış"} iptal edilecek, emin misin?`)) onDelete(p.id);
+                    } else {
+                      onDelete(p.id);
+                    }
+                  }}
+                  className="h-8 w-8 text-destructive/60 hover:text-destructive"
+                  title={isPending ? "İşlemi iptal et" : "Pozisyonu arşivle"}
+                >
+                  ✕
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -521,11 +568,12 @@ function Cell({ label, value, sub, highlight }: { label: string; value: string; 
 
 function StatusBadge({ status }: { status: Position["status"] }) {
   const map: Record<Position["status"], { label: string; cls: string }> = {
-    pending_buy:  { label: "Alınıyor",  cls: "bg-primary/15 text-primary border border-primary/40" },
-    open:         { label: "Açık",      cls: "bg-chart-4/15 text-chart-4 border border-chart-4/40" },
-    pending_sell: { label: "Satılıyor", cls: "bg-primary/15 text-primary border border-primary/40" },
-    closed:       { label: "Kapandı",   cls: "bg-muted text-muted-foreground border border-muted-foreground/30" },
-    failed:       { label: "Başarısız", cls: "bg-destructive/15 text-destructive border border-destructive/40" },
+    pending_buy:  { label: "Alınıyor",   cls: "bg-primary/15 text-primary border border-primary/40" },
+    open:         { label: "Açık",       cls: "bg-chart-4/15 text-chart-4 border border-chart-4/40" },
+    pending_sell: { label: "Satılıyor",  cls: "bg-primary/15 text-primary border border-primary/40" },
+    closed:       { label: "Kapandı",    cls: "bg-muted text-muted-foreground border border-muted-foreground/30" },
+    failed:       { label: "Başarısız",  cls: "bg-destructive/15 text-destructive border border-destructive/40" },
+    deleted:      { label: "Arşivlendi", cls: "bg-muted/50 text-muted-foreground/60 border border-muted-foreground/20" },
   };
   const cfg = map[status];
   return <Badge className={`text-xs ${cfg.cls}`}>{cfg.label}</Badge>;

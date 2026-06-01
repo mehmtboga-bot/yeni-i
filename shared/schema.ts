@@ -40,7 +40,7 @@ export const positionSchema = z.object({
   mintAddress: z.string(),
   name: z.string(),
   symbol: z.string(),
-  status: z.enum(["pending_buy", "open", "pending_sell", "closed", "failed"]),
+  status: z.enum(["pending_buy", "open", "pending_sell", "closed", "failed", "deleted"]),
   dex: z.enum(["jupiter", "pumpswap"]).optional(),
   buyTimestamp: z.number(),
   buySolAmount: z.number(),
@@ -58,6 +58,7 @@ export const positionSchema = z.object({
   unrealizedPnlPct: z.number().optional(),
   error: z.string().optional(),
   autoSellAt: z.number().optional(),  // Auto-trader satış zamanı (timestamp)
+  deletedAt: z.number().optional(),   // Soft-delete zamanı (timestamp)
 });
 
 export type Position = z.infer<typeof positionSchema>;

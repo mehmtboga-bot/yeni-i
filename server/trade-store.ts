@@ -58,7 +58,41 @@ export class TradeStore {
 
   getById(id: string): Position | undefined { return this.data.positions.find((p) => p.id === id); }
 
-  delete(id: string): void {
+  /** Soft-delete: status'u "deleted" olarak işaretle, fiziksel silme yapma */
+  delete(id: string): Position | undefined {
+    const idx = this.data.positions.findIndex((p) => p.id === id);
+    if (idx < 0) return undefined;
+    const updated: Position = {
+      ...this.data.positions[idx],
+      status: "deleted",
+      deletedAt: Date.now(),
+    };
+    this.data.positions[idx] = updated;
+    save(this.data);
+    return updated;
+  }
+
+  /** Soft-delete'i geri al: önceki status'a döndür */
+  restore(id: string): Position | undefined {
+    const idx = this.data.positions.findIndex((p) => p.id === id);
+    if (idx < 0) return undefined;
+    const pos = this.data.positions[idx];
+    if (pos.status !== "deleted") return pos;
+    // pnlSol varsa closed, yoksa failed veya closed olarak geri getir
+    const restoredStatus: Position["status"] =
+      pos.pnlSol !== undefined ? "closed" : pos.buyTxSignature ? "failed" : "closed";
+    const restored: Position = {
+      ...pos,
+      status: restoredStatus,
+      deletedAt: undefined,
+    };
+    this.data.positions[idx] = restored;
+    save(this.data);
+    return restored;
+  }
+
+  /** Pozisyonu kalıcı olarak sil (sadece gerektiğinde) */
+  hardDelete(id: string): void {
     this.data.positions = this.data.positions.filter((p) => p.id !== id);
     save(this.data);
   }
