@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check, Lock, Unlock, Droplet, Zap } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock, Unlock, Droplet, Zap, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ interface MintedTokenCardProps {
   traderReady?: boolean;
   hasOpenPosition?: boolean;
   onBuy?: (mintAddress: string, name: string, symbol: string, dex: "jupiter" | "pumpswap") => void;
+  onCancel?: (mintAddress: string) => void;
 }
 
 export function MintedTokenCard({
@@ -20,6 +21,7 @@ export function MintedTokenCard({
   traderReady = false,
   hasOpenPosition = false,
   onBuy,
+  onCancel,
 }: MintedTokenCardProps) {
   const [copied, setCopied] = useState(false);
 
@@ -111,6 +113,19 @@ export function MintedTokenCard({
               <ExternalLink className="h-3.5 w-3.5 mr-1.5" />Dex
             </a>
           </Button>
+          {hasOpenPosition && onCancel && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => onCancel(token.mintAddress)}
+              className="flex-1 min-w-[70px]"
+              data-testid="button-cancel-order"
+              title="Alım/satış işlemini iptal et"
+            >
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              İptal
+            </Button>
+          )}
         </div>
       </div>
     </Card>
