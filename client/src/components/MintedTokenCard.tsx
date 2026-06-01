@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Copy, Check, Lock, Unlock, Droplet, Zap } from "lucide-react";
+import { ExternalLink, Copy, Check, Lock, Unlock, Droplet, Zap, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ interface MintedTokenCardProps {
   traderReady?: boolean;
   hasOpenPosition?: boolean;
   onBuy?: (mintAddress: string, name: string, symbol: string, dex: "jupiter" | "pumpswap") => void;
+  onCancel?: (mintAddress: string) => void;
 }
 
 export function MintedTokenCard({
@@ -20,6 +21,7 @@ export function MintedTokenCard({
   traderReady = false,
   hasOpenPosition = false,
   onBuy,
+  onCancel,
 }: MintedTokenCardProps) {
   const [copied, setCopied] = useState(false);
 
@@ -105,6 +107,19 @@ export function MintedTokenCard({
                 {hasOpenPosition ? "Portföyde" : "Pump Al"}
               </Button>
             </>
+          )}
+          {onCancel && hasOpenPosition && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onCancel(token.mintAddress)}
+              className="flex-1 min-w-[70px] border-destructive/50 text-destructive hover:bg-destructive/10"
+              data-testid="button-cancel-position"
+              title="İşlemi iptal et"
+            >
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              İptal
+            </Button>
           )}
           <Button size="sm" variant="outline" asChild className="flex-1 min-w-[70px]" data-testid="button-dexscreener">
             <a href={dexscreenerUrl} target="_blank" rel="noopener noreferrer">

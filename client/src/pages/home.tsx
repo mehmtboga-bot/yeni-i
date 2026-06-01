@@ -579,6 +579,10 @@ export default function Home() {
                           traderReady={traderReady}
                           hasOpenPosition={activeBuyMints.has(token.mintAddress)}
                           onBuy={handleBuy}
+                          onCancel={(mintAddress) => {
+                            const pos = positions.find((p) => p.mintAddress === mintAddress);
+                            if (pos) handleDeletePosition(pos.id);
+                          }}
                         />
                       ))}
                     </div>
