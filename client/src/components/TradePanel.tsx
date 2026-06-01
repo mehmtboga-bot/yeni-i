@@ -17,12 +17,10 @@ interface TradePanelProps {
   traderReady: boolean;
   solPriceUsd: number;
   tradingRecords?: TradeRecord[];
-  globalHoldDurationMs?: number;
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
-  onUpdateHoldDuration?: (positionId: string, holdDurationMs: number) => void;
 }
 
 const formatUsd = (n?: number) => {
@@ -66,12 +64,10 @@ export function TradePanel({
   traderReady,
   solPriceUsd,
   tradingRecords = [],
-  globalHoldDurationMs,
   onSell,
   onDelete,
   onMarkRugPull,
   onUpdateConfig,
-  onUpdateHoldDuration,
 }: TradePanelProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -91,21 +87,6 @@ export function TradePanel({
     if (filter === "closed") return positions.filter((p) => p.status === "closed" || p.status === "failed");
     return positions;
   }, [positions, filter]);
-
-  // Açık pozisyonları iki gruba böl
-  const { globalHoldPositions, customHoldPositions } = useMemo(() => {
-    const openFiltered = filtered.filter(
-      (p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell"
-    );
-    const globalHoldPositions = openFiltered.filter((p) => !p.customHoldDurationMs);
-    const customHoldPositions = openFiltered.filter((p) => !!p.customHoldDurationMs);
-    return { globalHoldPositions, customHoldPositions };
-  }, [filtered]);
-
-  const nonOpenFiltered = useMemo(
-    () => filtered.filter((p) => p.status !== "open" && p.status !== "pending_buy" && p.status !== "pending_sell"),
-    [filtered]
-  );
 
   const stats = useMemo(() => {
     const open = positions.filter((p) => p.status === "open" || p.status === "pending_sell");
@@ -249,56 +230,11 @@ export function TradePanel({
           <p className="text-sm">Henüz pozisyon yok. Dashboard'daki "Jup Al" veya "Pump Al" ile işlem başlat.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* Bölüm 1: Global tutma süreli pozisyonlar */}
-          {globalHoldPositions.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1">
-                <Timer className="h-4 w-4 text-amber-400" />
-                <span className="text-xs font-semibold text-amber-400 uppercase tracking-wide">
-                  Otomatik Satış (Global - {globalHoldDurationMs ? Math.round(globalHoldDurationMs / 60000) : 10} dk)
-                </span>
-                <span className="text-xs text-muted-foreground">({globalHoldPositions.length})</span>
-              </div>
-              {globalHoldPositions.map((p) => (
-                <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete}
-                  onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
-              ))}
-            </div>
-          )}
-
-          {/* Bölüm 2: Özel tutma süreli pozisyonlar */}
-          {customHoldPositions.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1">
-                <Timer className="h-4 w-4 text-violet-400" />
-                <span className="text-xs font-semibold text-violet-400 uppercase tracking-wide">
-                  Özel Tutma Süresi
-                </span>
-                <span className="text-xs text-muted-foreground">({customHoldPositions.length})</span>
-              </div>
-              {customHoldPositions.map((p) => (
-                <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete}
-                  onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
-              ))}
-            </div>
-          )}
-
-          {/* Kapalı / başarısız pozisyonlar */}
-          {nonOpenFiltered.length > 0 && (
-            <div className="space-y-2">
-              {(globalHoldPositions.length > 0 || customHoldPositions.length > 0) && (
-                <div className="border-t border-card-border pt-2" />
-              )}
-              {nonOpenFiltered.map((p) => (
-                <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete}
-                  onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
-              ))}
-            </div>
-          )}
+        <div className="space-y-2">
+          {filtered.map((p) => (
+            <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
+              takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete} onMarkRugPull={onMarkRugPull} />
+          ))}
         </div>
       )}
 
@@ -339,15 +275,11 @@ interface PositionRowProps {
   onSell: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
-  onUpdateHoldDuration?: (positionId: string, holdDurationMs: number) => void;
 }
 
-function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete, onMarkRugPull, onUpdateHoldDuration }: PositionRowProps) {
+function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete, onMarkRugPull }: PositionRowProps) {
   const isOpen = p.status === "open";
   const isPending = p.status === "pending_buy" || p.status === "pending_sell";
-  const [holdDurationInput, setHoldDurationInput] = useState<string>(
-    p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : ""
-  );
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
   const profitPct = isOpen ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
   const profitPositive = (profitPct ?? 0) >= 0;
@@ -509,44 +441,6 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
 
           {p.error && (
             <div className="text-[11px] text-destructive bg-destructive/10 rounded px-2 py-1">⚠️ {p.error}</div>
-          )}
-
-          {/* Özel tutma süresi ayarı — sadece açık pozisyonlar için */}
-          {isOpen && onUpdateHoldDuration && (
-            <div className="flex items-center gap-2 pt-1">
-              <Label htmlFor={`hold-dur-${p.id}`} className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
-                <Timer className="h-3 w-3 text-violet-400" />
-                Tutma Süresi (sn)
-              </Label>
-              <Input
-                id={`hold-dur-${p.id}`}
-                type="number"
-                min="1"
-                step="30"
-                placeholder={p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : "örn: 300"}
-                value={holdDurationInput}
-                onChange={(e) => setHoldDurationInput(e.target.value)}
-                className="h-6 text-xs w-24 px-2"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 px-2 text-xs border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
-                onClick={() => {
-                  const secs = parseInt(holdDurationInput, 10);
-                  if (!Number.isNaN(secs) && secs > 0) {
-                    onUpdateHoldDuration(p.id, secs * 1000);
-                  }
-                }}
-              >
-                Uygula
-              </Button>
-              {p.customHoldDurationMs && (
-                <span className="text-[10px] text-violet-400">
-                  ✓ {Math.round(p.customHoldDurationMs / 1000)}s ayarlı
-                </span>
-              )}
-            </div>
           )}
         </div>
 
