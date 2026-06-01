@@ -2,6 +2,9 @@ import { TradeStore } from "./trade-store";
 import type { Position } from "@shared/schema";
 
 const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
+const UPDATE_INTERVAL_MS = 3000;
+const BATCH_SIZE = 50;
+const INTER_BATCH_DELAY_MS = 500;
 
 export class PositionPricer {
   private store: TradeStore;
@@ -36,8 +39,8 @@ export class PositionPricer {
 
   start() {
     if (this.updateInterval) return;
-    console.log("🎯 [Pricer] Başlatıldı (1.5s aralık)");
-    this.updateInterval = setInterval(() => this.updatePrices(), 1500);
+    console.log(`🎯 [Pricer] Başlatıldı (${UPDATE_INTERVAL_MS / 1000}s aralık, batch=${BATCH_SIZE})`);
+    this.updateInterval = setInterval(() => this.updatePrices(), UPDATE_INTERVAL_MS);
     this.updatePrices();
   }
 
@@ -49,53 +52,99 @@ export class PositionPricer {
     }
   }
 
+  /**
+   * Verilen mint listesi için Jupiter API'sini sorgular.
+   * Exponential backoff ile 3 deneme yapar.
+   * Başarısızlık durumunda null döner.
+   */
+  private async fetchBatch(
+    mints: string[],
+    batchIndex: number,
+  ): Promise<Record<string, { usdPrice?: number; price?: number }> | null> {
+    const ids = mints.join(",");
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        const res = await fetch(`${JUP_PRICE_API}?ids=${ids}`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!res.ok) {
+          // Exponential backoff: 1s, 2s, 4s
+          const backoff = Math.pow(2, attempt - 1) * 1000;
+          console.warn(
+            `⚠️ [Pricer] Batch ${batchIndex} HTTP ${res.status} (deneme ${attempt}/${maxAttempts}, ${backoff}ms bekle)`,
+          );
+          if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, backoff));
+          continue;
+        }
+
+        const data = await res.json();
+        if (!data || Object.keys(data).length === 0) {
+          const backoff = Math.pow(2, attempt - 1) * 1000;
+          console.warn(
+            `⚠️ [Pricer] Batch ${batchIndex} boş yanıt (deneme ${attempt}/${maxAttempts}, ${backoff}ms bekle)`,
+          );
+          if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, backoff));
+          continue;
+        }
+
+        return data;
+      } catch (err) {
+        const backoff = Math.pow(2, attempt - 1) * 1000;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `⚠️ [Pricer] Batch ${batchIndex} hata: ${msg} (deneme ${attempt}/${maxAttempts}, ${backoff}ms bekle)`,
+        );
+        if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, backoff));
+      }
+    }
+
+    console.warn(`❌ [Pricer] Batch ${batchIndex} ${maxAttempts} deneme sonrası başarısız`);
+    return null;
+  }
+
   private async updatePrices() {
     const positions = this.store.getAll();
     const openPositions = positions.filter((p) => p.status === "open");
     if (openPositions.length === 0) return;
 
-    const mints = openPositions.map((p) => p.mintAddress).join(",");
-    
-    // Retry ile API çağrısı yap (3 deneme)
-    let data: Record<string, { usdPrice?: number; price?: number }> | null = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        
-        const res = await fetch(`${JUP_PRICE_API}?ids=${mints}`, {
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        
-        if (!res.ok) {
-          console.warn(`⚠️ [Pricer] HTTP ${res.status} (deneme ${attempt}/3)`);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
-          continue;
-        }
-        
-        data = await res.json();
-        if (!data || Object.keys(data).length === 0) {
-          console.warn(`⚠️ [Pricer] Boş API yanıtı (deneme ${attempt}/3)`);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
-          continue;
-        }
-        
-        // Başarılı — döngüden çık
-        break;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`⚠️ [Pricer] Hata: ${msg} (deneme ${attempt}/3)`);
-        if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+    // Tüm mint'leri BATCH_SIZE'lık gruplara böl
+    const allMints = openPositions.map((p) => p.mintAddress);
+    const batches: string[][] = [];
+    for (let i = 0; i < allMints.length; i += BATCH_SIZE) {
+      batches.push(allMints.slice(i, i + BATCH_SIZE));
+    }
+
+    if (batches.length > 1) {
+      console.log(`📦 [Pricer] ${openPositions.length} pozisyon → ${batches.length} batch`);
+    }
+
+    // Tüm batch'lerden gelen fiyat verilerini birleştir
+    const mergedData: Record<string, { usdPrice?: number; price?: number }> = {};
+
+    for (let i = 0; i < batches.length; i++) {
+      const batchData = await this.fetchBatch(batches[i], i + 1);
+      if (batchData) {
+        Object.assign(mergedData, batchData);
+      }
+      // Son batch değilse batch'ler arası bekle (rate limit'e saygı)
+      if (i < batches.length - 1) {
+        await new Promise((r) => setTimeout(r, INTER_BATCH_DELAY_MS));
       }
     }
 
-    // Hala veri yok
-    if (!data) {
-      console.warn("❌ [Pricer] 3 deneme sonrası veri alınamadı");
+    if (Object.keys(mergedData).length === 0) {
+      console.warn("❌ [Pricer] Hiçbir batch'ten veri alınamadı");
       return;
     }
 
+    const data = mergedData;
     const config = this.store.getConfig();
     const takeProfitPct = config.takeProfitPct ?? 0;
 
