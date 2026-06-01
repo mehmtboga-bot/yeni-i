@@ -197,28 +197,55 @@ export class AutoTraderEngine {
         });
       }
 
-      // Satış zamanı geçmiş mi?
-      if (now >= record.shouldSellAt) {
-        console.log(
-          `⏰ [Auto-Trader] Tutma süresi geçti: ${record.tokenSymbol} (${((now - record.buyTimestamp) / 1000).toFixed(0)}s)`
-        );
+      // İlgili pozisyonu bul
+      const position = this.tradeStore.getByMint(record.mintAddress);
+      if (!position || position.status !== "open") continue;
 
-        // İlgili pozisyonu bul
-        const position = this.tradeStore.getByMint(record.mintAddress);
-        if (position && position.status === "open") {
-          // Direkt satış yap (event zincirini bypass et — daha hızlı)
+      // Kar hedefi kontrolü
+      const config = this.configStore.getConfig();
+      if (config.profitTargetPct > 0) {
+        // unrealizedPnlPct: position-pricer tarafından hesaplanıp position'a yazılır
+        const pnlPct = position.unrealizedPnlPct ?? 0;
+
+        if (pnlPct >= config.profitTargetPct) {
+          console.log(
+            `💰 [Auto-Trader] Kar hedefine ulaşıldı: ${record.tokenSymbol} | ` +
+            `Kar: ${pnlPct.toFixed(1)}% (Hedef: ${config.profitTargetPct}%)`
+          );
+
+          // Direkt satış yap
           if (this.trader) {
             this.trader.sell(position.id).catch((err: any) => {
-              console.error("Auto-sell hatası:", err);
+              console.error("Auto-sell (kar hedefi) hatası:", err);
             });
           } else {
-            // Fallback: trader yoksa event yayınla
             this.emit("auto_sell_ready", { positionId: position.id });
           }
 
           record.status = "sold";
           this.emit("auto_trade_record_updated", record);
+          continue;
         }
+      }
+
+      // Satış zamanı geçmiş mi? (kar hedefine ulaşmadıysa)
+      if (now >= record.shouldSellAt) {
+        console.log(
+          `⏰ [Auto-Trader] Tutma süresi geçti: ${record.tokenSymbol} (${((now - record.buyTimestamp) / 1000).toFixed(0)}s)`
+        );
+
+        // Direkt satış yap (event zincirini bypass et — daha hızlı)
+        if (this.trader) {
+          this.trader.sell(position.id).catch((err: any) => {
+            console.error("Auto-sell hatası:", err);
+          });
+        } else {
+          // Fallback: trader yoksa event yayınla
+          this.emit("auto_sell_ready", { positionId: position.id });
+        }
+
+        record.status = "sold";
+        this.emit("auto_trade_record_updated", record);
       }
     }
   }
