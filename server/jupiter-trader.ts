@@ -77,8 +77,8 @@ export class JupiterTrader {
 
   getPublicKey(): string | undefined { return this.keypair?.publicKey.toBase58(); }
 
-  // --- Retry yardımcısı: 1 deneme, 500ms aralık ---
-  private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 1, delayMs = 500): Promise<T> {
+  // --- Retry yardımcısı: 2 deneme, 300ms aralık ---
+  private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 2, delayMs = 300): Promise<T> {
     let lastErr: Error = new Error("Bilinmeyen hata");
     for (let i = 0; i <= retries; i++) {
       try { return await fn(); }
@@ -124,6 +124,19 @@ export class JupiterTrader {
     }
   }
 
+  private calculateDynamicSlippage(priceImpactPct: string): number {
+    // Price impact'e göre dynamic slippage hesapla
+    // Impact %0-1 → slippage %2
+    // Impact %1-5 → slippage %5
+    // Impact %5-10 → slippage %10
+    // Impact %10+ → slippage %15
+    const impact = Math.abs(parseFloat(priceImpactPct));
+    if (impact <= 1) return 200;  // 2%
+    if (impact <= 5) return 500;  // 5%
+    if (impact <= 10) return 1000; // 10%
+    return 1500; // 15%
+  }
+
   private async getQuote(params: {
     inputMint: string; outputMint: string; amount: string; slippageBps: number;
   }): Promise<QuoteResponse> {
@@ -132,7 +145,10 @@ export class JupiterTrader {
     url.searchParams.set("outputMint", params.outputMint);
     url.searchParams.set("amount", params.amount);
     // Jupiter max %99 slippage kabul eder (10000 bps üzeri negatif threshold üretir → hata)
-    const clampedSlippage = Math.min(params.slippageBps, 9900);
+    // Dynamic slippage: quote'dan gelen price impact'e göre hesapla
+    // Eğer quote henüz yoksa, config'teki slippage'ı kullan
+    let slippageBps = params.slippageBps;
+    const clampedSlippage = Math.min(slippageBps, 9900);
     url.searchParams.set("slippageBps", String(clampedSlippage));
     url.searchParams.set("onlyDirectRoutes", "false");
     url.searchParams.set("asLegacyTransaction", "false");
@@ -143,6 +159,22 @@ export class JupiterTrader {
     if (!res.ok) throw new Error(`Jupiter quote ${res.status}: ${bodyText.slice(0, 200)}`);
     const json = JSON.parse(bodyText) as QuoteResponse;
     if (!json?.outAmount || BigInt(json.outAmount) === 0n) throw new Error("Jupiter quote: route bulunamadı");
+
+    // Dynamic slippage: price impact'e göre ayarla
+    const dynamicSlippage = this.calculateDynamicSlippage(json.priceImpactPct);
+    if (dynamicSlippage > params.slippageBps) {
+      console.log(`📊 [Dynamic Slippage] Impact: ${json.priceImpactPct}% → Slippage: ${(dynamicSlippage / 100).toFixed(1)}%`);
+      // Quote'u yeniden al (dynamic slippage ile)
+      url.searchParams.set("slippageBps", String(Math.min(dynamicSlippage, 9900)));
+      const retryRes = await fetch(url.toString());
+      if (retryRes.ok) {
+        const retryJson = JSON.parse(await retryRes.text()) as QuoteResponse;
+        if (retryJson?.outAmount && BigInt(retryJson.outAmount) !== 0n) {
+          return retryJson;
+        }
+      }
+    }
+
     return json;
   }
 
@@ -168,7 +200,7 @@ export class JupiterTrader {
 
     const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, "base64"));
     tx.sign([this.keypair]);
-    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 2 });
     // "processed" commitment en hızlı onay (~400ms) — confirmed (~1.5s) beklemeye gerek yok
     const latest = await this.connection.getLatestBlockhash("processed");
     const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
@@ -248,6 +280,8 @@ export class JupiterTrader {
 
     try {
       const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+      // Quote ile swap arası delay (fiyat stabilizasyonu için)
+      await new Promise((r) => setTimeout(r, 100));
       const decimals = await this.fetchDecimals(mintAddress);
       const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
       const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
