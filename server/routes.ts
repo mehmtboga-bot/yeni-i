@@ -141,6 +141,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Yeni endpoint: son 100 mint detected event'i al
+  app.get("/api/recent-mints", (req, res) => {
+    try {
+      const allEvents = eventStore.getLast(100);
+      const mints = allEvents
+        .filter((e) => e.type === "mint_detected")
+        .reverse(); // en yeni ilk
+      res.json({ mints });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
 
   app.post("/api/update-secrets", (req, res) => {
     const { HELIUS_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TRADER_PRIVATE_KEY } = req.body || {};
@@ -598,6 +610,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 config: autoTraderConfigStore.getConfig(),
                 records: autoTraderEngine.getRecords(),
               },
+            })
+          );
+        } else if (message.type === "request_recent_mints") {
+          const allEvents = eventStore.getLast(100);
+          const mints = allEvents
+            .filter((e) => e.type === "mint_detected")
+            .reverse() // en yeni ilk
+            .map((e) => e.data);
+          ws.send(
+            JSON.stringify({
+              type: "recent_mints_snapshot",
+              data: { mints },
             })
           );
         }
