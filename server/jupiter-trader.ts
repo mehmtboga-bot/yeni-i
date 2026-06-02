@@ -484,6 +484,28 @@ export class JupiterTrader {
     };
 
     try {
+      // TX sonrası bakiye doğrulama: token hala cüzdanda mı?
+      // 1. deneme: hemen kontrol et
+      // 2. deneme: 2 saniye bekle, kontrol et
+      // Her ikisinde de bakiye > 0 ise satış gerçekleşmemiş demektir → exception
+      const verifySellBalance = async (sig: string, label: string): Promise<void> => {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          if (attempt === 2) {
+            console.log(`⏳ [${label}] Satış doğrulama — 2s bekleniyor (Deneme 2/2)...`);
+            await new Promise((r) => setTimeout(r, 2_000));
+          }
+          const bal = await this.getTokenBalance(pos.mintAddress);
+          const remaining = bal?.uiAmount ?? 0;
+          console.log(`🔍 [${label}] Satış doğrulama Deneme ${attempt}/2: bakiye = ${remaining.toLocaleString()} ${pos.symbol}`);
+          if (remaining === 0) {
+            console.log(`✅ [${label}] Token bakiyesi sıfırlandı — satış doğrulandı (tx ${sig.slice(0, 16)}...)`);
+            return; // Satış başarılı
+          }
+        }
+        // Her iki denemede de token hala cüzdanda
+        throw new Error(`SELL_NOT_CONFIRMED: TX gönderildi (${sig.slice(0, 16)}...) ancak ${pos.symbol} bakiyesi hala > 0 — satış gerçekleşmedi`);
+      };
+
       if (pos.dex === "pumpswap") {
         // PumpSwap satışı
         const result = await this.withRetry(async () => {
@@ -499,6 +521,9 @@ export class JupiterTrader {
           });
           return { sig, tokenAmount: balance.uiAmount };
         }, `PumpSwap Sell ${pos.symbol}`, 1);
+
+        // TX sonrası bakiye doğrulama
+        await verifySellBalance(result.sig, "PumpSwap");
 
         updated = { ...updated, status: "closed", sellTimestamp: Date.now(), sellTxSignature: result.sig };
         this.updateAndEmit(updated);
@@ -516,6 +541,9 @@ export class JupiterTrader {
             const sig = await this.swap(quote, config.priorityFeeMicroLamports);
             return { sig, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
           }, `Jupiter Sell ${pos.symbol}`, 1);
+
+          // TX sonrası bakiye doğrulama
+          await verifySellBalance(result.sig, "Jupiter");
 
           jupiterOk = true;
           const pnlSol = result.solOut - (pos.buySolAmount ?? 0);
@@ -542,6 +570,10 @@ export class JupiterTrader {
             const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
             return { sig, tokenAmount: balance.uiAmount };
           }, `PumpSwap Fallback Sell ${pos.symbol}`, 1);
+
+          // TX sonrası bakiye doğrulama
+          await verifySellBalance(result.sig, "PumpSwap Fallback");
+
           updated = { ...updated, status: "closed", sellTimestamp: Date.now(), sellTxSignature: result.sig };
           this.updateAndEmit(updated);
           console.log(`✅ [PumpSwap Fallback] SATIŞ tamam: ${pos.symbol} | tx ${result.sig.slice(0, 16)}...`);
@@ -566,6 +598,14 @@ export class JupiterTrader {
         };
         this.updateAndEmit(updated);
         console.error(`🚨 [Rug Pull] ${pos.symbol} — -%100 zarar olarak kapatıldı`);
+        return updated;
+      }
+
+      // SELL_NOT_CONFIRMED: TX gönderildi ama token hala cüzdanda → pending_sell bırak (retry)
+      if (message.includes("SELL_NOT_CONFIRMED")) {
+        updated = { ...pos, status: "pending_sell", error: message };
+        this.updateAndEmit(updated);
+        console.error(`❌ [${dexLabel}] SATIŞ DOĞRULANAMADI — pozisyon pending_sell kalıyor (retry): ${pos.symbol}`);
         return updated;
       }
 
