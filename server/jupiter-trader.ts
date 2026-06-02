@@ -78,15 +78,23 @@ export class JupiterTrader {
   getPublicKey(): string | undefined { return this.keypair?.publicKey.toBase58(); }
 
   // --- Retry yardımcısı ---
-  // Varsayılan: 3 retry, 1600ms aralık → toplam max ~5s (alım ve satış için)
-  private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 3, delayMs = 1600): Promise<T> {
+  // Varsayılan: 3 deneme × 500ms timeout + 2 × 500ms bekleme → toplam max ~2.5s
+  private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 3, delayMs = 500): Promise<T> {
+    const TIMEOUT_MS = 500;
     let lastErr: Error = new Error("Bilinmeyen hata");
     for (let i = 0; i <= retries; i++) {
-      try { return await fn(); }
+      try {
+        return await Promise.race([
+          fn(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout: ${TIMEOUT_MS}ms aşıldı`)), TIMEOUT_MS)
+          ),
+        ]);
+      }
       catch (err) {
         lastErr = err as Error;
         if (i < retries) {
-          console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries + 1} başarısız — ${delayMs}ms bekleniyor...`);
+          console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries + 1} başarısız — ${delayMs}ms bekleniyor... (${lastErr.message})`);
           await new Promise((r) => setTimeout(r, delayMs));
         }
       }
@@ -251,7 +259,7 @@ export class JupiterTrader {
     await new Promise((r) => setTimeout(r, 650));
 
     try {
-      // 3 retry, max ~5s (withRetry varsayılanı: 3 retry × 1600ms)
+      // 3 deneme × 500ms timeout + 2 × 500ms bekleme → max ~2.5s
       const result = await this.withRetry(async () => {
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
@@ -306,7 +314,7 @@ export class JupiterTrader {
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     try {
-      // 3 retry, max ~5s (withRetry varsayılanı: 3 retry × 1600ms)
+      // 3 deneme × 500ms timeout + 2 × 500ms bekleme → max ~2.5s
       const sig = await this.withRetry(
         () => this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol }),
         `PumpSwap Buy ${symbol}`
@@ -399,7 +407,7 @@ export class JupiterTrader {
 
     try {
       if (pos.dex === "pumpswap") {
-        // PumpSwap satışı — 3 retry, max ~5s
+        // PumpSwap satışı — 3 deneme × 500ms timeout + 2 × 500ms bekleme → max ~2.5s
         const result = await this.withRetry(async () => {
           const balance = await fetchBalance();
           console.log(`🔍 [PumpSwap] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
@@ -418,7 +426,7 @@ export class JupiterTrader {
         this.updateAndEmit(updated);
         console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | ${result.tokenAmount.toLocaleString()} token | tx ${result.sig.slice(0, 16)}...`);
       } else {
-        // Jupiter satışı — route yoksa PumpSwap'a fallback, her ikisi de 3 retry
+        // Jupiter satışı — route yoksa PumpSwap'a fallback, her ikisi de 3 deneme × 500ms timeout
         let jupiterOk = false;
         try {
           const result = await this.withRetry(async () => {
@@ -448,7 +456,7 @@ export class JupiterTrader {
           console.log(`✅ [Jupiter] SATIŞ tamam: ${pos.symbol} | ${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%)`);
         } catch (jupErr) {
           if (jupiterOk) throw jupErr;
-          // Jupiter route yok → PumpSwap fallback dene (3 retry)
+          // Jupiter route yok → PumpSwap fallback dene (3 deneme × 500ms timeout)
           console.warn(`⚠️ [Jupiter] SATIŞ başarısız, PumpSwap'a geçiliyor: ${(jupErr as Error).message}`);
           const result = await this.withRetry(async () => {
             const balance = await fetchBalance();
@@ -552,7 +560,7 @@ export class JupiterTrader {
       let updated: Position;
 
       if (pos.dex === "pumpswap") {
-        // PumpSwap yarı satışı — 3 retry
+        // PumpSwap yarı satışı — 3 deneme × 500ms timeout + 2 × 500ms bekleme → max ~2.5s
         const result = await this.withRetry(async () => {
           const balance = await fetchBalance();
           const halfAmount = balance.uiAmount / 2;
@@ -578,7 +586,7 @@ export class JupiterTrader {
         this.updateAndEmit(updated);
         console.log(`✅ [PumpSwap] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfAmount.toLocaleString()} token satıldı | tx ${result.sig.slice(0, 16)}...`);
       } else {
-        // Jupiter yarı satışı — route yoksa PumpSwap'a fallback
+        // Jupiter yarı satışı — route yoksa PumpSwap'a fallback, her ikisi de 3 deneme × 500ms timeout
         let jupiterOk = false;
         try {
           const result = await this.withRetry(async () => {
@@ -605,7 +613,7 @@ export class JupiterTrader {
           console.log(`✅ [Jupiter] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfUiAmount.toFixed(4)} token → ${result.solOut.toFixed(4)} SOL | tx ${result.sig.slice(0, 16)}...`);
         } catch (jupErr) {
           if (jupiterOk) throw jupErr;
-          // Jupiter route yok → PumpSwap fallback dene
+          // Jupiter route yok → PumpSwap fallback dene (3 deneme × 500ms timeout)
           console.warn(`⚠️ [Jupiter] YARI SATIŞ başarısız, PumpSwap'a geçiliyor: ${(jupErr as Error).message}`);
           const result = await this.withRetry(async () => {
             const balance = await fetchBalance();
