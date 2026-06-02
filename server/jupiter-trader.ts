@@ -295,7 +295,7 @@ export class JupiterTrader {
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     try {
-      const sig = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
+      const sig = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: Math.floor(actualSolAmount * 1e9), denominatedInSol: true, slippagePct, priorityFeeSol });
 
       // Pozisyonu hemen "open" olarak işaretle — bakiye arka planda çekilir
       position = { ...position, status: "open", buyTxSignature: sig };
@@ -365,7 +365,7 @@ export class JupiterTrader {
           const sig = await this.pumpSwapTx({
             action: "sell",
             mint: pos.mintAddress,
-            amount: balance.uiAmount,
+            amount: Math.floor(Number(balance.raw)),
             denominatedInSol: false,
             slippagePct,
             priorityFeeSol,
@@ -412,7 +412,7 @@ export class JupiterTrader {
           const result = await this.withRetry(async () => {
             const balance = await fetchBalanceWithRetry();
             console.log(`🔍 [PumpSwap Fallback] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
-            const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
+            const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: Math.floor(Number(balance.raw)), denominatedInSol: false, slippagePct, priorityFeeSol });
             return { sig, tokenAmount: balance.uiAmount };
           }, `PumpSwap Fallback Sell ${pos.symbol}`, 1);
           updated = { ...updated, status: "closed", sellTimestamp: Date.now(), sellTxSignature: result.sig };
