@@ -7,10 +7,6 @@ import type { AutoTraderConfigStore } from "./auto-trader-config";
 import type { TradeStore } from "./trade-store";
 import type { Position } from "@shared/schema";
 
-// Satış denemesi ayarları
-const MAX_SELL_RETRIES = 5;          // Maksimum kaç kez satış denensin
-const SELL_RETRY_COOLDOWN_MS = 30_000; // Denemeler arası minimum bekleme (30 saniye)
-
 interface AutoTradeRecord {
   id: string;
   mintAddress: string;
@@ -47,10 +43,8 @@ export class AutoTraderEngine {
   private readonly MAX_RECENT_TRADES = 7;
   private liquidityDropInFlight: Set<string> = new Set();
 
-  // Satış denemesi takibi (log spam ve sonsuz döngü koruması)
-  private sellRetryCount: Map<string, number> = new Map();    // mint → kaç kez denendi
-  private sellLastAttemptAt: Map<string, number> = new Map(); // mint → son deneme zamanı
-  private sellInProgress: Set<string> = new Set();            // mint → şu an deneniyor mu
+  // Satış tetikleme takibi — sell() kendi sonsuz döngüsünü yönetir, engine sadece ilk çağrıyı yapar
+  private sellInProgress: Set<string> = new Set(); // mint → sell() zaten tetiklendi mi
 
   constructor(
     configStore: AutoTraderConfigStore,
@@ -175,28 +169,8 @@ export class AutoTraderEngine {
       const position = this.tradeStore.getByMint(record.mintAddress);
       if (!position || position.status !== "open") continue;
 
-      // Bu mint için şu an satış işlemi sürüyor mu?
+      // sell() zaten tetiklendi mi? — tekrar tetikleme (sell() kendi döngüsünü yönetir)
       if (this.sellInProgress.has(record.mintAddress)) continue;
-
-      // Retry sayısı limitine ulaşıldıysa — daha fazla deneme
-      const retryCount = this.sellRetryCount.get(record.mintAddress) ?? 0;
-      if (retryCount >= MAX_SELL_RETRIES) {
-        // Sadece ilk ulaşıldığında bir kez logla (tekrar tetiklenmesin)
-        if (record.status === "active") {
-          console.error(
-            `❌ [Auto-Trader] ${record.tokenSymbol} satış ${MAX_SELL_RETRIES} denemede başarısız — ` +
-            `pozisyon manuel satış gerektiriyor`
-          );
-          record.status = "failed";
-          record.error = `${MAX_SELL_RETRIES} satış denemesi başarısız`;
-          this.emit("auto_trade_record_updated", record);
-        }
-        continue;
-      }
-
-      // Cooldown: son denemeden bu yana yeterli süre geçti mi?
-      const lastAttempt = this.sellLastAttemptAt.get(record.mintAddress) ?? 0;
-      if (retryCount > 0 && now - lastAttempt < SELL_RETRY_COOLDOWN_MS) continue;
 
       const config = this.configStore.getConfig();
 
@@ -213,48 +187,22 @@ export class AutoTraderEngine {
         ? `Kar hedefi: +${(position.unrealizedPnlPct ?? 0).toFixed(1)}% (Hedef: ${config.profitTargetPct}%)`
         : `Tutma süresi doldu (${((now - record.buyTimestamp) / 1000).toFixed(0)}s)`;
 
-      const attemptNum = retryCount + 1;
-      console.log(`💰 [Auto-Trader] Satış tetiklendi (Deneme ${attemptNum}/${MAX_SELL_RETRIES}): ${record.tokenSymbol} — ${reason}`);
+      console.log(`💰 [Auto-Trader] Satış tetiklendi: ${record.tokenSymbol} — ${reason}`);
 
-      // Satışı başlat — eş zamanlı tetiklenmeyi engelle
+      // sell() ilk kez tetikleniyor — kendi sonsuz döngüsünü yönetir
       this.sellInProgress.add(record.mintAddress);
-      this.sellLastAttemptAt.set(record.mintAddress, now);
-      this.sellRetryCount.set(record.mintAddress, attemptNum);
+      record.status = "sold";
+      this.emit("auto_trade_record_updated", record);
 
       if (this.trader) {
         this.trader.sell(position.id)
-          .then((result: Position | null) => {
-            this.sellInProgress.delete(record.mintAddress);
-
-            if (result && result.status === "closed") {
-              // Başarılı satış
-              record.status = "sold";
-              this.emit("auto_trade_record_updated", record);
-              // Retry sayaçlarını temizle
-              this.sellRetryCount.delete(record.mintAddress);
-              this.sellLastAttemptAt.delete(record.mintAddress);
-              console.log(`✅ [Auto-Trader] ${record.tokenSymbol} satış başarılı (Deneme ${attemptNum})`);
-            } else {
-              // Satış başarısız — bir sonraki deneme cooldown sonrası yapılacak
-              const remaining = MAX_SELL_RETRIES - attemptNum;
-              if (remaining > 0) {
-                console.warn(`⚠️ [Auto-Trader] ${record.tokenSymbol} satış başarısız — ${remaining} deneme kaldı (${SELL_RETRY_COOLDOWN_MS / 1000}s bekleniyor)`);
-              }
-            }
-          })
           .catch((err: any) => {
-            this.sellInProgress.delete(record.mintAddress);
-            const remaining = MAX_SELL_RETRIES - attemptNum;
-            console.error(`❌ [Auto-Trader] ${record.tokenSymbol} satış hatası (Deneme ${attemptNum}): ${err?.message ?? err}${remaining > 0 ? ` — ${remaining} deneme kaldı` : ""}`);
+            console.error(`❌ [Auto-Trader] ${record.tokenSymbol} sell() başlatma hatası: ${err?.message ?? err}`);
           });
       } else {
         // Trader direkt bağlı değil — event yayınla
         this.emit("auto_sell_ready", { positionId: position.id });
-        record.status = "sold";
-        this.emit("auto_trade_record_updated", record);
         this.sellInProgress.delete(record.mintAddress);
-        this.sellRetryCount.delete(record.mintAddress);
-        this.sellLastAttemptAt.delete(record.mintAddress);
       }
     }
   }
@@ -306,9 +254,6 @@ export class AutoTraderEngine {
           freshRecord.status = "sold";
           freshRecord.pnlPct = -100;
           this.emit("auto_trade_record_updated", freshRecord);
-          // Retry sayaçlarını temizle
-          this.sellRetryCount.delete(record.mintAddress);
-          this.sellLastAttemptAt.delete(record.mintAddress);
           this.sellInProgress.delete(record.mintAddress);
         }
       }
@@ -390,9 +335,6 @@ export class AutoTraderEngine {
         this.seenTokenSymbols.add(tokenKey);
         this.recentlyClosedTrades.push({ symbol: record.tokenSymbol, closedAt: Date.now() });
         if (this.recentlyClosedTrades.length > this.MAX_RECENT_TRADES) this.recentlyClosedTrades.shift();
-        // Retry sayaçlarını temizle
-        this.sellRetryCount.delete(mintAddress);
-        this.sellLastAttemptAt.delete(mintAddress);
         this.sellInProgress.delete(mintAddress);
         break;
       }
@@ -406,9 +348,6 @@ export class AutoTraderEngine {
         record.closedAt = Date.now();
         this.emit("auto_trade_record_updated", record);
         console.log(`✅ [Auto-Trader] ${record.tokenSymbol} manuel satıldı, record kapatıldı`);
-        // Retry sayaçlarını temizle
-        this.sellRetryCount.delete(mintAddress);
-        this.sellLastAttemptAt.delete(mintAddress);
         this.sellInProgress.delete(mintAddress);
         break;
       }
