@@ -476,8 +476,20 @@ export class JupiterTrader {
     const slippagePct = Math.floor(config.slippageBps / 100);
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
-    // Token bakiyesini tek seferde çek
-    const fetchBalanceWithRetry = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
+    // ── Satış öncesi bakiye kontrolü ──────────────────────────────────────
+    // Swap denemesinden önce cüzdandaki gerçek token bakiyesini doğrula.
+    // Bakiye sıfır veya okunamıyorsa token rug pull'a uğramış demektir;
+    // fake satış log'u yazmamak için işlemi burada durdur.
+    console.log(`🔍 [${dexLabel}] Satış öncesi bakiye kontrol ediliyor: ${pos.symbol}...`);
+    const preCheckBalance = await this.getTokenBalance(pos.mintAddress);
+    if (!preCheckBalance || preCheckBalance.uiAmount <= 0) {
+      throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı — satış iptal edildi`);
+    }
+    console.log(`✅ [${dexLabel}] Bakiye onaylandı: ${preCheckBalance.uiAmount.toLocaleString()} ${pos.symbol}`);
+    // ─────────────────────────────────────────────────────────────────────
+
+    // Swap sırasında güncel bakiyeyi çek (pre-check'ten sonra değişmiş olabilir)
+    const fetchCurrentBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
       const bal = await this.getTokenBalance(pos.mintAddress);
       if (bal && bal.uiAmount > 0) return bal;
       throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
@@ -487,7 +499,7 @@ export class JupiterTrader {
       if (pos.dex === "pumpswap") {
         // PumpSwap satışı
         const result = await this.withRetry(async () => {
-          const balance = await fetchBalanceWithRetry();
+          const balance = await fetchCurrentBalance();
           console.log(`🔍 [PumpSwap] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
           const sig = await this.pumpSwapTx({
             action: "sell",
@@ -508,7 +520,7 @@ export class JupiterTrader {
         let jupiterOk = false;
         try {
           const result = await this.withRetry(async () => {
-            const balance = await fetchBalanceWithRetry();
+            const balance = await fetchCurrentBalance();
             if (BigInt(balance.raw) === 0n) throw new Error("Cüzdanda token bakiyesi yok");
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
             const solOut = Number(quote.outAmount) / 1e9;
@@ -534,10 +546,12 @@ export class JupiterTrader {
           console.log(`✅ [Jupiter] SATIŞ tamam: ${pos.symbol} | ${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%)`);
         } catch (jupErr) {
           if (jupiterOk) throw jupErr;
+          // Rug pull ise fallback deneme — token zaten yok
+          if ((jupErr as Error).message.includes("RUG_PULL")) throw jupErr;
           // Jupiter route yok → PumpSwap fallback dene
           console.warn(`⚠️ [Jupiter] SATIŞ başarısız, PumpSwap'a geçiliyor: ${(jupErr as Error).message}`);
           const result = await this.withRetry(async () => {
-            const balance = await fetchBalanceWithRetry();
+            const balance = await fetchCurrentBalance();
             console.log(`🔍 [PumpSwap Fallback] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
             const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
             return { sig, tokenAmount: balance.uiAmount };
