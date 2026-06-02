@@ -343,6 +343,7 @@ export class JupiterTrader {
 
       if (confirmedTokenAmount === null) {
         // Bakiye 3 denemede bulunamadı → Rug pull olarak kapat (SOL gönderildi, token gelmedi)
+        const totalWaitMs = BALANCE_POLL_TIMES.reduce((a, b) => a + b, 0);
         const rugLoss = -actualSolAmount;
         position = {
           ...position,
@@ -352,10 +353,15 @@ export class JupiterTrader {
           sellPriceSol: 0,
           pnlSol: rugLoss,
           pnlPct: -100,
-          error: `Rug Pull — TX: ${sig.slice(0, 16)}... Token ${(MAX_BALANCE_ATTEMPTS * BALANCE_POLL_INTERVAL_MS) / 1000}s içinde gelmedi`,
+          error: `Rug Pull — TX: ${sig.slice(0, 16)}... Token ${(totalWaitMs / 1000).toFixed(1)}s içinde gelmedi`,
         };
+
         this.updateAndEmit(position);
-        console.error(`🚨 [Jupiter] ${symbol} bakiye ${MAX_BALANCE_ATTEMPTS} denemede bulunamadı — rug pull olarak kapatıldı (-100%)`);
+
+        console.error(
+          `🚨 [Jupiter] ${symbol} bakiye ${MAX_BALANCE_ATTEMPTS} denemede bulunamadı`
+        );
+
         return position;
       }
 
