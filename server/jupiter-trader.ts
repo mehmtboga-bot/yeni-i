@@ -19,6 +19,19 @@ const PUMP_TRADE_API = "https://pumpportal.fun/api/trade-local";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const SOL_DECIMALS = 9;
 
+// Cache TTL sabitleri
+const BLOCKHASH_CACHE_TTL_MS = 5_000;  // 5 saniye
+const BALANCE_CACHE_TTL_MS   = 2_000;  // 2 saniye
+
+// TX onay zaman aşımı
+const TX_CONFIRM_TIMEOUT_MS  = 30_000; // 30 saniye
+
+// Fiyat monitörü güncelleme aralığı
+const PRICE_MONITOR_INTERVAL_MS = 500; // 500ms
+
+// Öncelik ücreti çarpanı
+const PRIORITY_FEE_MULTIPLIER = 2;
+
 type Emitter = (event: string, data: any) => void;
 
 interface QuoteResponse {
@@ -34,6 +47,11 @@ interface QuoteResponse {
   contextSlot?: number;
 }
 
+interface RetryOptions {
+  retries: number;
+  delayMs: number;
+}
+
 export class JupiterTrader {
   private store: TradeStore;
   private emit: Emitter;
@@ -41,13 +59,21 @@ export class JupiterTrader {
   private connection: Connection | null = null;
   private decimalsCache: Map<string, number> = new Map();
   private inFlight: Set<string> = new Set();
-  private blockhashCache: { hash: string; timestamp: number } | null = null;
-  private lastBlockhashTime = 0;
+
+  // Blockhash cache — 5s TTL
+  private blockhashCache: { hash: string; lastValidBlockHeight: number; timestamp: number } | null = null;
+
+  // Token balance cache — 2s TTL per mint
+  private balanceCache: Map<string, { value: { uiAmount: number; raw: string; decimals: number } | null; timestamp: number }> = new Map();
+
+  // Price monitor interval handle
+  private priceMonitorInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(store: TradeStore, emit: Emitter) {
     this.store = store;
     this.emit = emit;
     this.initWallet();
+    this.startPriceMonitor();
   }
 
   private initWallet() {
@@ -79,31 +105,65 @@ export class JupiterTrader {
 
   getPublicKey(): string | undefined { return this.keypair?.publicKey.toBase58(); }
 
-  private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 2, delayMs = 300): Promise<T> {
-    let lastErr: Error = new Error("Bilinmeyen hata");
-    for (let i = 0; i <= retries; i++) {
-      try { return await fn(); }
-      catch (err) {
-        lastErr = err as Error;
-        if (i < retries) {
-          console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries + 1} başarısız — ${delayMs}ms bekleniyor...`);
-          await new Promise((r) => setTimeout(r, delayMs));
-        }
-      }
-    }
-    throw lastErr;
+  /** Kaynakları temizle (interval'ları durdur) */
+  destroy() {
+    this.stopPriceMonitor();
+    console.log("🛑 [JupiterTrader] Kaynaklar temizlendi");
   }
+
+  // ─────────────────────────────────────────────
+  //  BLOCKHASH CACHE (5s TTL)
+  // ─────────────────────────────────────────────
 
   private async getLatestBlockhash() {
     const now = Date.now();
-    if (this.blockhashCache && now - this.lastBlockhashTime < 2000) {
+    if (this.blockhashCache && now - this.blockhashCache.timestamp < BLOCKHASH_CACHE_TTL_MS) {
       return this.blockhashCache;
     }
     if (!this.connection) throw new Error("RPC bağlantısı yok");
     const bh = await this.connection.getLatestBlockhash("confirmed");
-    this.blockhashCache = bh;
-    this.lastBlockhashTime = now;
-    return bh;
+    this.blockhashCache = { ...bh, timestamp: now };
+    return this.blockhashCache;
+  }
+
+  // ─────────────────────────────────────────────
+  //  TOKEN BALANCE CACHE (2s TTL)
+  // ─────────────────────────────────────────────
+
+  private async getTokenBalance(
+    mint: string,
+    opts: { bypassCache?: boolean } = {}
+  ): Promise<{ uiAmount: number; raw: string; decimals: number } | null> {
+    if (!this.keypair || !this.connection) return null;
+
+    const now = Date.now();
+    const cached = this.balanceCache.get(mint);
+    if (!opts.bypassCache && cached && now - cached.timestamp < BALANCE_CACHE_TTL_MS) {
+      return cached.value;
+    }
+
+    try {
+      const res = await this.connection.getParsedTokenAccountsByOwner(
+        this.keypair.publicKey,
+        { mint: new PublicKey(mint) }
+      );
+      let totalRaw = 0n;
+      let decimals = 6;
+      for (const acc of res.value) {
+        const info = (acc.account.data as any).parsed?.info?.tokenAmount;
+        if (!info) continue;
+        decimals = info.decimals ?? decimals;
+        totalRaw += BigInt(info.amount);
+      }
+      const uiAmount = Number(totalRaw) / Math.pow(10, decimals);
+      const value = { uiAmount, raw: totalRaw.toString(), decimals };
+      this.balanceCache.set(mint, { value, timestamp: now });
+      return value;
+    } catch (err) {
+      console.error("❌ Token bakiye okunamadı:", (err as Error).message);
+      this.balanceCache.set(mint, { value: null, timestamp: now });
+      return null;
+    }
   }
 
   private async fetchDecimals(mint: string): Promise<number> {
@@ -117,26 +177,6 @@ export class JupiterTrader {
     return dec;
   }
 
-  private async getTokenBalance(mint: string): Promise<{ uiAmount: number; raw: string; decimals: number } | null> {
-    if (!this.keypair || !this.connection) return null;
-    try {
-      const res = await this.connection.getParsedTokenAccountsByOwner(this.keypair.publicKey, { mint: new PublicKey(mint) });
-      let totalRaw = 0n;
-      let decimals = 6;
-      for (const acc of res.value) {
-        const info = (acc.account.data as any).parsed?.info?.tokenAmount;
-        if (!info) continue;
-        decimals = info.decimals ?? decimals;
-        totalRaw += BigInt(info.amount);
-      }
-      const uiAmount = Number(totalRaw) / Math.pow(10, decimals);
-      return { uiAmount, raw: totalRaw.toString(), decimals };
-    } catch (err) {
-      console.error("❌ Token bakiye okunamadı:", (err as Error).message);
-      return null;
-    }
-  }
-
   private calculateDynamicSlippage(priceImpactPct: string): number {
     const impact = Math.abs(parseFloat(priceImpactPct));
     if (impact <= 1) return 200;
@@ -145,9 +185,14 @@ export class JupiterTrader {
     return 1500;
   }
 
-  private async getQuote(params: {
-    inputMint: string; outputMint: string; amount: string; slippageBps: number;
-  }): Promise<QuoteResponse> {
+  // ─────────────────────────────────────────────
+  //  QUOTE (parametrize retry options)
+  // ─────────────────────────────────────────────
+
+  private async getQuote(
+    params: { inputMint: string; outputMint: string; amount: string; slippageBps: number },
+    retryOpts: RetryOptions = { retries: 3, delayMs: 500 }
+  ): Promise<QuoteResponse> {
     const url = new URL(JUP_QUOTE);
     url.searchParams.set("inputMint", params.inputMint);
     url.searchParams.set("outputMint", params.outputMint);
@@ -158,32 +203,52 @@ export class JupiterTrader {
     url.searchParams.set("asLegacyTransaction", "false");
     url.searchParams.set("restrictIntermediateTokens", "true");
 
-    const res = await fetch(url.toString());
-    const bodyText = await res.text();
-    if (!res.ok) throw new Error(`Jupiter quote ${res.status}: ${bodyText.slice(0, 200)}`);
-    const json = JSON.parse(bodyText) as QuoteResponse;
-    if (!json?.outAmount || BigInt(json.outAmount) === 0n) throw new Error("Jupiter quote: route bulunamadı");
+    let lastErr: Error = new Error("Quote alınamadı");
+    for (let attempt = 1; attempt <= retryOpts.retries; attempt++) {
+      try {
+        const res = await fetch(url.toString());
+        const bodyText = await res.text();
+        if (!res.ok) throw new Error(`Jupiter quote ${res.status}: ${bodyText.slice(0, 200)}`);
+        const json = JSON.parse(bodyText) as QuoteResponse;
+        if (!json?.outAmount || BigInt(json.outAmount) === 0n) throw new Error("Jupiter quote: route bulunamadı");
 
-    const dynamicSlippage = this.calculateDynamicSlippage(json.priceImpactPct);
-    if (dynamicSlippage > params.slippageBps) {
-      console.log(`📊 [Dynamic Slippage] Impact: ${json.priceImpactPct}% → Slippage: ${(dynamicSlippage / 100).toFixed(1)}%`);
-      url.searchParams.set("slippageBps", String(Math.min(dynamicSlippage, 9900)));
-      const retryRes = await fetch(url.toString());
-      if (retryRes.ok) {
-        const retryJson = JSON.parse(await retryRes.text()) as QuoteResponse;
-        if (retryJson?.outAmount && BigInt(retryJson.outAmount) !== 0n) {
-          return retryJson;
+        const dynamicSlippage = this.calculateDynamicSlippage(json.priceImpactPct);
+        if (dynamicSlippage > params.slippageBps) {
+          console.log(`📊 [Dynamic Slippage] Impact: ${json.priceImpactPct}% → Slippage: ${(dynamicSlippage / 100).toFixed(1)}%`);
+          url.searchParams.set("slippageBps", String(Math.min(dynamicSlippage, 9900)));
+          const retryRes = await fetch(url.toString());
+          if (retryRes.ok) {
+            const retryJson = JSON.parse(await retryRes.text()) as QuoteResponse;
+            if (retryJson?.outAmount && BigInt(retryJson.outAmount) !== 0n) {
+              return retryJson;
+            }
+          }
+        }
+
+        return json;
+      } catch (err) {
+        lastErr = err as Error;
+        if (attempt < retryOpts.retries) {
+          const delay = retryOpts.delayMs * attempt;
+          console.warn(`⏳ [Quote] Deneme ${attempt}/${retryOpts.retries} başarısız — ${delay}ms bekleniyor...`);
+          await new Promise((r) => setTimeout(r, delay));
         }
       }
     }
-
-    return json;
+    throw lastErr;
   }
+
+  // ─────────────────────────────────────────────
+  //  SWAP (30s TX confirmation timeout)
+  // ─────────────────────────────────────────────
 
   private async swap(quote: QuoteResponse, priorityFeeMicroLamports: number): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
 
     const latestBlockhash = await this.getLatestBlockhash();
+
+    // 2x priority fee multiplier for better landing rate
+    const effectiveFee = Math.max(priorityFeeMicroLamports * PRIORITY_FEE_MULTIPLIER * 50, 50000);
 
     const swapBody = {
       quoteResponse: quote,
@@ -191,7 +256,7 @@ export class JupiterTrader {
       wrapAndUnwrapSol: true,
       dynamicComputeUnitLimit: true,
       prioritizationFeeLamports: {
-        priorityLevelWithMaxLamports: { maxLamports: Math.max(priorityFeeMicroLamports * 50, 50000), priorityLevel: "veryHigh" },
+        priorityLevelWithMaxLamports: { maxLamports: effectiveFee, priorityLevel: "veryHigh" },
       },
     };
     const swapRes = await fetch(JUP_SWAP, {
@@ -212,20 +277,15 @@ export class JupiterTrader {
       "confirmed"
     );
 
-    const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error("TX confirmation timeout (120s)")), 120000)
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`TX confirmation timeout (${TX_CONFIRM_TIMEOUT_MS / 1000}s)`)), TX_CONFIRM_TIMEOUT_MS)
     );
 
-    try {
-      const result = await Promise.race([confirmationPromise, timeoutPromise]);
-      if (result.value?.err) {
-        throw new Error(`TX hata: ${JSON.stringify(result.value.err)}`);
-      }
-      console.log(`✅ TX confirmed: ${signature.slice(0, 16)}...`);
-    } catch (err) {
-      console.error(`❌ TX confirmation hatası: ${(err as Error).message}`);
-      throw err;
+    const result = await Promise.race([confirmationPromise, timeoutPromise]);
+    if (result.value?.err) {
+      throw new Error(`TX hata: ${JSON.stringify(result.value.err)}`);
     }
+    console.log(`✅ TX confirmed: ${signature.slice(0, 16)}...`);
 
     return signature;
   }
@@ -275,20 +335,15 @@ export class JupiterTrader {
       "confirmed"
     );
 
-    const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error("PumpSwap TX confirmation timeout (120s)")), 120000)
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`PumpSwap TX confirmation timeout (${TX_CONFIRM_TIMEOUT_MS / 1000}s)`)), TX_CONFIRM_TIMEOUT_MS)
     );
 
-    try {
-      const result = await Promise.race([confirmationPromise, timeoutPromise]);
-      if (result.value?.err) {
-        throw new Error(`PumpSwap TX hata: ${JSON.stringify(result.value.err)}`);
-      }
-      console.log(`✅ PumpSwap TX confirmed: ${signature.slice(0, 16)}...`);
-    } catch (err) {
-      console.error(`❌ PumpSwap TX confirmation hatası: ${(err as Error).message}`);
-      throw err;
+    const result = await Promise.race([confirmationPromise, timeoutPromise]);
+    if (result.value?.err) {
+      throw new Error(`PumpSwap TX hata: ${JSON.stringify(result.value.err)}`);
     }
+    console.log(`✅ PumpSwap TX confirmed: ${signature.slice(0, 16)}...`);
 
     return signature;
   }
@@ -298,7 +353,65 @@ export class JupiterTrader {
     this.emit("position_update", position);
   }
 
-  // ========== JUPITER ALIM ==========
+  // ─────────────────────────────────────────────
+  //  PRICE MONITOR (real-time P&L, 500ms interval)
+  // ─────────────────────────────────────────────
+
+  private startPriceMonitor() {
+    if (this.priceMonitorInterval) return;
+    this.priceMonitorInterval = setInterval(() => {
+      this.updateOpenPositionsPrices().catch((err) => {
+        // Sessizce devam et — fiyat güncellemesi kritik değil
+      });
+    }, PRICE_MONITOR_INTERVAL_MS);
+    console.log(`📡 [PriceMonitor] Başlatıldı (${PRICE_MONITOR_INTERVAL_MS}ms aralık)`);
+  }
+
+  private stopPriceMonitor() {
+    if (this.priceMonitorInterval) {
+      clearInterval(this.priceMonitorInterval);
+      this.priceMonitorInterval = null;
+      console.log("⏹️ [PriceMonitor] Durduruldu");
+    }
+  }
+
+  /** Açık pozisyonların fiyatlarını toplu olarak günceller (batch fetch) */
+  async updateOpenPositionsPrices(): Promise<void> {
+    const openPositions = this.store.getAll().filter((p) => p.status === "open");
+    if (openPositions.length === 0) return;
+
+    // Batch price fetch — tek API çağrısıyla tüm mintleri sorgula
+    const mints = openPositions.map((p) => p.mintAddress).join(",");
+    let priceData: Record<string, { usdPrice?: number; price?: number }> | null = null;
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(`${JUP_PRICE}?ids=${mints}`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) return;
+      priceData = await res.json();
+    } catch {
+      return;
+    }
+
+    if (!priceData || Object.keys(priceData).length === 0) return;
+
+    for (const pos of openPositions) {
+      const entry = priceData[pos.mintAddress];
+      const currentPriceUsd = entry?.usdPrice ?? entry?.price ?? 0;
+      if (!currentPriceUsd || currentPriceUsd <= 0) continue;
+
+      const updated: Position = { ...pos, currentPriceUsd };
+      this.store.upsert(updated);
+      this.emit("position_update", updated);
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  //  JUPITER ALIM
+  // ─────────────────────────────────────────────
+
   async buy(input: { 
     mintAddress: string; 
     name: string; 
@@ -347,9 +460,9 @@ export class JupiterTrader {
         await new Promise((r) => setTimeout(r, 650));
       }
 
-      // ✅ 3 DENEME (50ms ara)
+      // ✅ 3 DENEME — artan gecikmeler (500ms, 1s, 2s)
       const MAX_RETRIES = 3;
-      const RETRY_DELAY = 50;
+      const RETRY_DELAYS = [500, 1000, 2000];
       let lastError = "";
       let buyTxSignature: string | null = null;
       let buyPriceSol = 0;
@@ -372,7 +485,7 @@ export class JupiterTrader {
           const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
           const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
 
-          console.log(`📊 [Deneme ${attempt}] Quote: ${tokensOut.toLocaleString()} token @ $${pricePerToken.toFixed(6)}`);
+          console.log(`📊 [Deneme ${attempt}] Quote: ${tokensOut.toLocaleString()} token @ ${pricePerToken.toFixed(6)}`);
 
           // ✅ HER DENEMEDE YENİ TX GÖNDER
           const sig = await this.swap(quote, config.priorityFeeMicroLamports);
@@ -386,10 +499,10 @@ export class JupiterTrader {
           lastError = (err as Error).message;
           console.error(`❌ [Deneme ${attempt}/${MAX_RETRIES}] Hata: ${lastError}`);
 
-          // Son deneme değilse, 50ms bekle ve tekrar dene
           if (attempt < MAX_RETRIES) {
-            console.log(`⏳ 50ms bekleniyor — sonraki denemeye geçiliyor...`);
-            await new Promise((r) => setTimeout(r, RETRY_DELAY));
+            const delay = RETRY_DELAYS[attempt - 1];
+            console.log(`⏳ ${delay}ms bekleniyor — sonraki denemeye geçiliyor...`);
+            await new Promise((r) => setTimeout(r, delay));
           }
         }
       }
@@ -410,7 +523,7 @@ export class JupiterTrader {
       console.log(`⏳ Token bakiye kontrol için 1 saniye bekleniyor...`);
       await new Promise((r) => setTimeout(r, 1000));
 
-      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara)
+      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara) — cache bypass
       const BALANCE_CHECKS = 2;
       const BALANCE_DELAY = 500;
       let confirmedTokenAmount: number | null = null;
@@ -419,7 +532,7 @@ export class JupiterTrader {
         console.log(`📊 [Bakiye Kontrol ${check}/${BALANCE_CHECKS}] Token kontrol ediliyor...`);
 
         try {
-          const bal = await this.getTokenBalance(mintAddress);
+          const bal = await this.getTokenBalance(mintAddress, { bypassCache: true });
           if (bal && bal.uiAmount > 0) {
             confirmedTokenAmount = bal.uiAmount;
             console.log(`✅ [Bakiye Kontrol ${check}/${BALANCE_CHECKS}] Token bulundu: ${bal.uiAmount.toLocaleString()} ${symbol}`);
@@ -472,7 +585,10 @@ export class JupiterTrader {
     }
   }
 
-  // ========== PUMPSWAP ALIM ==========
+  // ─────────────────────────────────────────────
+  //  PUMPSWAP ALIM
+  // ─────────────────────────────────────────────
+
   async buyPumpSwap(input: { 
     mintAddress: string; 
     name: string; 
@@ -515,7 +631,7 @@ export class JupiterTrader {
     console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "AUTO" : "MANUAL"})`);
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports * 50, 50000) / 1_000_000_000;
+    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports * PRIORITY_FEE_MULTIPLIER * 50, 50000) / 1_000_000_000;
 
     try {
       // ✅ OTOMATİK: 650ms bekle
@@ -524,9 +640,9 @@ export class JupiterTrader {
         await new Promise((r) => setTimeout(r, 650));
       }
 
-      // ✅ 3 DENEME (50ms ara)
+      // ✅ 3 DENEME — artan gecikmeler (500ms, 1s, 2s)
       const MAX_RETRIES = 3;
-      const RETRY_DELAY = 50;
+      const RETRY_DELAYS = [500, 1000, 2000];
       let lastError = "";
       let buyTxSignature: string | null = null;
 
@@ -553,8 +669,9 @@ export class JupiterTrader {
           console.error(`❌ [Deneme ${attempt}/${MAX_RETRIES}] Hata: ${lastError}`);
 
           if (attempt < MAX_RETRIES) {
-            console.log(`⏳ 50ms bekleniyor — sonraki denemeye geçiliyor...`);
-            await new Promise((r) => setTimeout(r, RETRY_DELAY));
+            const delay = RETRY_DELAYS[attempt - 1];
+            console.log(`⏳ ${delay}ms bekleniyor — sonraki denemeye geçiliyor...`);
+            await new Promise((r) => setTimeout(r, delay));
           }
         }
       }
@@ -575,7 +692,7 @@ export class JupiterTrader {
       console.log(`⏳ Token bakiye kontrol için 1 saniye bekleniyor...`);
       await new Promise((r) => setTimeout(r, 1000));
 
-      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara)
+      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara) — cache bypass
       const BALANCE_CHECKS = 2;
       const BALANCE_DELAY = 500;
       let confirmedTokenAmount: number | null = null;
@@ -584,7 +701,7 @@ export class JupiterTrader {
         console.log(`📊 [Bakiye Kontrol ${check}/${BALANCE_CHECKS}] Token kontrol ediliyor...`);
 
         try {
-          const bal = await this.getTokenBalance(mintAddress);
+          const bal = await this.getTokenBalance(mintAddress, { bypassCache: true });
           if (bal && bal.uiAmount > 0) {
             confirmedTokenAmount = bal.uiAmount;
             console.log(`✅ [Bakiye Kontrol ${check}/${BALANCE_CHECKS}] Token bulundu: ${bal.uiAmount.toLocaleString()} ${symbol}`);
@@ -635,7 +752,10 @@ export class JupiterTrader {
     }
   }
 
-  // ========== SATIŞ ==========
+  // ─────────────────────────────────────────────
+  //  SATIŞ
+  // ─────────────────────────────────────────────
+
   async sell(positionId: string): Promise<Position | null> {
     const pos = this.store.getById(positionId);
     if (!pos) { 
@@ -661,12 +781,12 @@ export class JupiterTrader {
     console.log(`💸 [${dexLabel}] SATIŞ BAŞLADI: ${pos.symbol}`);
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports * 50, 50000) / 1_000_000_000;
+    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports * PRIORITY_FEE_MULTIPLIER * 50, 50000) / 1_000_000_000;
 
     try {
-      // ✅ 3 DENEME (50ms ara)
+      // ✅ 3 DENEME — artan gecikmeler (500ms, 1s, 2s)
       const MAX_RETRIES = 3;
-      const RETRY_DELAY = 50;
+      const RETRY_DELAYS = [500, 1000, 2000];
       let lastError = "";
       let sellTxSignature: string | null = null;
       let solOut = 0;
@@ -676,8 +796,8 @@ export class JupiterTrader {
         console.log(`📤 [Deneme ${attempt}/${MAX_RETRIES}] Satış TX gönderiliyor...`);
 
         try {
-          // ✅ HER DENEMEDE GÜNCEL BAKIYE AL
-          const balance = await this.getTokenBalance(pos.mintAddress);
+          // ✅ HER DENEMEDE GÜNCEL BAKIYE AL (cache bypass)
+          const balance = await this.getTokenBalance(pos.mintAddress, { bypassCache: true });
           if (!balance || balance.uiAmount <= 0) {
             throw new Error(`Token bakiyesi yok: ${balance?.uiAmount ?? 0}`);
           }
@@ -717,8 +837,9 @@ export class JupiterTrader {
           console.error(`❌ [Deneme ${attempt}/${MAX_RETRIES}] Hata: ${lastError}`);
 
           if (attempt < MAX_RETRIES) {
-            console.log(`⏳ 50ms bekleniyor — sonraki denemeye geçiliyor...`);
-            await new Promise((r) => setTimeout(r, RETRY_DELAY));
+            const delay = RETRY_DELAYS[attempt - 1];
+            console.log(`⏳ ${delay}ms bekleniyor — sonraki denemeye geçiliyor...`);
+            await new Promise((r) => setTimeout(r, delay));
           }
         }
       }
@@ -739,7 +860,7 @@ export class JupiterTrader {
       console.log(`⏳ Token bakiye kontrol için 500ms bekleniyor...`);
       await new Promise((r) => setTimeout(r, 500));
 
-      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara) — FAKE SATIŞ CHECK
+      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara) — FAKE SATIŞ CHECK (cache bypass)
       const BALANCE_CHECKS = 2;
       const BALANCE_DELAY = 500;
       let tokenGone = false;
@@ -748,7 +869,7 @@ export class JupiterTrader {
         console.log(`📊 [Bakiye Kontrol ${check}/${BALANCE_CHECKS}] Token=0 kontrol...`);
 
         try {
-          const bal = await this.getTokenBalance(pos.mintAddress);
+          const bal = await this.getTokenBalance(pos.mintAddress, { bypassCache: true });
           if (!bal || bal.uiAmount === 0) {
             tokenGone = true;
             console.log(`✅ [Bakiye Kontrol ${check}/${BALANCE_CHECKS}] Token sıfırlandı — Satış başarılı`);
