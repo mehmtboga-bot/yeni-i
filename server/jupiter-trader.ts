@@ -78,8 +78,8 @@ export class JupiterTrader {
   getPublicKey(): string | undefined { return this.keypair?.publicKey.toBase58(); }
 
   // --- Retry yardımcısı ---
-  // Varsayılan: 3 retry, 1600ms aralık → toplam max ~5s (alım ve satış için)
-  private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 3, delayMs = 1600): Promise<T> {
+  // Varsayılan: 3 retry, 500ms aralık
+  private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 3, delayMs = 500): Promise<T> {
     let lastErr: Error = new Error("Bilinmeyen hata");
     for (let i = 0; i <= retries; i++) {
       try { return await fn(); }
@@ -247,11 +247,11 @@ export class JupiterTrader {
     this.updateAndEmit(position);
     console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL`);
 
-    // 650ms bekle — LP indexer'ın yayılması için
-    await new Promise((r) => setTimeout(r, 650));
+    // 500ms bekle — LP indexer'ın yayılması için
+    await new Promise((r) => setTimeout(r, 500));
 
     try {
-      // 3 retry, max ~5s (withRetry varsayılanı: 3 retry × 1600ms)
+      // 3 retry, max ~5s timeout
       const result = await this.withRetry(async () => {
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
@@ -299,14 +299,14 @@ export class JupiterTrader {
     this.updateAndEmit(position);
     console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${actualSolAmount} SOL`);
 
-    // 650ms bekle — LP indexer'ın yayılması için
-    await new Promise((r) => setTimeout(r, 650));
+    // 500ms bekle — LP indexer'ın yayılması için
+    await new Promise((r) => setTimeout(r, 500));
 
     const slippagePct = Math.floor(config.slippageBps / 100);
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     try {
-      // 3 retry, max ~5s (withRetry varsayılanı: 3 retry × 1600ms)
+      // 3 retry, max ~5s timeout
       const sig = await this.withRetry(
         () => this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol }),
         `PumpSwap Buy ${symbol}`
