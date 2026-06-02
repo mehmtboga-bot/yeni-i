@@ -337,11 +337,21 @@ export default function Home() {
         setTokenComparison(msg.data);
       } else if (msg.type === "recent_mints_snapshot") {
         // Sayfa yenilenirken gelen son 100 logdaki mint_detected eventlerini ekle
+        // SADECE henüz süresi dolmamış (aktif) tokenları göster
         const mints = msg.data.mints || [];
         if (mints.length > 0) {
+          const now = Date.now();
           setMintedTokens((prev) => {
-            // Gelen mintleri öncekilerle birleştir, duplikatları çıkar, sınırla
-            const combined = [...mints, ...prev];
+            // Gelen mintlerden sadece henüz aktif olanları filtrele (expiresAt > şu an)
+            const activeMints = mints.filter((mint: any) => mint.expiresAt > now);
+            
+            if (activeMints.length === 0) {
+              // Aktif token yoksa mevcut tokenları koru
+              return prev;
+            }
+            
+            // Aktif mintleri öncekilerle birleştir, duplikatları çıkar, sınırla
+            const combined = [...activeMints, ...prev];
             const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
             const next = unique.slice(0, MAX_MINTED_TOKENS);
             try { localStorage.setItem("mintedTokens", JSON.stringify(next)); } catch {}
