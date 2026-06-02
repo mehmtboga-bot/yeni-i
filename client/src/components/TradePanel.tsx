@@ -19,6 +19,7 @@ interface TradePanelProps {
   tradingRecords?: TradeRecord[];
   globalHoldDurationMs?: number;
   onSell: (positionId: string) => void;
+  onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
   onUpdateConfig: (cfg: Partial<TradeConfig>) => void;
@@ -68,6 +69,7 @@ export function TradePanel({
   tradingRecords = [],
   globalHoldDurationMs,
   onSell,
+  onSellHalf,
   onDelete,
   onMarkRugPull,
   onUpdateConfig,
@@ -262,7 +264,7 @@ export function TradePanel({
               </div>
               {globalHoldPositions.map((p) => (
                 <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
                   onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
               ))}
             </div>
@@ -280,7 +282,7 @@ export function TradePanel({
               </div>
               {customHoldPositions.map((p) => (
                 <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
                   onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
               ))}
             </div>
@@ -294,7 +296,7 @@ export function TradePanel({
               )}
               {nonOpenFiltered.map((p) => (
                 <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onDelete={onDelete}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
                   onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
               ))}
             </div>
@@ -337,12 +339,13 @@ interface PositionRowProps {
   takeProfitPct: number;
   onCopy: (addr: string, id: string) => void;
   onSell: (positionId: string) => void;
+  onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
   onUpdateHoldDuration?: (positionId: string, holdDurationMs: number) => void;
 }
 
-function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onDelete, onMarkRugPull, onUpdateHoldDuration }: PositionRowProps) {
+function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onSellHalf, onDelete, onMarkRugPull, onUpdateHoldDuration }: PositionRowProps) {
   const isOpen = p.status === "open";
   const isPending = p.status === "pending_buy" || p.status === "pending_sell";
   const [holdDurationInput, setHoldDurationInput] = useState<string>(
@@ -570,23 +573,25 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
               <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
                 Sat
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
-                disabled={isHalfSelling}
-                onClick={() => {
-                  setIsHalfSelling(true);
-                  onSell(p.id);
-                }}
-                data-testid={`button-half-sell-${p.id}`}
-              >
-                {isHalfSelling ? (
-                  <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Satılıyor</>
-                ) : (
-                  "½ Sat"
-                )}
-              </Button>
+              {(p.buyTokenAmount ?? 0) > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                  disabled={isPending || isHalfSelling}
+                  onClick={() => {
+                    setIsHalfSelling(true);
+                    onSellHalf(p.id);
+                  }}
+                  data-testid={`button-half-sell-${p.id}`}
+                >
+                  {isHalfSelling ? (
+                    <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Satılıyor</>
+                  ) : (
+                    "½ Sat"
+                  )}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
