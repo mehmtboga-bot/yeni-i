@@ -347,9 +347,9 @@ export class JupiterTrader {
         await new Promise((r) => setTimeout(r, 650));
       }
 
-      // ✅ 3 DENEME (750ms ara)
+      // ✅ 3 DENEME (50ms ara)
       const MAX_RETRIES = 3;
-      const RETRY_DELAY = 750;
+      const RETRY_DELAY = 50;
       let lastError = "";
       let buyTxSignature: string | null = null;
       let buyPriceSol = 0;
@@ -386,9 +386,9 @@ export class JupiterTrader {
           lastError = (err as Error).message;
           console.error(`❌ [Deneme ${attempt}/${MAX_RETRIES}] Hata: ${lastError}`);
 
-          // Son deneme değilse, 750ms bekle ve tekrar dene
+          // Son deneme değilse, 50ms bekle ve tekrar dene
           if (attempt < MAX_RETRIES) {
-            console.log(`⏳ 750ms bekleniyor — sonraki denemeye geçiliyor...`);
+            console.log(`⏳ 50ms bekleniyor — sonraki denemeye geçiliyor...`);
             await new Promise((r) => setTimeout(r, RETRY_DELAY));
           }
         }
@@ -524,9 +524,9 @@ export class JupiterTrader {
         await new Promise((r) => setTimeout(r, 650));
       }
 
-      // ✅ 3 DENEME (750ms ara)
+      // ✅ 3 DENEME (50ms ara)
       const MAX_RETRIES = 3;
-      const RETRY_DELAY = 750;
+      const RETRY_DELAY = 50;
       let lastError = "";
       let buyTxSignature: string | null = null;
 
@@ -553,7 +553,7 @@ export class JupiterTrader {
           console.error(`❌ [Deneme ${attempt}/${MAX_RETRIES}] Hata: ${lastError}`);
 
           if (attempt < MAX_RETRIES) {
-            console.log(`⏳ 750ms bekleniyor — sonraki denemeye geçiliyor...`);
+            console.log(`⏳ 50ms bekleniyor — sonraki denemeye geçiliyor...`);
             await new Promise((r) => setTimeout(r, RETRY_DELAY));
           }
         }
@@ -664,9 +664,9 @@ export class JupiterTrader {
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     try {
-      // ✅ 3 DENEME (750ms ara)
+      // ✅ 3 DENEME (50ms ara)
       const MAX_RETRIES = 3;
-      const RETRY_DELAY = 750;
+      const RETRY_DELAY = 50;
       let lastError = "";
       let sellTxSignature: string | null = null;
       let solOut = 0;
@@ -717,7 +717,7 @@ export class JupiterTrader {
           console.error(`❌ [Deneme ${attempt}/${MAX_RETRIES}] Hata: ${lastError}`);
 
           if (attempt < MAX_RETRIES) {
-            console.log(`⏳ 750ms bekleniyor — sonraki denemeye geçiliyor...`);
+            console.log(`⏳ 50ms bekleniyor — sonraki denemeye geçiliyor...`);
             await new Promise((r) => setTimeout(r, RETRY_DELAY));
           }
         }
