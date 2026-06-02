@@ -60,7 +60,7 @@ export class JupiterTrader {
       const secret = bs58.decode(pk.trim());
       if (secret.length !== 64) throw new Error(`Beklenmeyen anahtar uzunluğu: ${secret.length} (64 olmalı)`);
       this.keypair = Keypair.fromSecretKey(secret);
-      this.connection = new Connection(RPC_URL, "confirmed");
+      this.connection = new Connection(RPC_URL, "processed");
       console.log(`💼 Trader cüzdanı yüklendi: ${this.keypair.publicKey.toBase58()}`);
     } catch (err) {
       console.error("❌ TRADER_PRIVATE_KEY çözümlenemedi:", (err as Error).message);
@@ -96,11 +96,11 @@ export class JupiterTrader {
 
   private async getLatestBlockhash() {
     const now = Date.now();
-    if (this.blockhashCache && now - this.lastBlockhashTime < 2000) {
+    if (this.blockhashCache && now - this.lastBlockhashTime < 5000) {
       return this.blockhashCache;
     }
     if (!this.connection) throw new Error("RPC bağlantısı yok");
-    const bh = await this.connection.getLatestBlockhash("confirmed");
+    const bh = await this.connection.getLatestBlockhash("processed");
     this.blockhashCache = bh;
     this.lastBlockhashTime = now;
     return bh;
@@ -209,11 +209,11 @@ export class JupiterTrader {
 
     const confirmationPromise = this.connection.confirmTransaction(
       { signature, ...latestBlockhash },
-      "confirmed"
+      "processed"
     );
 
     const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error("TX confirmation timeout (120s)")), 120000)
+      setTimeout(() => reject(new Error("TX confirmation timeout (30s)")), 30000)
     );
 
     try {
@@ -272,11 +272,11 @@ export class JupiterTrader {
 
     const confirmationPromise = this.connection.confirmTransaction(
       { signature, ...latestBlockhash },
-      "confirmed"
+      "processed"
     );
 
     const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error("PumpSwap TX confirmation timeout (120s)")), 120000)
+      setTimeout(() => reject(new Error("PumpSwap TX confirmation timeout (30s)")), 30000)
     );
 
     try {
@@ -571,57 +571,41 @@ export class JupiterTrader {
         return position;
       }
 
-      // ✅ ALIM BAŞARILI: 1 SANIYE BEKLE
-      console.log(`⏳ Token bakiye kontrol için 1 saniye bekleniyor...`);
-      await new Promise((r) => setTimeout(r, 1000));
-
-      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara)
-      const BALANCE_CHECKS = 2;
-      const BALANCE_DELAY = 500;
-      let confirmedTokenAmount: number | null = null;
-
-      for (let check = 1; check <= BALANCE_CHECKS; check++) {
-        console.log(`📊 [Bakiye Kontrol ${check}/${BALANCE_CHECKS}] Token kontrol ediliyor...`);
-
-        try {
-          const bal = await this.getTokenBalance(mintAddress);
-          if (bal && bal.uiAmount > 0) {
-            confirmedTokenAmount = bal.uiAmount;
-            console.log(`✅ [Bakiye Kontrol ${check}/${BALANCE_CHECKS}] Token bulundu: ${bal.uiAmount.toLocaleString()} ${symbol}`);
-            break;
-          }
-          console.warn(`⚠️ [Bakiye Kontrol ${check}/${BALANCE_CHECKS}] Token henüz yok`);
-
-          if (check < BALANCE_CHECKS) {
-            await new Promise((r) => setTimeout(r, BALANCE_DELAY));
-          }
-        } catch (err) {
-          console.error(`❌ [Bakiye Kontrol ${check}] Hata:`, (err as Error).message);
-        }
-      }
-
-      // ✅ TOKEN BULUNAMADI
-      if (confirmedTokenAmount === null) {
-        console.warn(`⚠️ [PumpSwap] Alım yapılmadı — Token bulunamadı`);
-        position = {
-          ...position,
-          status: "failed",
-          buyTxSignature,
-          error: `Alım yapılmadı — Token bakiyesi bulunamadı (TX: ${buyTxSignature.slice(0, 16)}...)`,
-        };
-        this.updateAndEmit(position);
-        return position;
-      }
-
-      // ✅ BAŞARILI
+      // ✅ ALIM BAŞARILI: Pozisyonu hemen "open" olarak işaretle (non-blocking)
       position = {
         ...position,
         status: "open",
-        buyTokenAmount: confirmedTokenAmount,
+        buyTokenAmount: 0,
         buyTxSignature,
       };
       this.updateAndEmit(position);
-      console.log(`✅ [PumpSwap] ALIM BAŞARILI: ${symbol} | ${confirmedTokenAmount.toLocaleString()} token | tx ${buyTxSignature.slice(0, 16)}...`);
+      console.log(`✅ [PumpSwap] ALIM BAŞARILI: ${symbol} | tx ${buyTxSignature.slice(0, 16)}... — bakiye arka planda güncelleniyor`);
+
+      // ✅ ARKA PLANDA BAKİYE GÜNCELLE (2s, 3s, 5s gecikme ile)
+      const posId = position.id;
+      const updateDelays = [2000, 3000, 5000];
+      (async () => {
+        for (const delay of updateDelays) {
+          await new Promise((r) => setTimeout(r, delay));
+          try {
+            const bal = await this.getTokenBalance(mintAddress);
+            if (bal && bal.uiAmount > 0) {
+              const current = this.store.getById(posId);
+              if (current && current.status === "open") {
+                const updated = { ...current, buyTokenAmount: bal.uiAmount };
+                this.updateAndEmit(updated);
+                console.log(`📊 [PumpSwap] Bakiye güncellendi: ${bal.uiAmount.toLocaleString()} ${symbol}`);
+              }
+              return; // Bakiye bulundu, daha fazla deneme gerekmez
+            }
+            console.warn(`⚠️ [PumpSwap] Arka plan bakiye kontrolü: Token henüz yok (${delay}ms sonra)`);
+          } catch (err) {
+            console.error(`❌ [PumpSwap] Arka plan bakiye güncelleme hatası:`, (err as Error).message);
+          }
+        }
+        console.warn(`⚠️ [PumpSwap] ${symbol} bakiyesi tüm arka plan denemelerinde bulunamadı`);
+      })();
+
       return position;
 
     } catch (err) {
@@ -678,8 +662,22 @@ export class JupiterTrader {
         try {
           // ✅ HER DENEMEDE GÜNCEL BAKIYE AL
           const balance = await this.getTokenBalance(pos.mintAddress);
+
+          // 🚨 RUG PULL TESPİTİ: Satış denemesinde bakiye sıfırsa rug pull
           if (!balance || balance.uiAmount <= 0) {
-            throw new Error(`Token bakiyesi yok: ${balance?.uiAmount ?? 0}`);
+            console.error(`🚨 [Rug Pull] ${pos.symbol} — -%100 zarar olarak kapatıldı`);
+            updated = {
+              ...updated,
+              status: "closed",
+              sellTimestamp: Date.now(),
+              sellSolAmount: 0,
+              sellPriceSol: 0,
+              pnlSol: -(pos.buySolAmount ?? 0),
+              pnlPct: -100,
+              error: "Rug pull — token bakiyesi sıfır",
+            };
+            this.updateAndEmit(updated);
+            return updated;
           }
 
           console.log(`📊 [Deneme ${attempt}] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
@@ -696,17 +694,34 @@ export class JupiterTrader {
             });
             sellTxSignature = sig;
           } else {
-            const quote = await this.getQuote({
-              inputMint: pos.mintAddress,
-              outputMint: SOL_MINT,
-              amount: balance.raw,
-              slippageBps: config.slippageBps,
-            });
-            solOut = Number(quote.outAmount) / 1e9;
-            pricePerTokenSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
+            // ✅ JUPITER SATIŞ — PUMPSWAP FALLBACK
+            try {
+              const quote = await this.getQuote({
+                inputMint: pos.mintAddress,
+                outputMint: SOL_MINT,
+                amount: balance.raw,
+                slippageBps: config.slippageBps,
+              });
+              solOut = Number(quote.outAmount) / 1e9;
+              pricePerTokenSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
 
-            const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-            sellTxSignature = sig;
+              const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+              sellTxSignature = sig;
+            } catch (jupErr) {
+              const jupErrMsg = (jupErr as Error).message;
+              console.warn(`⚠️ [Jupiter] Satış başarısız (${jupErrMsg}) — PumpSwap fallback deneniyor...`);
+
+              const sig = await this.pumpSwapTx({
+                action: "sell",
+                mint: pos.mintAddress,
+                amount: balance.uiAmount,
+                denominatedInSol: false,
+                slippagePct,
+                priorityFeeSol,
+              });
+              sellTxSignature = sig;
+              console.log(`✅ [PumpSwap Fallback] Satış başarılı: ${sig.slice(0, 16)}...`);
+            }
           }
 
           console.log(`✅ [Deneme ${attempt}/${MAX_RETRIES}] TX başarılı: ${sellTxSignature.slice(0, 16)}...`);
