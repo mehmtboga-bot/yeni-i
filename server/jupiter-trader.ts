@@ -498,6 +498,171 @@ export class JupiterTrader {
     }
   }
 
+  // ========== YARI SATIŞ ==========
+  // Pozisyonun token bakiyesinin yarısını satar. Kalan yarısı pozisyonda kalır (status "open").
+  // Satış başarısız olursa status "open" kalır, 1s sonra tekrar denenir (sonsuz döngü).
+  // Bakiye yoksa (rug pull) → "closed" pnlPct:-100.
+  async sellHalf(positionId: string): Promise<Position | null> {
+    const pos = this.store.getById(positionId);
+    if (!pos) { console.warn(`⚠️ Pozisyon bulunamadı: ${positionId}`); return null; }
+    if (pos.status !== "open") { console.warn(`⚠️ Yarı satış için pozisyon açık olmalı (${pos.status}): ${pos.symbol}`); return pos; }
+    if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — yarı satış atlandı"); return null; }
+    if (this.inFlight.has(`sell:${pos.id}`)) return pos;
+    this.inFlight.add(`sell:${pos.id}`);
+
+    const config = this.store.getConfig();
+    const dexLabel = pos.dex === "pumpswap" ? "PumpSwap" : "Jupiter";
+    console.log(`💸 [${dexLabel}] YARI SATIŞ başlatılıyor: ${pos.symbol}`);
+
+    const slippagePct = Math.floor(config.slippageBps / 100);
+    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
+
+    // Bakiye kontrolü — sıfırsa RUG_PULL fırlatır
+    const fetchBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
+      const bal = await this.getTokenBalance(pos.mintAddress);
+      if (bal && bal.uiAmount > 0) return bal;
+      throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
+    };
+
+    // Satış öncesi bakiye kontrolü — rug pull erken tespiti
+    try {
+      const preBal = await this.getTokenBalance(pos.mintAddress);
+      if (!preBal || preBal.uiAmount <= 0) {
+        const rugPullLoss = -(pos.buySolAmount ?? 0);
+        const updated: Position = {
+          ...pos,
+          status: "closed",
+          sellTimestamp: Date.now(),
+          sellSolAmount: 0,
+          sellPriceSol: 0,
+          pnlSol: rugPullLoss,
+          pnlPct: -100,
+          error: "Rug Pull Detected",
+        };
+        this.updateAndEmit(updated);
+        console.error(`🚨 [Rug Pull] ${pos.symbol} — bakiye sıfır, -%100 zarar olarak kapatıldı`);
+        this.inFlight.delete(`sell:${pos.id}`);
+        return updated;
+      }
+    } catch {
+      // Bakiye okunamazsa satışa devam et
+    }
+
+    try {
+      let updated: Position;
+
+      if (pos.dex === "pumpswap") {
+        // PumpSwap yarı satışı — 3 retry
+        const result = await this.withRetry(async () => {
+          const balance = await fetchBalance();
+          const halfAmount = balance.uiAmount / 2;
+          console.log(`🔍 [PumpSwap] Yarısı satılacak: ${halfAmount.toLocaleString()} ${pos.symbol} (toplam: ${balance.uiAmount.toLocaleString()})`);
+          const sig = await this.pumpSwapTx({
+            action: "sell",
+            mint: pos.mintAddress,
+            amount: halfAmount,
+            denominatedInSol: false,
+            slippagePct,
+            priorityFeeSol,
+          });
+          return { sig, halfAmount };
+        }, `PumpSwap HalfSell ${pos.symbol}`);
+
+        const remainingAmount = (pos.buyTokenAmount ?? 0) / 2;
+        updated = {
+          ...pos,
+          status: "open",
+          buyTokenAmount: remainingAmount,
+          sellTxSignature: result.sig,
+        };
+        this.updateAndEmit(updated);
+        console.log(`✅ [PumpSwap] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfAmount.toLocaleString()} token satıldı | tx ${result.sig.slice(0, 16)}...`);
+      } else {
+        // Jupiter yarı satışı — route yoksa PumpSwap'a fallback
+        let jupiterOk = false;
+        try {
+          const result = await this.withRetry(async () => {
+            const balance = await fetchBalance();
+            const halfRaw = (BigInt(balance.raw) / 2n).toString();
+            if (BigInt(halfRaw) === 0n) throw new Error("Yarı bakiye sıfır");
+            const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: halfRaw, slippageBps: config.slippageBps });
+            const solOut = Number(quote.outAmount) / 1e9;
+            const halfUiAmount = balance.uiAmount / 2;
+            const sellPriceSol = halfUiAmount > 0 ? solOut / halfUiAmount : 0;
+            const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+            return { sig, solOut, sellPriceSol, halfUiAmount };
+          }, `Jupiter HalfSell ${pos.symbol}`);
+
+          jupiterOk = true;
+          const remainingAmount = (pos.buyTokenAmount ?? 0) / 2;
+          updated = {
+            ...pos,
+            status: "open",
+            buyTokenAmount: remainingAmount,
+            sellTxSignature: result.sig,
+          };
+          this.updateAndEmit(updated);
+          console.log(`✅ [Jupiter] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfUiAmount.toFixed(4)} token → ${result.solOut.toFixed(4)} SOL | tx ${result.sig.slice(0, 16)}...`);
+        } catch (jupErr) {
+          if (jupiterOk) throw jupErr;
+          // Jupiter route yok → PumpSwap fallback dene
+          console.warn(`⚠️ [Jupiter] YARI SATIŞ başarısız, PumpSwap'a geçiliyor: ${(jupErr as Error).message}`);
+          const result = await this.withRetry(async () => {
+            const balance = await fetchBalance();
+            const halfAmount = balance.uiAmount / 2;
+            console.log(`🔍 [PumpSwap Fallback] Yarısı satılacak: ${halfAmount.toLocaleString()} ${pos.symbol}`);
+            const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: halfAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
+            return { sig, halfAmount };
+          }, `PumpSwap Fallback HalfSell ${pos.symbol}`);
+
+          const remainingAmount = (pos.buyTokenAmount ?? 0) / 2;
+          updated = {
+            ...pos,
+            status: "open",
+            buyTokenAmount: remainingAmount,
+            sellTxSignature: result.sig,
+          };
+          this.updateAndEmit(updated);
+          console.log(`✅ [PumpSwap Fallback] YARI SATIŞ tamam: ${pos.symbol} | tx ${result.sig.slice(0, 16)}...`);
+        }
+      }
+
+      this.inFlight.delete(`sell:${pos.id}`);
+      return updated!;
+    } catch (err) {
+      const message = (err as Error).message || String(err);
+
+      // Rug pull tespiti — bakiye sıfır, pozisyonu -%100 zararla kapat
+      if (message.includes("RUG_PULL")) {
+        const rugPullLoss = -(pos.buySolAmount ?? 0);
+        const updated: Position = {
+          ...pos,
+          status: "closed",
+          sellTimestamp: Date.now(),
+          sellSolAmount: 0,
+          sellPriceSol: 0,
+          pnlSol: rugPullLoss,
+          pnlPct: -100,
+          error: "Rug Pull Detected",
+        };
+        this.updateAndEmit(updated);
+        console.error(`🚨 [Rug Pull] ${pos.symbol} — -%100 zarar olarak kapatıldı`);
+        this.inFlight.delete(`sell:${pos.id}`);
+        return updated;
+      }
+
+      // Satış başarısız — status "open" olarak bırak, 1 saniye sonra tekrar dene (sonsuz döngü)
+      const failedPos: Position = { ...pos, status: "open", error: message };
+      this.updateAndEmit(failedPos);
+      console.warn(`⚠️ [${dexLabel}] YARI SATIŞ başarısız (${pos.symbol}): ${message} — 1s sonra tekrar deneniyor...`);
+      this.inFlight.delete(`sell:${pos.id}`);
+      setTimeout(() => this.sellHalf(positionId), 1000);
+      return failedPos;
+    } finally {
+      this.inFlight.delete(`sell:${pos.id}`);
+    }
+  }
+
   updateConfig(partial: Partial<TradeConfig>): TradeConfig {
     const cfg = this.store.updateConfig(partial);
     this.emit("trade_config_update", cfg);

@@ -644,6 +644,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     _origError("❌ WebSocket Server hatası:", error);
   });
 
+  // ---- Yarı Satış API ----
+  app.post("/api/sell-half", async (req, res) => {
+    const { positionId } = req.body || {};
+    if (!positionId || typeof positionId !== "string") {
+      return res.status(400).json({ error: "positionId gerekli" });
+    }
+    const pos = tradeStore.getById(positionId);
+    if (!pos) {
+      return res.status(404).json({ error: "Pozisyon bulunamadı" });
+    }
+    try {
+      const result = await trader.sellHalf(positionId);
+      if (!result) {
+        return res.status(500).json({ error: "Yarı satış başlatılamadı" });
+      }
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+  // ------------------------
+
   process.on("SIGTERM", () => { monitor.stop(); autoTraderEngine.stop(); wss.close(); });
   process.on("SIGINT",  () => { monitor.stop(); autoTraderEngine.stop(); wss.close(); });
 

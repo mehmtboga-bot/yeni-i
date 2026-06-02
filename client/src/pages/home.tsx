@@ -216,6 +216,31 @@ export default function Home() {
     }
   };
 
+  const handleSellHalf = async (positionId: string) => {
+    try {
+      const res = await fetch("/api/sell-half", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ positionId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Bilinmeyen hata" }));
+        console.error("Yarı satış hatası:", err.error);
+        return;
+      }
+      const updated = await res.json();
+      setPositions((prev) => {
+        const idx = prev.findIndex((p) => p.id === updated.id);
+        const next = idx >= 0 ? [...prev] : [updated, ...prev];
+        if (idx >= 0) next[idx] = updated;
+        try { localStorage.setItem("positions", JSON.stringify(next)); } catch {}
+        return next;
+      });
+    } catch (err) {
+      console.error("Yarı satış isteği başarısız:", err);
+    }
+  };
+
   const handleDeletePosition = (positionId: string) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "delete_position", data: { positionId } }));
@@ -646,6 +671,7 @@ export default function Home() {
               solPriceUsd={solPriceUsd}
               globalHoldDurationMs={autoTraderConfig.holdDurationMs}
               onSell={handleSell}
+              onSellHalf={handleSellHalf}
               onDelete={handleDeletePosition}
               onMarkRugPull={handleMarkRugPull}
               onUpdateConfig={handleConfigUpdate}
