@@ -63,4 +63,9 @@ export class EventStore {
   getAfter(afterId = 0, limit = 1000) {
     return this.store.events.filter((e) => e.id > afterId).slice(0, limit);
   }
+
+  // Son N eventı döndür
+  getLast(count = 100) {
+    return this.store.events.slice(-count);
+  }
 }
