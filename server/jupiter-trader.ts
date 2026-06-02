@@ -410,9 +410,9 @@ export class JupiterTrader {
       console.log(`⏳ Token bakiye kontrol için 1 saniye bekleniyor...`);
       await new Promise((r) => setTimeout(r, 1000));
 
-      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara)
+      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 50ms ara)
       const BALANCE_CHECKS = 2;
-      const BALANCE_DELAY = 500;
+      const BALANCE_DELAY = 50;
       let confirmedTokenAmount: number | null = null;
 
       for (let check = 1; check <= BALANCE_CHECKS; check++) {
@@ -437,7 +437,7 @@ export class JupiterTrader {
 
       // ✅ TOKEN BULUNAMADI → BAŞARISIZ
       if (confirmedTokenAmount === null) {
-        console.warn(`⚠️ [Jupiter] Alım yapılmadı — Token 1 saniye + 2 kontrol (500ms ara) sonrası bulunamadı`);
+        console.warn(`⚠️ [Jupiter] Alım yapılmadı — Token 1 saniye + 2 kontrol (50ms ara) sonrası bulunamadı`);
         position = {
           ...position,
           status: "failed",
@@ -575,9 +575,9 @@ export class JupiterTrader {
       console.log(`⏳ Token bakiye kontrol için 1 saniye bekleniyor...`);
       await new Promise((r) => setTimeout(r, 1000));
 
-      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara)
+      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 50ms ara)
       const BALANCE_CHECKS = 2;
-      const BALANCE_DELAY = 500;
+      const BALANCE_DELAY = 50;
       let confirmedTokenAmount: number | null = null;
 
       for (let check = 1; check <= BALANCE_CHECKS; check++) {
@@ -735,13 +735,13 @@ export class JupiterTrader {
         return updated;
       }
 
-      // ✅ SATIŞ SONRASI: 500ms BEKLE (fake satış check)
-      console.log(`⏳ Token bakiye kontrol için 500ms bekleniyor...`);
-      await new Promise((r) => setTimeout(r, 500));
+      // ✅ SATIŞ SONRASI: 50ms BEKLE (fake satış check)
+      console.log(`⏳ Token bakiye kontrol için 50ms bekleniyor...`);
+      await new Promise((r) => setTimeout(r, 50));
 
-      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 500ms ara) — FAKE SATIŞ CHECK
+      // ✅ TOKEN BAKIYE KONTROL (2 deneme, 50ms ara) — FAKE SATIŞ CHECK
       const BALANCE_CHECKS = 2;
-      const BALANCE_DELAY = 500;
+      const BALANCE_DELAY = 50;
       let tokenGone = false;
 
       for (let check = 1; check <= BALANCE_CHECKS; check++) {
