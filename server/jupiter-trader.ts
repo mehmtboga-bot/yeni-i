@@ -182,16 +182,13 @@ export class JupiterTrader {
 
   private async swap(quote: QuoteResponse, priorityFeeMicroLamports: number): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
-
-    const latestBlockhash = await this.getLatestBlockhash();
-
     const swapBody = {
       quoteResponse: quote,
       userPublicKey: this.keypair.publicKey.toBase58(),
       wrapAndUnwrapSol: true,
       dynamicComputeUnitLimit: true,
       prioritizationFeeLamports: {
-        priorityLevelWithMaxLamports: { maxLamports: Math.max(priorityFeeMicroLamports * 50, 50000), priorityLevel: "veryHigh" },
+        priorityLevelWithMaxLamports: { maxLamports: Math.max(priorityFeeMicroLamports, 1), priorityLevel: "veryHigh" },
       },
     };
     const swapRes = await fetch(JUP_SWAP, {
@@ -202,31 +199,12 @@ export class JupiterTrader {
     if (!swapRes.ok) throw new Error(`Jupiter swap ${swapRes.status}: ${(await swapRes.text()).slice(0, 200)}`);
     const { swapTransaction } = (await swapRes.json()) as { swapTransaction: string };
     if (!swapTransaction) throw new Error("swapTransaction alınamadı");
-
     const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, "base64"));
     tx.sign([this.keypair]);
-    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 3 });
-
-    const confirmationPromise = this.connection.confirmTransaction(
-      { signature, ...latestBlockhash },
-      "confirmed"
-    );
-
-    const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error("TX confirmation timeout (120s)")), 120000)
-    );
-
-    try {
-      const result = await Promise.race([confirmationPromise, timeoutPromise]);
-      if (result.value?.err) {
-        throw new Error(`TX hata: ${JSON.stringify(result.value.err)}`);
-      }
-      console.log(`✅ TX confirmed: ${signature.slice(0, 16)}...`);
-    } catch (err) {
-      console.error(`❌ TX confirmation hatası: ${(err as Error).message}`);
-      throw err;
-    }
-
+    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    const latest = await this.connection.getLatestBlockhash("processed");
+    const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+    if (conf.value.err) throw new Error(`TX hata: ${JSON.stringify(conf.value.err)}`);
     return signature;
   }
 
@@ -239,8 +217,6 @@ export class JupiterTrader {
     priorityFeeSol: number;
   }): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
-
-    const latestBlockhash = await this.getLatestBlockhash();
 
     const safeAmount = opts.denominatedInSol
       ? opts.amount
@@ -268,27 +244,10 @@ export class JupiterTrader {
     const tx = VersionedTransaction.deserialize(new Uint8Array(buf));
     tx.sign([this.keypair]);
 
-    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 3 });
-
-    const confirmationPromise = this.connection.confirmTransaction(
-      { signature, ...latestBlockhash },
-      "confirmed"
-    );
-
-    const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error("PumpSwap TX confirmation timeout (120s)")), 120000)
-    );
-
-    try {
-      const result = await Promise.race([confirmationPromise, timeoutPromise]);
-      if (result.value?.err) {
-        throw new Error(`PumpSwap TX hata: ${JSON.stringify(result.value.err)}`);
-      }
-      console.log(`✅ PumpSwap TX confirmed: ${signature.slice(0, 16)}...`);
-    } catch (err) {
-      console.error(`❌ PumpSwap TX confirmation hatası: ${(err as Error).message}`);
-      throw err;
-    }
+    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    const latest = await this.connection.getLatestBlockhash("processed");
+    const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+    if (conf.value.err) throw new Error(`PumpSwap TX hata: ${JSON.stringify(conf.value.err)}`);
 
     return signature;
   }
