@@ -96,7 +96,7 @@ export class JupiterTrader {
 
   private async getLatestBlockhash() {
     const now = Date.now();
-    if (this.blockhashCache && now - this.lastBlockhashTime < 2000) {
+    if (this.blockhashCache && now - this.lastBlockhashTime < 5000) {
       return this.blockhashCache;
     }
     if (!this.connection) throw new Error("RPC bağlantısı yok");
@@ -191,7 +191,7 @@ export class JupiterTrader {
       wrapAndUnwrapSol: true,
       dynamicComputeUnitLimit: true,
       prioritizationFeeLamports: {
-        priorityLevelWithMaxLamports: { maxLamports: Math.max(priorityFeeMicroLamports * 50, 50000), priorityLevel: "veryHigh" },
+        priorityLevelWithMaxLamports: { maxLamports: Math.max(priorityFeeMicroLamports, 1), priorityLevel: "veryHigh" },
       },
     };
     const swapRes = await fetch(JUP_SWAP, {
@@ -347,9 +347,9 @@ export class JupiterTrader {
         await new Promise((r) => setTimeout(r, 650));
       }
 
-      // ✅ 3 DENEME (50ms ara)
+      // ✅ 3 DENEME (300ms ara)
       const MAX_RETRIES = 3;
-      const RETRY_DELAY = 50;
+      const RETRY_DELAY = 300;
       let lastError = "";
       let buyTxSignature: string | null = null;
       let buyPriceSol = 0;
@@ -386,9 +386,9 @@ export class JupiterTrader {
           lastError = (err as Error).message;
           console.error(`❌ [Deneme ${attempt}/${MAX_RETRIES}] Hata: ${lastError}`);
 
-          // Son deneme değilse, 50ms bekle ve tekrar dene
+          // Son deneme değilse, 300ms bekle ve tekrar dene
           if (attempt < MAX_RETRIES) {
-            console.log(`⏳ 50ms bekleniyor — sonraki denemeye geçiliyor...`);
+            console.log(`⏳ 300ms bekleniyor — sonraki denemeye geçiliyor...`);
             await new Promise((r) => setTimeout(r, RETRY_DELAY));
           }
         }
@@ -515,7 +515,7 @@ export class JupiterTrader {
     console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "AUTO" : "MANUAL"})`);
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports * 50, 50000) / 1_000_000_000;
+    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports, 1) / 1_000_000_000;
 
     try {
       // ✅ OTOMATİK: 650ms bekle
@@ -524,9 +524,9 @@ export class JupiterTrader {
         await new Promise((r) => setTimeout(r, 650));
       }
 
-      // ✅ 3 DENEME (50ms ara)
+      // ✅ 3 DENEME (300ms ara)
       const MAX_RETRIES = 3;
-      const RETRY_DELAY = 50;
+      const RETRY_DELAY = 300;
       let lastError = "";
       let buyTxSignature: string | null = null;
 
@@ -553,7 +553,7 @@ export class JupiterTrader {
           console.error(`❌ [Deneme ${attempt}/${MAX_RETRIES}] Hata: ${lastError}`);
 
           if (attempt < MAX_RETRIES) {
-            console.log(`⏳ 50ms bekleniyor — sonraki denemeye geçiliyor...`);
+            console.log(`⏳ 300ms bekleniyor — sonraki denemeye geçiliyor...`);
             await new Promise((r) => setTimeout(r, RETRY_DELAY));
           }
         }
@@ -661,12 +661,12 @@ export class JupiterTrader {
     console.log(`💸 [${dexLabel}] SATIŞ BAŞLADI: ${pos.symbol}`);
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports * 50, 50000) / 1_000_000_000;
+    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports, 1) / 1_000_000_000;
 
     try {
-      // ✅ 3 DENEME (50ms ara)
+      // ✅ 3 DENEME (300ms ara)
       const MAX_RETRIES = 3;
-      const RETRY_DELAY = 50;
+      const RETRY_DELAY = 300;
       let lastError = "";
       let sellTxSignature: string | null = null;
       let solOut = 0;
@@ -717,7 +717,7 @@ export class JupiterTrader {
           console.error(`❌ [Deneme ${attempt}/${MAX_RETRIES}] Hata: ${lastError}`);
 
           if (attempt < MAX_RETRIES) {
-            console.log(`⏳ 50ms bekleniyor — sonraki denemeye geçiliyor...`);
+            console.log(`⏳ 300ms bekleniyor — sonraki denemeye geçiliyor...`);
             await new Promise((r) => setTimeout(r, RETRY_DELAY));
           }
         }
