@@ -601,11 +601,85 @@ export class JupiterTrader {
         return updated;
       }
 
-      // SELL_NOT_CONFIRMED: TX gönderildi ama token hala cüzdanda → pending_sell bırak (retry)
+      // SELL_NOT_CONFIRMED: TX gönderildi ama token hala cüzdanda → hemen tekrar dene (max 3 kez)
       if (message.includes("SELL_NOT_CONFIRMED")) {
-        updated = { ...pos, status: "pending_sell", error: message };
-        this.updateAndEmit(updated);
-        console.error(`❌ [${dexLabel}] SATIŞ DOĞRULANAMADI — pozisyon pending_sell kalıyor (retry): ${pos.symbol}`);
+        console.warn(`⚠️ [${dexLabel}] SATIŞ DOĞRULANAMADI — otomatik yeniden deneme başlıyor (max 3): ${pos.symbol}`);
+
+        const MAX_SELL_RETRIES = 3;
+        const SELL_RETRY_DELAY_MS = 2_000;
+        let retryClosed = false;
+
+        for (let attempt = 1; attempt <= MAX_SELL_RETRIES; attempt++) {
+          console.log(`🔄 [${dexLabel}] Satış yeniden deneme ${attempt}/${MAX_SELL_RETRIES}: ${pos.symbol} — ${SELL_RETRY_DELAY_MS / 1000}s bekleniyor...`);
+          await new Promise((r) => setTimeout(r, SELL_RETRY_DELAY_MS));
+
+          try {
+            // Güncel bakiyeyi çek
+            const bal = await this.getTokenBalance(pos.mintAddress);
+            const remaining = bal?.uiAmount ?? 0;
+
+            if (remaining === 0) {
+              // Token zaten gitmiş — önceki TX geç de olsa işlendi
+              console.log(`✅ [${dexLabel}] Yeniden deneme ${attempt}: Token bakiyesi sıfır — satış tamamlandı: ${pos.symbol}`);
+              retryClosed = true;
+              break;
+            }
+
+            console.log(`🔍 [${dexLabel}] Yeniden deneme ${attempt}: ${remaining.toLocaleString()} ${pos.symbol} hala cüzdanda — satış TX gönderiliyor...`);
+
+            // Satış TX'ini tekrar gönder (dex'e göre)
+            if (pos.dex === "pumpswap") {
+              const sig = await this.pumpSwapTx({
+                action: "sell",
+                mint: pos.mintAddress,
+                amount: remaining,
+                denominatedInSol: false,
+                slippagePct,
+                priorityFeeSol,
+              });
+              console.log(`📤 [PumpSwap] Yeniden satış TX gönderildi (Deneme ${attempt}): ${sig.slice(0, 16)}...`);
+            } else {
+              // Jupiter (veya PumpSwap fallback)
+              try {
+                const balance = await fetchBalanceWithRetry();
+                const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
+                const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+                console.log(`📤 [Jupiter] Yeniden satış TX gönderildi (Deneme ${attempt}): ${sig.slice(0, 16)}...`);
+              } catch (jupRetryErr) {
+                // Jupiter route yok → PumpSwap fallback
+                console.warn(`⚠️ [Jupiter] Yeniden deneme ${attempt} Jupiter başarısız, PumpSwap fallback: ${(jupRetryErr as Error).message}`);
+                const balance = await fetchBalanceWithRetry();
+                const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
+                console.log(`📤 [PumpSwap Fallback] Yeniden satış TX gönderildi (Deneme ${attempt}): ${sig.slice(0, 16)}...`);
+              }
+            }
+          } catch (retryErr) {
+            console.error(`❌ [${dexLabel}] Yeniden deneme ${attempt} hatası: ${(retryErr as Error).message}`);
+          }
+        }
+
+        // 3 deneme sonunda bakiyeyi son kez kontrol et
+        if (!retryClosed) {
+          const finalBal = await this.getTokenBalance(pos.mintAddress).catch(() => null);
+          const finalRemaining = finalBal?.uiAmount ?? 0;
+
+          if (finalRemaining === 0) {
+            retryClosed = true;
+            console.log(`✅ [${dexLabel}] Son bakiye kontrolü: Token sıfırlandı — satış tamamlandı: ${pos.symbol}`);
+          } else {
+            console.error(`❌ [${dexLabel}] ${MAX_SELL_RETRIES} deneme sonunda token hala cüzdanda (${finalRemaining.toLocaleString()} ${pos.symbol}) — pending_sell kalıyor`);
+          }
+        }
+
+        if (retryClosed) {
+          updated = { ...pos, status: "closed", sellTimestamp: Date.now() };
+          this.updateAndEmit(updated);
+          console.log(`✅ [${dexLabel}] SATIŞ otomatik yeniden deneme ile tamamlandı: ${pos.symbol}`);
+        } else {
+          updated = { ...pos, status: "pending_sell", error: message };
+          this.updateAndEmit(updated);
+          console.error(`❌ [${dexLabel}] SATIŞ DOĞRULANAMADI — pozisyon pending_sell kalıyor (dış retry): ${pos.symbol}`);
+        }
         return updated;
       }
 
