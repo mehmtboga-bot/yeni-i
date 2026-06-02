@@ -244,19 +244,72 @@ export class JupiterTrader {
       status: "pending_buy", buyTimestamp: Date.now(), buySolAmount: actualSolAmount,
     };
     this.updateAndEmit(position);
+
+    // Alım başlamadan önce 650ms bekle (zincir hazırlık süresi)
+    await new Promise((r) => setTimeout(r, 650));
     console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL`);
 
-    try {
-      const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
-      const decimals = await this.fetchDecimals(mintAddress);
-      const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
-      const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
-      const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-      const result = { sig, tokensOut, pricePerToken };
+    const BUY_TIMEOUT_MS = 5_000;
+    const MAX_BUY_RETRIES = 3;
+    const RETRY_DELAY_MS = 500;
 
-      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
+    try {
+      // Her retry'da yeni quote + yeni TX — toplam max 5 saniye
+      let lastErr: Error = new Error("Bilinmeyen alım hatası");
+      let result: { sig: string; tokensOut: number; pricePerToken: number } | null = null;
+
+      const buyDeadline = Date.now() + BUY_TIMEOUT_MS;
+
+      for (let attempt = 1; attempt <= MAX_BUY_RETRIES; attempt++) {
+        if (Date.now() >= buyDeadline) {
+          throw new Error(`Jupiter alım timeout: ${BUY_TIMEOUT_MS}ms içinde tamamlanamadı`);
+        }
+        try {
+          if (attempt > 1) {
+            console.warn(`⏳ [Jupiter] ALIM retry ${attempt}/${MAX_BUY_RETRIES}: ${symbol} — ${RETRY_DELAY_MS}ms bekleniyor...`);
+            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+          }
+          // Her denemede taze quote al
+          const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+          const decimals = await this.fetchDecimals(mintAddress);
+          const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
+          const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
+          // Her denemede yeni TX (yeni blockhash swap() içinde alınır)
+          const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+          result = { sig, tokensOut, pricePerToken };
+          break; // Başarılı — döngüden çık
+        } catch (err) {
+          lastErr = err as Error;
+          if (attempt === MAX_BUY_RETRIES) throw lastErr;
+        }
+      }
+
+      if (!result) throw lastErr!;
+
+      // TX başarılı — 2 kez bakiye kontrol et (500ms ara ile) → fake işlem tespiti
+      let confirmedBalance = 0;
+      for (let check = 1; check <= 2; check++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const bal = await this.getTokenBalance(mintAddress);
+        if (bal && bal.uiAmount > 0) {
+          confirmedBalance = bal.uiAmount;
+          break;
+        }
+      }
+
+      if (confirmedBalance === 0) {
+        // TX başarılı ama token gelmedi → fake işlem
+        console.error(`❌ [Jupiter] FAKE İŞLEM: ${symbol} — TX başarılı ama token almamış`);
+        position = { ...position, status: "failed", buyTxSignature: result.sig, error: "Fake işlem: TX başarılı ama token alınamadı" };
+        this.updateAndEmit(position);
+        return position;
+      }
+
+      // Bakiye onaylandı — pozisyonu aç
+      const finalTokenAmount = confirmedBalance > 0 ? confirmedBalance : result.tokensOut;
+      position = { ...position, status: "open", buyTokenAmount: finalTokenAmount, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
-      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
+      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${finalTokenAmount.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
       return position;
     } catch (err) {
       const message = (err as Error).message || String(err);
@@ -349,18 +402,21 @@ export class JupiterTrader {
     const slippagePct = Math.floor(config.slippageBps / 100);
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
-    // Token bakiyesini tek seferde çek
-    const fetchBalanceWithRetry = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
-      const bal = await this.getTokenBalance(pos.mintAddress);
-      if (bal && bal.uiAmount > 0) return bal;
-      throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
-    };
+    const SELL_TIMEOUT_MS = 5_000;
+    const MAX_SELL_RETRIES = 3;
+    const SELL_RETRY_DELAY_MS = 500;
 
     try {
       if (pos.dex === "pumpswap") {
-        // PumpSwap satışı
+        // PumpSwap satışı — bakiye yoksa rug pull
+        const initialBal = await this.getTokenBalance(pos.mintAddress);
+        if (!initialBal || initialBal.uiAmount === 0) {
+          throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
+        }
+
         const result = await this.withRetry(async () => {
-          const balance = await fetchBalanceWithRetry();
+          const balance = await this.getTokenBalance(pos.mintAddress);
+          if (!balance || balance.uiAmount === 0) throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
           console.log(`🔍 [PumpSwap] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
           const sig = await this.pumpSwapTx({
             action: "sell",
@@ -377,40 +433,91 @@ export class JupiterTrader {
         this.updateAndEmit(updated);
         console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | ${result.tokenAmount.toLocaleString()} token | tx ${result.sig.slice(0, 16)}...`);
       } else {
-        // Jupiter satışı — route yoksa PumpSwap'a fallback
+        // ── Jupiter satışı ──────────────────────────────────────────────────
+        // 1) Satıştan önce bakiye kontrol — rug pull tespiti
+        const preSellBal = await this.getTokenBalance(pos.mintAddress);
+        if (!preSellBal || preSellBal.uiAmount === 0) {
+          throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
+        }
+
+        // 2) 3 retry, her birinde yeni quote + yeni TX, toplam max 5 saniye
         let jupiterOk = false;
-        try {
-          const result = await this.withRetry(async () => {
-            const balance = await fetchBalanceWithRetry();
+        let sellResult: { sig: string; solOut: number; sellPriceSol: number; tokenAmount: number } | null = null;
+        let lastSellErr: Error = new Error("Bilinmeyen satış hatası");
+        const sellDeadline = Date.now() + SELL_TIMEOUT_MS;
+
+        for (let attempt = 1; attempt <= MAX_SELL_RETRIES; attempt++) {
+          if (Date.now() >= sellDeadline) {
+            lastSellErr = new Error(`Jupiter satış timeout: ${SELL_TIMEOUT_MS}ms içinde tamamlanamadı`);
+            break;
+          }
+          try {
+            if (attempt > 1) {
+              console.warn(`⏳ [Jupiter] SATIŞ retry ${attempt}/${MAX_SELL_RETRIES}: ${pos.symbol} — ${SELL_RETRY_DELAY_MS}ms bekleniyor...`);
+              await new Promise((r) => setTimeout(r, SELL_RETRY_DELAY_MS));
+            }
+            // Taze bakiye al (her denemede)
+            const balance = await this.getTokenBalance(pos.mintAddress);
+            if (!balance || balance.uiAmount === 0) throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
             if (BigInt(balance.raw) === 0n) throw new Error("Cüzdanda token bakiyesi yok");
+            // Taze quote al
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
             const solOut = Number(quote.outAmount) / 1e9;
             const sellPriceSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
+            // Yeni TX gönder (swap() içinde taze blockhash alınır)
             const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-            return { sig, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
-          }, `Jupiter Sell ${pos.symbol}`, 1);
+            sellResult = { sig, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
+            jupiterOk = true;
+            break;
+          } catch (err) {
+            lastSellErr = err as Error;
+            // Rug pull ise döngüyü kır, üst catch'e bırak
+            if ((lastSellErr.message || "").includes("RUG_PULL")) throw lastSellErr;
+            if (attempt === MAX_SELL_RETRIES) break;
+          }
+        }
 
-          jupiterOk = true;
-          const pnlSol = result.solOut - (pos.buySolAmount ?? 0);
+        if (jupiterOk && sellResult) {
+          // 3) TX başarılı — 2 kez bakiye kontrol et (500ms ara ile) → fake satış tespiti
+          let postSellBalance = preSellBal.uiAmount;
+          for (let check = 1; check <= 2; check++) {
+            await new Promise((r) => setTimeout(r, 500));
+            const bal = await this.getTokenBalance(pos.mintAddress);
+            postSellBalance = bal ? bal.uiAmount : postSellBalance;
+            if (!bal || bal.uiAmount === 0) break;
+          }
+
+          if (postSellBalance > 0) {
+            // TX başarılı ama token hala cüzdanda → fake satış → otomatik tekrar dene
+            console.warn(`⚠️ [Jupiter] FAKE SATIŞ tespit edildi: ${pos.symbol} — TX başarılı ama token hala cüzdanda. Satış yeniden tetikleniyor...`);
+            this.inFlight.delete(`sell:${pos.id}`);
+            return this.sell(positionId);
+          }
+
+          const pnlSol = sellResult.solOut - (pos.buySolAmount ?? 0);
           const pnlPct = (pos.buySolAmount ?? 0) > 0 ? (pnlSol / pos.buySolAmount!) * 100 : 0;
           updated = {
             ...updated,
             status: "closed",
             sellTimestamp: Date.now(),
-            sellSolAmount: result.solOut,
-            sellPriceSol: result.sellPriceSol,
-            sellTxSignature: result.sig,
+            sellSolAmount: sellResult.solOut,
+            sellPriceSol: sellResult.sellPriceSol,
+            sellTxSignature: sellResult.sig,
             pnlSol,
             pnlPct,
           };
           this.updateAndEmit(updated);
-          console.log(`✅ [Jupiter] SATIŞ tamam: ${pos.symbol} | ${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%)`);
-        } catch (jupErr) {
-          if (jupiterOk) throw jupErr;
-          // Jupiter route yok → PumpSwap fallback dene
-          console.warn(`⚠️ [Jupiter] SATIŞ başarısız, PumpSwap'a geçiliyor: ${(jupErr as Error).message}`);
+          console.log(`✅ [Jupiter] SATIŞ tamam: ${pos.symbol} | ${sellResult.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%)`);
+        } else {
+          // Jupiter tüm retry'lar başarısız → PumpSwap fallback dene
+          console.warn(`⚠️ [Jupiter] SATIŞ başarısız (${MAX_SELL_RETRIES} deneme), PumpSwap'a geçiliyor: ${lastSellErr.message}`);
+          const fallbackBal = await this.getTokenBalance(pos.mintAddress);
+          if (!fallbackBal || fallbackBal.uiAmount === 0) {
+            throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
+          }
           const result = await this.withRetry(async () => {
-            const balance = await fetchBalanceWithRetry();
+            const balance = await this.getTokenBalance(pos.mintAddress);
+            if (!balance || balance.uiAmount === 0) throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
             console.log(`🔍 [PumpSwap Fallback] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
             const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
             return { sig, tokenAmount: balance.uiAmount };
