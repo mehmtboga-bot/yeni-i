@@ -335,6 +335,19 @@ export default function Home() {
         setAutoTraderRunning(msg.data.running);
       } else if (msg.type === "token_comparison_snapshot") {
         setTokenComparison(msg.data);
+      } else if (msg.type === "recent_mints_snapshot") {
+        // Sayfa yenilenirken gelen son 100 logdaki mint_detected eventlerini ekle
+        const mints = msg.data.mints || [];
+        if (mints.length > 0) {
+          setMintedTokens((prev) => {
+            // Gelen mintleri öncekilerle birleştir, duplikatları çıkar, sınırla
+            const combined = [...mints, ...prev];
+            const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
+            const next = unique.slice(0, MAX_MINTED_TOKENS);
+            try { localStorage.setItem("mintedTokens", JSON.stringify(next)); } catch {}
+            return next;
+          });
+        }
       }
 
       try {
@@ -368,6 +381,8 @@ export default function Home() {
         setConnectionMessage("");
         // Token karşılaştırma iste
         wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
+        // Son 100 logdaki mint_detected eventlerini iste
+        wsInstance?.send(JSON.stringify({ type: "request_recent_mints" }));
       };
 
       wsInstance.onmessage = (event) => {
