@@ -21,7 +21,7 @@ export interface AutoTraderConfig {
 }
 
 const DEFAULT_CONFIG: AutoTraderConfig = {
-  enabled: false,
+  enabled: true,
   solAmountPerTrade: 0.1,
   maxTokensHeld: 5,
   holdDurationMs: 60000,           // 1 dakika
@@ -29,7 +29,7 @@ const DEFAULT_CONFIG: AutoTraderConfig = {
   stopLossPct: 20,                 // %20 zarar
   slippageBps: 5000,               // %50 slippage
   priorityFeeMicroLamports: 1_000_000,
-  minLiquidityUsd: 5000,           // Minimum $5,000 likidite
+  minLiquidityUsd: 1000,           // Minimum $1,000 likidite
   skipRecentlyTradedSymbols: true, // Son 7 işlemde aynı symbol varsa atla
 };
 
