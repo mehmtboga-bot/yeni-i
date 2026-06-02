@@ -96,7 +96,7 @@ export class JupiterTrader {
 
   private async getLatestBlockhash() {
     const now = Date.now();
-    if (this.blockhashCache && now - this.lastBlockhashTime < 5000) {
+    if (this.blockhashCache && now - this.lastBlockhashTime < 2000) {
       return this.blockhashCache;
     }
     if (!this.connection) throw new Error("RPC bağlantısı yok");
@@ -191,7 +191,7 @@ export class JupiterTrader {
       wrapAndUnwrapSol: true,
       dynamicComputeUnitLimit: true,
       prioritizationFeeLamports: {
-        priorityLevelWithMaxLamports: { maxLamports: Math.max(priorityFeeMicroLamports, 1), priorityLevel: "veryHigh" },
+        priorityLevelWithMaxLamports: { maxLamports: Math.max(priorityFeeMicroLamports * 50, 50000), priorityLevel: "veryHigh" },
       },
     };
     const swapRes = await fetch(JUP_SWAP, {
@@ -515,7 +515,7 @@ export class JupiterTrader {
     console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "AUTO" : "MANUAL"})`);
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
+    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports * 50, 50000) / 1_000_000_000;
 
     try {
       // ✅ OTOMATİK: 650ms bekle
@@ -661,7 +661,7 @@ export class JupiterTrader {
     console.log(`💸 [${dexLabel}] SATIŞ BAŞLADI: ${pos.symbol}`);
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
+    const priorityFeeSol = Math.max(config.priorityFeeMicroLamports * 50, 50000) / 1_000_000_000;
 
     try {
       // ✅ 3 DENEME (50ms ara)
