@@ -213,7 +213,7 @@ export class JupiterTrader {
     );
 
     const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error("TX confirmation timeout (120s)")), 120000)
+      setTimeout(() => reject(new Error("TX confirmation timeout (30s)")), 30000)
     );
 
     try {
@@ -276,7 +276,7 @@ export class JupiterTrader {
     );
 
     const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error("PumpSwap TX confirmation timeout (120s)")), 120000)
+      setTimeout(() => reject(new Error("PumpSwap TX confirmation timeout (30s)")), 30000)
     );
 
     try {
