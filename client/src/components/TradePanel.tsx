@@ -80,6 +80,14 @@ export function TradePanel({
   const [solAmountInput, setSolAmountInput] = useState(String(config.solAmount));
   const [slippageInput, setSlippageInput] = useState(String(config.slippageBps));
   const [priorityInput, setPriorityInput] = useState(String(config.priorityFeeMicroLamports));
+  const [priorityManualInput, setPriorityManualInput] = useState(() => {
+    const saved = localStorage.getItem("priorityFeeManualMicroLamports");
+    return saved ?? String(config.priorityFeeManualMicroLamports ?? config.priorityFeeMicroLamports);
+  });
+  const [priorityAutoInput, setPriorityAutoInput] = useState(() => {
+    const saved = localStorage.getItem("priorityFeeAutoMicroLamports");
+    return saved ?? String(config.priorityFeeAutoMicroLamports ?? config.priorityFeeMicroLamports);
+  });
   const [takeProfitInput, setTakeProfitInput] = useState(String(config.takeProfitPct ?? 0));
 
   const copyAddress = async (address: string, id: string) => {
@@ -121,14 +129,25 @@ export function TradePanel({
     const sol = parseFloat(solAmountInput);
     const slip = parseInt(slippageInput, 10);
     const prio = parseInt(priorityInput, 10);
+    const prioManual = parseInt(priorityManualInput, 10);
+    const prioAuto = parseInt(priorityAutoInput, 10);
     const tp = parseFloat(takeProfitInput);
     const partial: Partial<TradeConfig> = {};
     if (!Number.isNaN(sol) && sol > 0) partial.solAmount = sol;
     if (!Number.isNaN(slip) && slip >= 50) partial.slippageBps = slip;
     if (!Number.isNaN(prio) && prio >= 0) partial.priorityFeeMicroLamports = prio;
+    if (!Number.isNaN(prioManual) && prioManual >= 0) {
+      partial.priorityFeeManualMicroLamports = prioManual;
+      localStorage.setItem("priorityFeeManualMicroLamports", String(prioManual));
+    }
+    if (!Number.isNaN(prioAuto) && prioAuto >= 0) {
+      partial.priorityFeeAutoMicroLamports = prioAuto;
+      localStorage.setItem("priorityFeeAutoMicroLamports", String(prioAuto));
+    }
     if (!Number.isNaN(tp) && tp >= 0) partial.takeProfitPct = tp;
     if (Object.keys(partial).length) onUpdateConfig(partial);
   };
+
 
   const takeProfitPct = config.takeProfitPct ?? 0;
 
@@ -186,7 +205,7 @@ export function TradePanel({
             <Settings className="h-5 w-5 text-chart-2" />
             <h2 className="text-base font-semibold">Trade Ayarları</h2>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label htmlFor="sol-amount" className="text-xs">İşlem Başına SOL</Label>
               <Input id="sol-amount" type="number" step="0.01" min="0.0001" value={solAmountInput}
@@ -204,11 +223,6 @@ export function TradePanel({
               </p>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="priority" className="text-xs">Priority Fee (µLamports)</Label>
-              <Input id="priority" type="number" step="1000000" min="0" value={priorityInput}
-                onChange={(e) => setPriorityInput(e.target.value)} data-testid="input-priority" />
-            </div>
-            <div className="space-y-1">
               <Label htmlFor="take-profit" className="text-xs flex items-center gap-1">
                 <Target className="h-3 w-3 text-emerald-400" />
                 Kar Hedefi (%)
@@ -218,6 +232,32 @@ export function TradePanel({
                 className={parseFloat(takeProfitInput) > 0 ? "border-emerald-500/50 text-emerald-400" : ""} />
               <p className="text-[10px] text-muted-foreground">
                 {parseFloat(takeProfitInput) > 0 ? `+%${takeProfitInput}'de otomatik sat` : "0 = devre dışı"}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="priority-manual" className="text-xs">Manuel Fee (µLamports)</Label>
+              <Input id="priority-manual" type="number" step="100000" min="0" value={priorityManualInput}
+                onChange={(e) => setPriorityManualInput(e.target.value)} data-testid="input-priority-manual" />
+              <p className="text-[10px] text-muted-foreground">
+                Manuel alım · {(parseInt(priorityManualInput || "0") / 1_000_000_000).toFixed(6)} SOL
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="priority-auto" className="text-xs">Otomatik Fee (µLamports)</Label>
+              <Input id="priority-auto" type="number" step="100000" min="0" value={priorityAutoInput}
+                onChange={(e) => setPriorityAutoInput(e.target.value)} data-testid="input-priority-auto" />
+              <p className="text-[10px] text-muted-foreground">
+                Otomatik alım · {(parseInt(priorityAutoInput || "0") / 1_000_000_000).toFixed(6)} SOL
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="priority" className="text-xs">Fallback Fee (µLamports)</Label>
+              <Input id="priority" type="number" step="100000" min="0" value={priorityInput}
+                onChange={(e) => setPriorityInput(e.target.value)} data-testid="input-priority" />
+              <p className="text-[10px] text-muted-foreground">
+                Genel fallback · {(parseInt(priorityInput || "0") / 1_000_000_000).toFixed(6)} SOL
               </p>
             </div>
           </div>

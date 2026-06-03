@@ -67,6 +67,8 @@ export const tradeConfigSchema = z.object({
   solAmount: z.number().min(0.0001),
   slippageBps: z.number().min(50).max(1_000_000),
   priorityFeeMicroLamports: z.number().min(0).max(100_000_000),
+  priorityFeeManualMicroLamports: z.number().min(0).max(100_000_000).optional(), // Manuel alım (override)
+  priorityFeeAutoMicroLamports: z.number().min(0).max(100_000_000).optional(),   // Otomatik alım (override)
   takeProfitPct: z.number().min(0).max(10000).optional().default(0),
 });
 

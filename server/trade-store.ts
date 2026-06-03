@@ -8,7 +8,9 @@ const STORE_PATH = path.join(DATA_DIR, "trades.json");
 const DEFAULT_CONFIG: TradeConfig = {
   solAmount: 0.01,
   slippageBps: 10000, // 100% kayma (fiyat ne olursa olsun al/sat)
-  priorityFeeMicroLamports: 20_000_000,
+  priorityFeeMicroLamports: 700_000,           // Fallback (genel)
+  priorityFeeManualMicroLamports: 700_000,     // Manuel alım: 0.0007 SOL (~1-2s)
+  priorityFeeAutoMicroLamports: 1_000_000,     // Otomatik alım: 0.001 SOL (<1s)
   takeProfitPct: 0,
 };
 
