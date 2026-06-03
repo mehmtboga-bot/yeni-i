@@ -188,11 +188,11 @@ export class JupiterTrader {
     const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, "base64"));
     tx.sign([this.keypair]);
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
-    // "processed" commitment en hızlı onay (~400ms) — max 1s timeout, aşılırsa retry
+    // "processed" commitment en hızlı onay (~400ms) — max 1.5s timeout, aşılırsa retry
     const latest = await this.connection.getLatestBlockhash("processed");
     const conf = await this.withTimeout(
       this.connection.confirmTransaction({ signature, ...latest }, "processed"),
-      1000,
+      1500,
       "Jupiter confirmTransaction"
     );
     if (conf.value.err) throw new Error(`TX hata: ${JSON.stringify(conf.value.err)}`);
@@ -239,11 +239,11 @@ export class JupiterTrader {
     tx.sign([this.keypair]);
 
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
-    // max 1s timeout — aşılırsa retry
+    // max 1.5s timeout — aşılırsa retry
     const latest = await this.connection.getLatestBlockhash("processed");
     const conf = await this.withTimeout(
       this.connection.confirmTransaction({ signature, ...latest }, "processed"),
-      1000,
+      1500,
       "PumpSwap confirmTransaction"
     );
     if (conf.value.err) throw new Error(`PumpSwap TX hata: ${JSON.stringify(conf.value.err)}`);
@@ -295,6 +295,23 @@ export class JupiterTrader {
       position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
       console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
+
+      // TX indexer'a yansısın diye arka planda bekle, pozisyonu güncelle (bloklamıyor)
+      (async () => {
+        for (const delay of [2000, 3000, 5000]) {
+          await new Promise((r) => setTimeout(r, delay));
+          try {
+            const bal = await this.getTokenBalance(mintAddress);
+            if (bal && bal.uiAmount > 0) {
+              const updated = { ...this.store.getById(position.id)!, buyTokenAmount: bal.uiAmount };
+              this.updateAndEmit(updated);
+              console.log(`🪙 [Jupiter] Token bakiyesi güncellendi: ${bal.uiAmount.toLocaleString()} ${symbol}`);
+              return;
+            }
+          } catch { /* sessizce devam et */ }
+        }
+      })();
+
       return position;
     } catch (err) {
       // 3 retry sonrası hâlâ başarısız → "failed", tekrar denenmez
@@ -448,6 +465,18 @@ export class JupiterTrader {
         updated = { ...updated, status: "closed", sellTimestamp: Date.now(), sellTxSignature: result.sig };
         this.updateAndEmit(updated);
         console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | ${result.tokenAmount.toLocaleString()} token | tx ${result.sig.slice(0, 16)}...`);
+
+        // TX sonrası bakiye kontrolü — arka planda (bloklamıyor)
+        (async () => {
+          for (const delay of [2000, 3000, 5000]) {
+            await new Promise((r) => setTimeout(r, delay));
+            try {
+              const bal = await this.getTokenBalance(pos.mintAddress);
+              console.log(`🔍 [PumpSwap] Satış sonrası bakiye: ${bal?.uiAmount ?? 0} ${pos.symbol}`);
+              if (!bal || bal.uiAmount === 0) return;
+            } catch { /* sessizce devam et */ }
+          }
+        })();
       } else {
         // Jupiter satışı — route yoksa PumpSwap'a fallback, her ikisi de 3 deneme, timeout yok
         let jupiterOk = false;
@@ -477,6 +506,18 @@ export class JupiterTrader {
           };
           this.updateAndEmit(updated);
           console.log(`✅ [Jupiter] SATIŞ tamam: ${pos.symbol} | ${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%)`);
+
+          // TX sonrası bakiye kontrolü — arka planda (bloklamıyor)
+          (async () => {
+            for (const delay of [2000, 3000, 5000]) {
+              await new Promise((r) => setTimeout(r, delay));
+              try {
+                const bal = await this.getTokenBalance(pos.mintAddress);
+                console.log(`🔍 [Jupiter] Satış sonrası bakiye: ${bal?.uiAmount ?? 0} ${pos.symbol}`);
+                if (!bal || bal.uiAmount === 0) return;
+              } catch { /* sessizce devam et */ }
+            }
+          })();
         } catch (jupErr) {
           if (jupiterOk) throw jupErr;
           // Jupiter route yok → PumpSwap fallback dene (3 deneme, timeout yok)
