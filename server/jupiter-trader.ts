@@ -21,6 +21,25 @@ const SOL_DECIMALS = 9;
 
 type Emitter = (event: string, data: any) => void;
 
+// --- Hata Türleri ---
+// RetryableError: Geçici hatalar — timeout, ağ hatası, RPC geçici arızası
+// FinalError: Kalıcı hatalar — TX onaylandı ama token yok, bakiye 0, geçersiz route
+class RetryableError extends Error {
+  readonly type = "retryable" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "RetryableError";
+  }
+}
+
+class FinalError extends Error {
+  readonly type = "final" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "FinalError";
+  }
+}
+
 interface QuoteResponse {
   inputMint: string;
   inAmount: string;
@@ -90,20 +109,26 @@ export class JupiterTrader {
   }
 
   // --- Retry yardımcısı ---
-  // Varsayılan: 3 deneme, denemeler arası 500ms bekleme
-  private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 3, delayMs = 500): Promise<T> {
+  // Varsayılan: 3 deneme, exponential backoff: 300ms → 600ms → 1200ms (2x çarpan)
+  // FinalError → anında throw (retry yok)
+  // RetryableError veya diğer hatalar → retry
+  private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 3, baseDelayMs = 300): Promise<T> {
     let lastErr: Error = new Error("Bilinmeyen hata");
-    // retries=3 → tam 3 deneme (düzeltildi: eskisi i<=retries ile 4 deneme yapıyordu)
     for (let i = 0; i < retries; i++) {
       try {
         return await fn();
       }
       catch (err) {
         lastErr = err as Error;
-        // "FINAL:" ile başlayan hatalar retry yapılmaz (TX onaylandı ama sorun var)
-        if (lastErr.message.startsWith("FINAL:")) throw lastErr;
+        // FinalError → kalıcı hata, retry yapılmaz
+        if (lastErr instanceof FinalError) {
+          console.error(`🚫 [${label}] Final hata (retry yok): ${lastErr.message}`);
+          throw lastErr;
+        }
         if (i < retries - 1) {
-          console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries} başarısız — ${delayMs}ms bekleniyor... (${lastErr.message})`);
+          const delayMs = baseDelayMs * Math.pow(2, i); // 300 → 600 → 1200
+          const errType = lastErr instanceof RetryableError ? "RetryableError" : "Error";
+          console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries} başarısız [${errType}] — ${delayMs}ms bekleniyor... (${lastErr.message})`);
           await new Promise((r) => setTimeout(r, delayMs));
         }
       }
@@ -325,8 +350,8 @@ export class JupiterTrader {
           console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/4)`);
         }
 
-        // Token gelmedi — FINAL hata (retry yok, tek TX garantisi)
-        throw new Error(`FINAL: TX gönderildi fakat token bakiyesi 0 (sig: ${sig.slice(0, 16)}...)`);
+        // Token gelmedi — FinalError (retry yok, tek TX garantisi)
+        throw new FinalError(`TX gönderildi fakat token bakiyesi 0 (sig: ${sig.slice(0, 16)}...)`);
       }, `Jupiter Buy ${symbol}`, 1);
 
       position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
@@ -430,11 +455,11 @@ export class JupiterTrader {
     const slippagePct = Math.floor(config.slippageBps / 100);
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
-    // Bakiye kontrolü — sıfırsa RUG_PULL fırlatır
+    // Bakiye kontrolü — sıfırsa FinalError fırlatır (rug pull)
     const fetchBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
       const bal = await this.getTokenBalance(pos.mintAddress);
       if (bal && bal.uiAmount > 0) return bal;
-      throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
+      throw new FinalError(`Cüzdanda ${pos.symbol} bakiyesi bulunamadı (rug pull)`);
     };
 
     // Satış öncesi bakiye kontrolü — rug pull erken tespiti
@@ -529,8 +554,8 @@ export class JupiterTrader {
     } catch (err) {
       const message = (err as Error).message || String(err);
 
-      // Rug pull tespiti — bakiye sıfır, pozisyonu -%100 zararla kapat
-      if (message.includes("RUG_PULL")) {
+      // Rug pull tespiti — FinalError ile bakiye sıfır, pozisyonu -%100 zararla kapat
+      if (err instanceof FinalError) {
         const rugPullLoss = -(pos.buySolAmount ?? 0);
         updated = {
           ...pos,
@@ -581,11 +606,11 @@ export class JupiterTrader {
     const slippagePct = Math.floor(config.slippageBps / 100);
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
-    // Bakiye kontrolü — sıfırsa RUG_PULL fırlatır
+    // Bakiye kontrolü — sıfırsa FinalError fırlatır (rug pull)
     const fetchBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
       const bal = await this.getTokenBalance(pos.mintAddress);
       if (bal && bal.uiAmount > 0) return bal;
-      throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
+      throw new FinalError(`Cüzdanda ${pos.symbol} bakiyesi bulunamadı (rug pull)`);
     };
 
     // Satış öncesi bakiye kontrolü — rug pull erken tespiti
@@ -696,8 +721,8 @@ export class JupiterTrader {
     } catch (err) {
       const message = (err as Error).message || String(err);
 
-      // Rug pull tespiti — bakiye sıfır, pozisyonu -%100 zararla kapat
-      if (message.includes("RUG_PULL")) {
+      // Rug pull tespiti — FinalError ile bakiye sıfır, pozisyonu -%100 zararla kapat
+      if (err instanceof FinalError) {
         const rugPullLoss = -(pos.buySolAmount ?? 0);
         const updated: Position = {
           ...pos,
