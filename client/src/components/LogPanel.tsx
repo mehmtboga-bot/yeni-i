@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -37,14 +36,6 @@ function formatTime(ts: number) {
 }
 
 export function LogPanel({ open, logs, onClose, onClear }: LogPanelProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  // Yeni log gelince en alta kaydır
-  useEffect(() => {
-    if (open) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [logs, open]);
 
   return (
     <>
@@ -108,7 +99,7 @@ export function LogPanel({ open, logs, onClose, onClear }: LogPanelProps) {
               Sunucu logları bekleniyor...
             </p>
           ) : (
-            logs.map((log) => (
+            [...logs].reverse().map((log) => (
               <div key={log.id} className="flex gap-2 items-start">
                 <span className="text-zinc-600 shrink-0 select-none">
                   {formatTime(log.timestamp)}
@@ -119,7 +110,6 @@ export function LogPanel({ open, logs, onClose, onClear }: LogPanelProps) {
               </div>
             ))
           )}
-          <div ref={bottomRef} />
         </div>
       </div>
     </>
