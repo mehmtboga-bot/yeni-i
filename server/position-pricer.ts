@@ -1,4 +1,5 @@
 import { TradeStore } from "./trade-store";
+import { SellScheduler } from "./sell-scheduler";
 import type { Position } from "@shared/schema";
 
 const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
@@ -7,7 +8,6 @@ export class PositionPricer {
   private store: TradeStore;
   private solPriceUsd: number = 0;
   private emit: (event: string, data: any) => void;
-  private onAutoSell: ((positionId: string) => void) | null = null;
   private updateInterval: ReturnType<typeof setInterval> | null = null;
   private autoSellInFlight: Set<string> = new Set();
 
@@ -15,21 +15,26 @@ export class PositionPricer {
   private aboveThresholdCount: Map<string, number> = new Map();
   // Son bilinen geçerli fiyat (spike tespiti için)
   private lastValidPrice: Map<string, number> = new Map();
-  
+
   // Retry mekanizması: mint başına kaç kez başarısız olduğunu takip et
   private failureCount: Map<string, number> = new Map();
   private maxFailuresBeforeAlert = 5;
+
+  // Satış kuyruğu — recursive setTimeout yerine setInterval tabanlı scheduler
+  private sellScheduler: SellScheduler;
 
   constructor(
     store: TradeStore,
     solPriceUsd: number,
     emit: (event: string, data: any) => void,
-    onAutoSell?: (positionId: string) => void,
+    onAutoSell?: (positionId: string) => Promise<{ status: string } | null>,
   ) {
     this.store = store;
     this.solPriceUsd = solPriceUsd;
     this.emit = emit;
-    this.onAutoSell = onAutoSell ?? null;
+    this.sellScheduler = new SellScheduler(
+      onAutoSell ?? (() => Promise.resolve(null)),
+    );
   }
 
   setSolPrice(price: number) { this.solPriceUsd = price; }
@@ -37,6 +42,7 @@ export class PositionPricer {
   start() {
     if (this.updateInterval) return;
     console.log("🎯 [Pricer] Başlatıldı (1.5s aralık)");
+    this.sellScheduler.start();
     this.updateInterval = setInterval(() => this.updatePrices(), 1500);
     this.updatePrices();
   }
@@ -45,6 +51,7 @@ export class PositionPricer {
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = null;
+      this.sellScheduler.stop();
       console.log("⏹️ [Pricer] Durduruldu");
     }
   }
@@ -151,11 +158,11 @@ export class PositionPricer {
         const count = (this.aboveThresholdCount.get(pos.id) ?? 0) + 1;
         this.aboveThresholdCount.set(pos.id, count);
 
-        if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onAutoSell) {
+        if (count >= 2 && !this.autoSellInFlight.has(pos.id)) {
           this.autoSellInFlight.add(pos.id);
           this.aboveThresholdCount.delete(pos.id);
-          console.log(`🎯 [Pricer] Kar hedefi: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}%`);
-          this.onAutoSell(pos.id);
+          console.log(`🎯 [Pricer] Kar hedefi: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% — satış kuyruğuna ekleniyor`);
+          this.sellScheduler.enqueue(pos.id);
         }
       } else {
         // Hedef altına düştü — sayacı sıfırla

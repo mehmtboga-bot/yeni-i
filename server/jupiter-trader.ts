@@ -548,12 +548,11 @@ export class JupiterTrader {
         return updated;
       }
 
-      // Satış başarısız — status "open" olarak bırak, 1 saniye sonra tekrar dene (sonsuz döngü)
+      // Satış başarısız — status "open" olarak bırak, SellScheduler yeniden dener
       updated = { ...pos, status: "open", error: message };
       this.updateAndEmit(updated);
-      console.warn(`⚠️ [${dexLabel}] SATIŞ başarısız (${pos.symbol}): ${message} — 1s sonra tekrar deneniyor...`);
+      console.warn(`⚠️ [${dexLabel}] SATIŞ başarısız (${pos.symbol}): ${message} — scheduler yeniden deneyecek`);
       this.inFlight.delete(`sell:${pos.id}`);
-      setTimeout(() => this.sell(positionId), 1000);
       return updated;
     } finally {
       // Başarılı veya rug pull durumunda inFlight'ı temizle
@@ -564,7 +563,7 @@ export class JupiterTrader {
 
   // ========== YARI SATIŞ ==========
   // Pozisyonun token bakiyesinin yarısını satar. Kalan yarısı pozisyonda kalır (status "open").
-  // Satış başarısız olursa status "open" kalır, 1s sonra tekrar denenir (sonsuz döngü).
+  // Satış başarısız olursa status "open" kalır, SellScheduler yeniden dener.
   // Bakiye yoksa (rug pull) → "closed" pnlPct:-100.
   async sellHalf(positionId: string): Promise<Position | null> {
     const pos = this.store.getById(positionId);
@@ -715,12 +714,11 @@ export class JupiterTrader {
         return updated;
       }
 
-      // Satış başarısız — status "open" olarak bırak, 1 saniye sonra tekrar dene (sonsuz döngü)
+      // Satış başarısız — status "open" olarak bırak, SellScheduler yeniden dener
       const failedPos: Position = { ...pos, status: "open", error: message };
       this.updateAndEmit(failedPos);
-      console.warn(`⚠️ [${dexLabel}] YARI SATIŞ başarısız (${pos.symbol}): ${message} — 1s sonra tekrar deneniyor...`);
+      console.warn(`⚠️ [${dexLabel}] YARI SATIŞ başarısız (${pos.symbol}): ${message} — scheduler yeniden deneyecek`);
       this.inFlight.delete(`sell:${pos.id}`);
-      setTimeout(() => this.sellHalf(positionId), 1000);
       return failedPos;
     } finally {
       this.inFlight.delete(`sell:${pos.id}`);
