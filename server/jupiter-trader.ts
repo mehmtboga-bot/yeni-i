@@ -409,8 +409,8 @@ export class JupiterTrader {
     await new Promise((r) => setTimeout(r, 650));
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    // Birim dönüşümü: micro-lamport → SOL (1 micro-lamport = 10^-15 SOL)
-    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000_000_000;
+    // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
+    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     try {
       // retries=1 → tek TX gönderilir, multiple TX sorunu önlenir
@@ -472,8 +472,8 @@ export class JupiterTrader {
     console.log(`💸 [${dexLabel}] SATIŞ başlatılıyor: ${pos.symbol}`);
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    // Birim dönüşümü: micro-lamport → SOL (1 micro-lamport = 10^-15 SOL)
-    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000_000_000;
+    // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
+    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     // Bakiye kontrolü — sıfırsa RUG_PULL fırlatır
     const fetchBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
@@ -657,8 +657,8 @@ export class JupiterTrader {
     console.log(`💸 [${dexLabel}] YARI SATIŞ başlatılıyor: ${pos.symbol}`);
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    // Birim dönüşümü: micro-lamport → SOL (1 micro-lamport = 10^-15 SOL)
-    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000_000_000;
+    // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
+    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     // Bakiye kontrolü — sıfırsa RUG_PULL fırlatır
     const fetchBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
