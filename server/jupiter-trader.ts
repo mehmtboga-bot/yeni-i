@@ -315,9 +315,28 @@ export class JupiterTrader {
         return { sig, tokensOut, pricePerToken };
       }, `Jupiter Buy ${symbol}`);
 
-      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
+      // TX gönderildi — token gelip gelmediğini her 500ms'de kontrol et (max 2 deneme = 1s)
+      let balCheck = null;
+      for (let c = 0; c < 2; c++) {
+        await new Promise((r) => setTimeout(r, 500));
+        balCheck = await this.getTokenBalance(mintAddress);
+        if (balCheck && balCheck.uiAmount > 0) break;
+        console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/2)`);
+      }
+
+      if (!balCheck || balCheck.uiAmount <= 0) {
+        // TX ağa gitti ama token gelmedi → blockchain'de başarısız olmuş
+        const errMsg = `TX gönderildi fakat token bakiyesi 0 — TX blockchain'de başarısız (sig: ${result.sig.slice(0, 16)}...)`;
+        position = { ...position, status: "failed", buyTxSignature: result.sig, error: errMsg };
+        this.updateAndEmit(position);
+        console.error(`❌ [Jupiter] ALIM başarısız — token gelmedi: ${symbol} | sig: ${result.sig.slice(0, 16)}...`);
+        return position;
+      }
+
+      // Gerçek bakiyeyi kullan (quote tahmini değil)
+      position = { ...position, status: "open", buyTokenAmount: balCheck.uiAmount, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
-      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
+      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${balCheck.uiAmount.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
       return position;
     } catch (err) {
       // 3 retry sonrası hâlâ başarısız → "failed", tekrar denenmez
