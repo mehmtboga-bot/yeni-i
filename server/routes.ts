@@ -249,25 +249,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         setTimeout(() => {
           console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
           if (dex === "pumpswap") {
-            trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
+            trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount, isAuto: true })
               .catch((err) => {
                 console.error("Auto-buy (PumpSwap) hatası:", err);
                 autoTraderEngine.markRecordFailed(mintAddress, String(err));
               });
           } else {
-            trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
+            trader.buy({ mintAddress, name: nm, symbol: sym, solAmount, isAuto: true })
               .catch((err) => {
                 console.error("Auto-buy hatası:", err);
                 autoTraderEngine.markRecordFailed(mintAddress, String(err));
               });
           }
         }, 500);
+
       } else if (event === "auto_sell_ready") {
         if (data.forceClose) {
           // Likidite düşüşü — token satılmadan zarar olarak kapat (rug pull)
           const pos = tradeStore.getById(data.positionId);
           if (pos && pos.status === "open") {
             const rugLoss = -(pos.buySolAmount ?? 0);
+
             const closed = {
               ...pos,
               status: "closed" as const,
@@ -366,7 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         setTimeout(() => {
           console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | SOL: ${solAmount}${customHoldDurationMs !== undefined ? ` | Özel süre: ${(customHoldDurationMs / 1000).toFixed(0)}s` : ""}`);
 
-          const buyOpts = { mintAddress, name: nm, symbol: sym, solAmount, customHoldDurationMs };
+          const buyOpts = { mintAddress, name: nm, symbol: sym, solAmount, customHoldDurationMs, isAuto: true };
           if (dex === "pumpswap") {
             trader.buyPumpSwap(buyOpts)
               .then((pos: any) => {
@@ -403,6 +405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (event === "token_skipped") {
       broadcastToClients({ type: "token_skipped", data });
     }
+
   });
 
   monitor.start();
@@ -490,13 +493,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }).catch((err) => console.error("sell_token hatası:", err));
           }
         } else if (message.type === "trade_config_update") {
-          const { solAmount, slippageBps, priorityFeeMicroLamports, takeProfitPct } = message.data || {};
+          const { solAmount, slippageBps, priorityFeeMicroLamports, priorityFeeManualMicroLamports, priorityFeeAutoMicroLamports, takeProfitPct } = message.data || {};
           const partial: Record<string, number> = {};
           if (typeof solAmount === "number" && solAmount > 0) partial.solAmount = solAmount;
           if (typeof slippageBps === "number" && slippageBps >= 50) partial.slippageBps = slippageBps;
           if (typeof priorityFeeMicroLamports === "number" && priorityFeeMicroLamports >= 0) partial.priorityFeeMicroLamports = priorityFeeMicroLamports;
+          if (typeof priorityFeeManualMicroLamports === "number" && priorityFeeManualMicroLamports >= 0) partial.priorityFeeManualMicroLamports = priorityFeeManualMicroLamports;
+          if (typeof priorityFeeAutoMicroLamports === "number" && priorityFeeAutoMicroLamports >= 0) partial.priorityFeeAutoMicroLamports = priorityFeeAutoMicroLamports;
           if (typeof takeProfitPct === "number" && takeProfitPct >= 0) partial.takeProfitPct = takeProfitPct;
           if (Object.keys(partial).length) trader.updateConfig(partial as any);
+
         } else if (message.type === "auto_trader_config_update") {
           // Otomatik trader konfigürasyonu güncelle
           const { solAmountPerTrade, maxTokensHeld, holdDurationMs, profitTargetPct, stopLossPct, slippageBps, priorityFeeMicroLamports, minLiquidityUsd, enabled } = message.data || {};

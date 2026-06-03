@@ -319,9 +319,8 @@ export class JupiterTrader {
     this.emit("position_update", position);
   }
 
-  // ========== JUPITER ALIM ==========
-  async buy(input: { mintAddress: string; name: string; symbol: string; solAmount?: number }): Promise<Position | null> {
-    const { mintAddress, name, symbol, solAmount } = input;
+  async buy(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; isAuto?: boolean }): Promise<Position | null> {
+    const { mintAddress, name, symbol, solAmount, isAuto = false } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
     const existing = this.store.getByMint(mintAddress);
@@ -334,13 +333,17 @@ export class JupiterTrader {
     const config = this.store.getConfig();
     const actualSolAmount = solAmount ?? config.solAmount;
     const lamports = Math.floor(actualSolAmount * 1e9);
+    // Manuel/otomatik alım için ayrı priority fee kullan
+    const priorityFee = isAuto
+      ? (config.priorityFeeAutoMicroLamports ?? config.priorityFeeMicroLamports)
+      : (config.priorityFeeManualMicroLamports ?? config.priorityFeeMicroLamports);
     const id = `pos-${mintAddress}-${Date.now()}`;
     let position: Position = {
       id, mintAddress, name, symbol, dex: "jupiter",
       status: "pending_buy", buyTimestamp: Date.now(), buySolAmount: actualSolAmount,
     };
     this.updateAndEmit(position);
-    console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL`);
+    console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "otomatik" : "manuel"}, fee: ${priorityFee})`);
 
     // 650ms bekle — LP indexer'ın yayılması için
     await new Promise((r) => setTimeout(r, 650));
@@ -351,7 +354,7 @@ export class JupiterTrader {
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
         const pricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
-        const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+        const sig = await this.swap(quote, priorityFee);
 
         // TX gönderildi — her 500ms'de bakiye kontrol (max 4 = 2s)
         for (let c = 0; c < 4; c++) {
@@ -371,6 +374,7 @@ export class JupiterTrader {
       this.updateAndEmit(position);
       console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
       return position;
+
     } catch (err) {
       const message = (err as Error).message || String(err);
       position = { ...position, status: "failed", error: message };
@@ -384,8 +388,8 @@ export class JupiterTrader {
   }
 
   // ========== PUMPSWAP ALIM ==========
-  async buyPumpSwap(input: { mintAddress: string; name: string; symbol: string; solAmount?: number }): Promise<Position | null> {
-    const { mintAddress, name, symbol, solAmount } = input;
+  async buyPumpSwap(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; isAuto?: boolean }): Promise<Position | null> {
+    const { mintAddress, name, symbol, solAmount, isAuto = false } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — PumpSwap alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
     const existing = this.store.getByMint(mintAddress);
@@ -403,22 +407,26 @@ export class JupiterTrader {
       status: "pending_buy", buyTimestamp: Date.now(), buySolAmount: actualSolAmount,
     };
     this.updateAndEmit(position);
-    console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${actualSolAmount} SOL`);
+    console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "otomatik" : "manuel"})`);
 
     // 650ms bekle — LP indexer'ın yayılması için
     await new Promise((r) => setTimeout(r, 650));
 
     const slippagePct = Math.floor(config.slippageBps / 100);
+    // Manuel/otomatik alım için ayrı priority fee kullan
     // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
-    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
+    const rawFee = isAuto
+      ? (config.priorityFeeAutoMicroLamports ?? config.priorityFeeMicroLamports)
+      : (config.priorityFeeManualMicroLamports ?? config.priorityFeeMicroLamports);
+    const priorityFeeSol = rawFee / 1_000_000_000;
 
     try {
-      // retries=1 → tek TX gönderilir, multiple TX sorunu önlenir
       const sig = await this.withRetry(
         () => this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol }),
         `PumpSwap Buy ${symbol}`,
         1
       );
+
 
       // TX gönderildi — her 500ms'de bakiye kontrol (max 4 = 2s)
       let tokensReceived = 0;
