@@ -3,7 +3,6 @@ import { ExternalLink, Copy, Check, Lock, Unlock, Droplet, Zap } from "lucide-re
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CountdownTimer } from "./CountdownTimer";
 import type { MintedToken } from "@shared/schema";
 
 interface MintedTokenCardProps {
@@ -64,7 +63,6 @@ export function MintedTokenCard({
               )}
             </div>
           </div>
-          <CountdownTimer detectedAt={token.detectedAt} />
         </div>
 
         <div className="flex items-center gap-2">
