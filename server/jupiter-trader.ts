@@ -21,6 +21,12 @@ const SOL_DECIMALS = 9;
 
 type Emitter = (event: string, data: any) => void;
 
+interface TxRecord {
+  mint: string;
+  timestamp: number;
+  status: "pending" | "confirmed" | "failed";
+}
+
 interface QuoteResponse {
   inputMint: string;
   inAmount: string;
@@ -41,6 +47,11 @@ export class JupiterTrader {
   private connection: Connection | null = null;
   private decimalsCache: Map<string, number> = new Map();
   private inFlight: Set<string> = new Set();
+  // TX hash registry: signature → { mint, timestamp, status }
+  // Aynı mint için birden fazla TX gönderilmesini önler
+  private txRegistry: Map<string, TxRecord> = new Map();
+  // Mint başına aktif TX signature — pending TX varken yeni TX engellenir
+  private mintPendingTx: Map<string, string> = new Map();
 
   constructor(store: TradeStore, emit: Emitter) {
     this.store = store;
@@ -164,8 +175,15 @@ export class JupiterTrader {
     return json;
   }
 
-  private async swap(quote: QuoteResponse, priorityFeeMicroLamports: number): Promise<string> {
+  private async swap(quote: QuoteResponse, priorityFeeMicroLamports: number, mint: string, checkDuplicate = false): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
+
+    // Duplicate TX koruması — alım TX'lerinde aynı mint için pending TX varsa gönderme
+    if (checkDuplicate && this.hasPendingTxForMint(mint)) {
+      const existingSig = this.mintPendingTx.get(mint)!;
+      throw new Error(`FINAL: ${mint.slice(0, 8)}... için pending TX zaten var (${existingSig.slice(0, 16)}...) — duplicate TX engellendi`);
+    }
+
     const swapBody = {
       quoteResponse: quote,
       userPublicKey: this.keypair.publicKey.toBase58(),
@@ -194,6 +212,9 @@ export class JupiterTrader {
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
 
+    // TX registry'ye ekle — sadece alım TX'leri için pending olarak işaretle
+    if (checkDuplicate) this.registerTx(signature, mint);
+
     // Confirm BACKGROUND'DA — throw etmez, withRetry'ı tetiklemez
     // Alım başarısı bakiye kontrolüyle, satış başarısı verifySellBalance ile doğrulanır
     const latest = await this.connection.getLatestBlockhash("processed");
@@ -202,11 +223,14 @@ export class JupiterTrader {
         const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
         if (conf.value.err) {
           console.error(`❌ [Jupiter] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
+          if (checkDuplicate) this.confirmTx(signature, false);
         } else {
           console.log(`✅ [Jupiter] TX onaylandı (background): ${signature.slice(0, 16)}...`);
+          if (checkDuplicate) this.confirmTx(signature, true);
         }
       } catch (err) {
         console.error(`❌ [Jupiter] TX confirm timeout (background): ${(err as Error).message}`);
+        if (checkDuplicate) this.confirmTx(signature, false);
       }
     })();
 
@@ -226,6 +250,12 @@ export class JupiterTrader {
     priorityFeeSol: number;
   }): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
+
+    // Duplicate TX koruması — alım işlemlerinde aynı mint için pending TX varsa gönderme
+    if (opts.action === "buy" && this.hasPendingTxForMint(opts.mint)) {
+      const existingSig = this.mintPendingTx.get(opts.mint)!;
+      throw new Error(`FINAL: ${opts.mint.slice(0, 8)}... için pending TX zaten var (${existingSig.slice(0, 16)}...) — duplicate TX engellendi`);
+    }
 
     const body = {
       publicKey: this.keypair.publicKey.toBase58(),
@@ -256,6 +286,11 @@ export class JupiterTrader {
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
 
+    // TX registry'ye ekle — pending olarak işaretle (alım TX'leri için)
+    if (opts.action === "buy") {
+      this.registerTx(signature, opts.mint);
+    }
+
     // Confirm BACKGROUND'DA — throw etmez, withRetry'ı tetiklemez
     const latest = await this.connection.getLatestBlockhash("processed");
     ;(async () => {
@@ -263,16 +298,53 @@ export class JupiterTrader {
         const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
         if (conf.value.err) {
           console.error(`❌ [PumpSwap] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
+          if (opts.action === "buy") this.confirmTx(signature, false);
         } else {
           console.log(`✅ [PumpSwap] TX onaylandı (background): ${signature.slice(0, 16)}...`);
+          if (opts.action === "buy") this.confirmTx(signature, true);
         }
       } catch (err) {
         console.error(`❌ [PumpSwap] TX confirm timeout (background): ${(err as Error).message}`);
+        if (opts.action === "buy") this.confirmTx(signature, false);
       }
     })();
 
     // Sig hemen döner — TX ağda, withRetry break yapar, tekrar TX atmaz
     return signature;
+  }
+
+  // ========== TX REGISTRY YARDIMCILARI ==========
+
+  // Mint için pending TX var mı kontrol et
+  private hasPendingTxForMint(mint: string): boolean {
+    const sig = this.mintPendingTx.get(mint);
+    if (!sig) return false;
+    const record = this.txRegistry.get(sig);
+    if (!record) return false;
+    // 60 saniyeden eski pending TX'leri geçersiz say (timeout koruması)
+    if (record.status === "pending" && Date.now() - record.timestamp < 60_000) return true;
+    // Süresi dolmuş veya artık pending değil — temizle
+    this.mintPendingTx.delete(mint);
+    return false;
+  }
+
+  // TX gönderildikten sonra registry'ye ekle (pending)
+  private registerTx(signature: string, mint: string): void {
+    this.txRegistry.set(signature, { mint, timestamp: Date.now(), status: "pending" });
+    this.mintPendingTx.set(mint, signature);
+    console.log(`📝 [TxRegistry] Kaydedildi (pending): ${signature.slice(0, 16)}... mint=${mint.slice(0, 8)}...`);
+  }
+
+  // TX onaylandığında registry'yi güncelle
+  private confirmTx(signature: string, success: boolean): void {
+    const record = this.txRegistry.get(signature);
+    if (!record) return;
+    record.status = success ? "confirmed" : "failed";
+    // mintPendingTx'ten temizle — artık pending değil
+    if (this.mintPendingTx.get(record.mint) === signature) {
+      this.mintPendingTx.delete(record.mint);
+    }
+    console.log(`📝 [TxRegistry] Güncellendi (${record.status}): ${signature.slice(0, 16)}...`);
   }
 
   private updateAndEmit(position: Position) {
@@ -285,6 +357,12 @@ export class JupiterTrader {
     const { mintAddress, name, symbol, solAmount } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
+    // TX registry kontrolü — pending TX varsa yeni TX gönderme
+    if (this.hasPendingTxForMint(mintAddress)) {
+      const existingSig = this.mintPendingTx.get(mintAddress)!;
+      console.warn(`⏳ [TxRegistry] ${symbol} için pending TX var (${existingSig.slice(0, 16)}...) — alım atlandı`);
+      return null;
+    }
     const existing = this.store.getByMint(mintAddress);
     if (existing && ["open", "pending_buy", "pending_sell"].includes(existing.status)) {
       console.warn(`⚠️ ${symbol} zaten portföyde (${existing.status})`);
@@ -313,7 +391,7 @@ export class JupiterTrader {
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
         const pricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
-        const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+        const sig = await this.swap(quote, config.priorityFeeMicroLamports, mintAddress, true);
 
         // TX gönderildi — her 500ms'de bakiye kontrol (max 4 = 2s)
         for (let c = 0; c < 4; c++) {
@@ -350,6 +428,12 @@ export class JupiterTrader {
     const { mintAddress, name, symbol, solAmount } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — PumpSwap alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
+    // TX registry kontrolü — pending TX varsa yeni TX gönderme
+    if (this.hasPendingTxForMint(mintAddress)) {
+      const existingSig = this.mintPendingTx.get(mintAddress)!;
+      console.warn(`⏳ [TxRegistry] ${symbol} için pending TX var (${existingSig.slice(0, 16)}...) — alım atlandı`);
+      return null;
+    }
     const existing = this.store.getByMint(mintAddress);
     if (existing && ["open", "pending_buy", "pending_sell"].includes(existing.status)) {
       console.warn(`⚠️ ${symbol} zaten portföyde (${existing.status})`);
@@ -491,7 +575,7 @@ export class JupiterTrader {
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
             const solOut = Number(quote.outAmount) / 1e9;
             const sellPriceSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
-            const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+            const sig = await this.swap(quote, config.priorityFeeMicroLamports, pos.mintAddress);
             return { sig, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
           }, `Jupiter Sell ${pos.symbol}`);
 
@@ -653,7 +737,7 @@ export class JupiterTrader {
             const solOut = Number(quote.outAmount) / 1e9;
             const halfUiAmount = balance.uiAmount / 2;
             const sellPriceSol = halfUiAmount > 0 ? solOut / halfUiAmount : 0;
-            const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+            const sig = await this.swap(quote, config.priorityFeeMicroLamports, pos.mintAddress);
             return { sig, solOut, sellPriceSol, halfUiAmount };
           }, `Jupiter HalfSell ${pos.symbol}`);
 
