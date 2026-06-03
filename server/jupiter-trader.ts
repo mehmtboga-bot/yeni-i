@@ -21,6 +21,15 @@ const SOL_DECIMALS = 9;
 
 type Emitter = (event: string, data: any) => void;
 
+// Timeout ve geçici ağ hatalarını temsil eder — withRetry tarafından yeniden denenir.
+// "FINAL:" prefix'li hatalardan farklı olarak bu hatalar her zaman retry'a uygundur.
+class RetryableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RetryableError";
+  }
+}
+
 interface QuoteResponse {
   inputMint: string;
   inAmount: string;
@@ -78,11 +87,16 @@ export class JupiterTrader {
   getPublicKey(): string | undefined { return this.keypair?.publicKey.toBase58(); }
 
   // --- Timeout yardımcısı ---
-  // Verilen promise'i ms milisaniye içinde tamamlamazsa "Timeout" hatası fırlatır
-  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  // AbortController ile fetch'i gerçekten iptal eder — timeout olursa arka planda devam etmez.
+  // fn: AbortSignal alıp fetch döndüren factory. Timeout → RetryableError (withRetry tarafından tekrar denenir).
+  private withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>, ms: number, label: string): Promise<T> {
+    const controller = new AbortController();
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`Timeout (${ms}ms): ${label}`)), ms);
-      promise.then(
+      const timer = setTimeout(() => {
+        controller.abort();
+        reject(new RetryableError(`Timeout (${ms}ms): ${label}`));
+      }, ms);
+      fn(controller.signal).then(
         (v) => { clearTimeout(timer); resolve(v); },
         (e) => { clearTimeout(timer); reject(e); }
       );
@@ -156,7 +170,7 @@ export class JupiterTrader {
     url.searchParams.set("asLegacyTransaction", "false");
     url.searchParams.set("restrictIntermediateTokens", "true");
 
-    const res = await this.withTimeout(fetch(url.toString()), 1000, "getQuote fetch");
+    const res = await this.withTimeout((signal) => fetch(url.toString(), { signal }), 1000, "getQuote fetch");
     const bodyText = await res.text();
     if (!res.ok) throw new Error(`Jupiter quote ${res.status}: ${bodyText.slice(0, 200)}`);
     const json = JSON.parse(bodyText) as QuoteResponse;
@@ -176,10 +190,11 @@ export class JupiterTrader {
       },
     };
     const swapRes = await this.withTimeout(
-      fetch(JUP_SWAP, {
+      (signal) => fetch(JUP_SWAP, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(swapBody),
+        signal,
       }),
       2500,
       "getSwapInstructions fetch"
@@ -239,10 +254,11 @@ export class JupiterTrader {
     };
 
     const res = await this.withTimeout(
-      fetch(PUMP_TRADE_API, {
+      (signal) => fetch(PUMP_TRADE_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal,
       }),
       1000,
       "pumpSwapTx fetch"
