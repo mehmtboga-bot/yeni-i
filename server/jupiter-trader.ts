@@ -9,6 +9,21 @@ import { TradeStore } from "./trade-store";
 import { secrets } from "./secrets-loader";
 import type { Position, TradeConfig } from "@shared/schema";
 
+// TX onayı sırasında oluşan geçici hatalar — withRetry tarafından yeniden denenir
+class RetryableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RetryableError";
+  }
+}
+
+// Signature registry — her TX'in anlık durumunu tutar
+interface TxRecord {
+  status: "pending" | "confirmed" | "failed";
+  error?: string;
+  timestamp: number;
+}
+
 const HELIUS_API_KEY = secrets.HELIUS_API_KEY;
 const RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const JUP_QUOTE = "https://lite-api.jup.ag/swap/v1/quote";
@@ -41,6 +56,7 @@ export class JupiterTrader {
   private connection: Connection | null = null;
   private decimalsCache: Map<string, number> = new Map();
   private inFlight: Set<string> = new Set();
+  private signatureRegistry: Map<string, TxRecord> = new Map();
 
   constructor(store: TradeStore, emit: Emitter) {
     this.store = store;
@@ -102,13 +118,85 @@ export class JupiterTrader {
         lastErr = err as Error;
         // "FINAL:" ile başlayan hatalar retry yapılmaz (TX onaylandı ama sorun var)
         if (lastErr.message.startsWith("FINAL:")) throw lastErr;
+        // RetryableError — her zaman yeniden denenir (FINAL: kontrolünden muaf)
         if (i < retries - 1) {
-          console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries} başarısız — ${delayMs}ms bekleniyor... (${lastErr.message})`);
+          const tag = lastErr instanceof RetryableError ? "⚠️ [retryable]" : "";
+          console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries} başarısız ${tag}— ${delayMs}ms bekleniyor... (${lastErr.message})`);
           await new Promise((r) => setTimeout(r, delayMs));
         }
       }
     }
     throw lastErr;
+  }
+
+  // --- TX onay yardımcısı (sync — throw eder, withRetry'ı tetikler) ---
+  // 1. getSignatureStatus ile hızlı durum sorgusu yapar (ağda görünüyor mu?)
+  // 2. confirmTransaction ile tam onay bekler (timeout: 30s)
+  // 3. Timeout veya geçici hata → RetryableError (withRetry yeniden dener)
+  // 4. TX chain'de hata → FINAL: fırlatır (retry yok)
+  // 5. Her durumda signatureRegistry güncellenir
+  private async confirmTx(
+    signature: string,
+    label: string,
+    blockhash: string,
+    lastValidBlockHeight: number,
+  ): Promise<void> {
+    if (!this.connection) throw new Error("RPC bağlantısı yok");
+
+    // Registry'ye "pending" olarak kaydet
+    this.signatureRegistry.set(signature, { status: "pending", timestamp: Date.now() });
+
+    // Adım 1 — hızlı durum sorgusu (TX ağa ulaştı mı?)
+    try {
+      const statusRes = await this.withTimeout(
+        this.connection.getSignatureStatus(signature, { searchTransactionHistory: false }),
+        5_000,
+        `getSignatureStatus ${label}`,
+      );
+      const sigStatus = statusRes?.value;
+      if (sigStatus?.err) {
+        const errStr = JSON.stringify(sigStatus.err);
+        this.signatureRegistry.set(signature, { status: "failed", error: errStr, timestamp: Date.now() });
+        throw new Error(`FINAL: TX chain hatası [${label}] sig=${signature.slice(0, 16)}... — ${errStr}`);
+      }
+      if (sigStatus?.confirmationStatus === "confirmed" || sigStatus?.confirmationStatus === "finalized") {
+        this.signatureRegistry.set(signature, { status: "confirmed", timestamp: Date.now() });
+        console.log(`✅ [${label}] TX zaten onaylı (getSignatureStatus): ${signature.slice(0, 16)}...`);
+        return;
+      }
+    } catch (err) {
+      // FINAL: hataları yukarı taşı
+      if ((err as Error).message.startsWith("FINAL:")) throw err;
+      // Timeout veya ağ hatası — confirmTransaction'a devam et
+      console.warn(`⚠️ [${label}] getSignatureStatus başarısız, confirmTransaction'a geçiliyor: ${(err as Error).message}`);
+    }
+
+    // Adım 2 — tam onay (30s timeout)
+    try {
+      const conf = await this.withTimeout(
+        this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed"),
+        30_000,
+        `confirmTransaction ${label}`,
+      );
+      if (conf.value.err) {
+        const errStr = JSON.stringify(conf.value.err);
+        this.signatureRegistry.set(signature, { status: "failed", error: errStr, timestamp: Date.now() });
+        throw new Error(`FINAL: TX chain hatası [${label}] sig=${signature.slice(0, 16)}... — ${errStr}`);
+      }
+      this.signatureRegistry.set(signature, { status: "confirmed", timestamp: Date.now() });
+      console.log(`✅ [${label}] TX onaylandı: ${signature.slice(0, 16)}...`);
+    } catch (err) {
+      if ((err as Error).message.startsWith("FINAL:")) throw err;
+      // Timeout veya geçici ağ hatası → RetryableError (withRetry yeniden dener)
+      const msg = (err as Error).message;
+      this.signatureRegistry.set(signature, { status: "failed", error: msg, timestamp: Date.now() });
+      throw new RetryableError(`TX onayı zaman aşımı [${label}] sig=${signature.slice(0, 16)}... — ${msg}`);
+    }
+  }
+
+  // Signature registry'yi dışarıya açar (API/debug için)
+  getSignatureRegistry(): ReadonlyMap<string, TxRecord> {
+    return this.signatureRegistry;
   }
 
   private async fetchDecimals(mint: string): Promise<number> {
@@ -192,25 +280,13 @@ export class JupiterTrader {
     tx.sign([this.keypair]);
 
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
+    const latest = await this.connection.getLatestBlockhash("processed");
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
 
-    // Confirm BACKGROUND'DA — throw etmez, withRetry'ı tetiklemez
-    // Alım başarısı bakiye kontrolüyle, satış başarısı verifySellBalance ile doğrulanır
-    const latest = await this.connection.getLatestBlockhash("processed");
-    ;(async () => {
-      try {
-        const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
-        if (conf.value.err) {
-          console.error(`❌ [Jupiter] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
-        } else {
-          console.log(`✅ [Jupiter] TX onaylandı (background): ${signature.slice(0, 16)}...`);
-        }
-      } catch (err) {
-        console.error(`❌ [Jupiter] TX confirm timeout (background): ${(err as Error).message}`);
-      }
-    })();
+    // confirmTx — sync, throw eder, withRetry'ı tetikler
+    // Timeout → RetryableError, chain hatası → FINAL:
+    await this.confirmTx(signature, "Jupiter", latest.blockhash, latest.lastValidBlockHeight);
 
-    // Sig hemen döner — TX ağda, withRetry break yapar, tekrar TX atmaz
     return signature;
   }
 
@@ -254,24 +330,13 @@ export class JupiterTrader {
     tx.sign([this.keypair]);
 
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
+    const latest = await this.connection.getLatestBlockhash("processed");
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
 
-    // Confirm BACKGROUND'DA — throw etmez, withRetry'ı tetiklemez
-    const latest = await this.connection.getLatestBlockhash("processed");
-    ;(async () => {
-      try {
-        const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
-        if (conf.value.err) {
-          console.error(`❌ [PumpSwap] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
-        } else {
-          console.log(`✅ [PumpSwap] TX onaylandı (background): ${signature.slice(0, 16)}...`);
-        }
-      } catch (err) {
-        console.error(`❌ [PumpSwap] TX confirm timeout (background): ${(err as Error).message}`);
-      }
-    })();
+    // confirmTx — sync, throw eder, withRetry'ı tetikler
+    // Timeout → RetryableError, chain hatası → FINAL:
+    await this.confirmTx(signature, "PumpSwap", latest.blockhash, latest.lastValidBlockHeight);
 
-    // Sig hemen döner — TX ağda, withRetry break yapar, tekrar TX atmaz
     return signature;
   }
 
