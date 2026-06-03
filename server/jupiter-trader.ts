@@ -100,6 +100,8 @@ export class JupiterTrader {
       }
       catch (err) {
         lastErr = err as Error;
+        // "FINAL:" ile başlayan hatalar retry yapılmaz (TX onaylandı ama sorun var)
+        if (lastErr.message.startsWith("FINAL:")) throw lastErr;
         if (i < retries - 1) {
           console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries} başarısız — ${delayMs}ms bekleniyor... (${lastErr.message})`);
           await new Promise((r) => setTimeout(r, delayMs));
@@ -305,38 +307,38 @@ export class JupiterTrader {
     await new Promise((r) => setTimeout(r, 650));
 
     try {
-      // 3 deneme, denemeler arası 500ms bekleme — timeout yok
+      // 3 deneme, denemeler arası 500ms bekleme
+      // Bakiye kontrolü withRetry İÇİNDE — TX expired/hatalıysa retry tetikler
       const result = await this.withRetry(async () => {
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
-        const tokensOut = Number(quote.outAmount) / Math.pow(10, decimals);
-        const pricePerToken = tokensOut > 0 ? actualSolAmount / tokensOut : 0;
+        const pricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
         const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-        return { sig, tokensOut, pricePerToken };
+
+        // TX gönderildi — her 500ms'de bakiye kontrol (max 2 = 1s)
+        for (let c = 0; c < 2; c++) {
+          await new Promise((r) => setTimeout(r, 500));
+          const bal = await this.getTokenBalance(mintAddress);
+          if (bal && bal.uiAmount > 0) {
+            return { sig, tokensOut: bal.uiAmount, pricePerToken };
+          }
+          console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/2)`);
+        }
+
+        // Token gelmedi — TX durumunu sorgula
+        const txStatus = await this.connection!.getSignatureStatus(sig);
+        if (!txStatus.value || txStatus.value.err) {
+          // TX expired veya hata aldı → SOL harcanmadı → retry güvenli
+          const reason = !txStatus.value ? "expired" : JSON.stringify(txStatus.value.err);
+          throw new Error(`TX başarısız (${reason}) — yeniden deneniyor`);
+        }
+        // TX onaylandı ama token yok → retry yapma (FINAL: prefix)
+        throw new Error(`FINAL: TX onaylandı fakat token bakiyesi 0 (sig: ${sig.slice(0, 16)}...)`);
       }, `Jupiter Buy ${symbol}`);
 
-      // TX gönderildi — token gelip gelmediğini her 500ms'de kontrol et (max 2 deneme = 1s)
-      let balCheck = null;
-      for (let c = 0; c < 2; c++) {
-        await new Promise((r) => setTimeout(r, 500));
-        balCheck = await this.getTokenBalance(mintAddress);
-        if (balCheck && balCheck.uiAmount > 0) break;
-        console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/2)`);
-      }
-
-      if (!balCheck || balCheck.uiAmount <= 0) {
-        // TX ağa gitti ama token gelmedi → blockchain'de başarısız olmuş
-        const errMsg = `TX gönderildi fakat token bakiyesi 0 — TX blockchain'de başarısız (sig: ${result.sig.slice(0, 16)}...)`;
-        position = { ...position, status: "failed", buyTxSignature: result.sig, error: errMsg };
-        this.updateAndEmit(position);
-        console.error(`❌ [Jupiter] ALIM başarısız — token gelmedi: ${symbol} | sig: ${result.sig.slice(0, 16)}...`);
-        return position;
-      }
-
-      // Gerçek bakiyeyi kullan (quote tahmini değil)
-      position = { ...position, status: "open", buyTokenAmount: balCheck.uiAmount, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
+      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
-      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${balCheck.uiAmount.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
+      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
       return position;
     } catch (err) {
       // 3 retry sonrası hâlâ başarısız → "failed", tekrar denenmez
