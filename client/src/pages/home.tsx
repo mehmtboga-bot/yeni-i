@@ -29,7 +29,7 @@ type Tab = "console" | "dashboard" | "trade" | "files";
 const DEFAULT_CONFIG: TradeConfig = {
   solAmount: 0.01,
   slippageBps: 5000,
-  priorityFeeMicroLamports: 200_000,
+  priorityFeeMicroLamports: 600_000,
   takeProfitPct: 0,
 };
 
