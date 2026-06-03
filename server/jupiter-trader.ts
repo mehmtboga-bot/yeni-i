@@ -181,7 +181,7 @@ export class JupiterTrader {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(swapBody),
       }),
-      1000,
+      2500,
       "getSwapInstructions fetch"
     );
     if (!swapRes.ok) throw new Error(`Jupiter swap ${swapRes.status}: ${(await swapRes.text()).slice(0, 200)}`);
@@ -307,34 +307,27 @@ export class JupiterTrader {
     await new Promise((r) => setTimeout(r, 650));
 
     try {
-      // 3 deneme, denemeler arası 500ms bekleme
-      // Bakiye kontrolü withRetry İÇİNDE — TX expired/hatalıysa retry tetikler
+      // 1 deneme — tek TX gönderilir, multiple TX sorunu önlenir
+      // 2.5s swap timeout içinde TX onaylanırsa başarılı
       const result = await this.withRetry(async () => {
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
         const pricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
         const sig = await this.swap(quote, config.priorityFeeMicroLamports);
 
-        // TX gönderildi — her 500ms'de bakiye kontrol (max 2 = 1s)
-        for (let c = 0; c < 2; c++) {
+        // TX gönderildi — her 500ms'de bakiye kontrol (max 4 = 2s)
+        for (let c = 0; c < 4; c++) {
           await new Promise((r) => setTimeout(r, 500));
           const bal = await this.getTokenBalance(mintAddress);
           if (bal && bal.uiAmount > 0) {
             return { sig, tokensOut: bal.uiAmount, pricePerToken };
           }
-          console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/2)`);
+          console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/4)`);
         }
 
-        // Token gelmedi — TX durumunu sorgula
-        const txStatus = await this.connection!.getSignatureStatus(sig);
-        if (!txStatus.value || txStatus.value.err) {
-          // TX expired veya hata aldı → SOL harcanmadı → retry güvenli
-          const reason = !txStatus.value ? "expired" : JSON.stringify(txStatus.value.err);
-          throw new Error(`TX başarısız (${reason}) — yeniden deneniyor`);
-        }
-        // TX onaylandı ama token yok → retry yapma (FINAL: prefix)
-        throw new Error(`FINAL: TX onaylandı fakat token bakiyesi 0 (sig: ${sig.slice(0, 16)}...)`);
-      }, `Jupiter Buy ${symbol}`);
+        // Token gelmedi — FINAL hata (retry yok, tek TX garantisi)
+        throw new Error(`FINAL: TX gönderildi fakat token bakiyesi 0 (sig: ${sig.slice(0, 16)}...)`);
+      }, `Jupiter Buy ${symbol}`, 1);
 
       position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
@@ -345,7 +338,7 @@ export class JupiterTrader {
       const message = (err as Error).message || String(err);
       position = { ...position, status: "failed", error: message };
       this.updateAndEmit(position);
-      console.error(`❌ [Jupiter] ALIM hatası ${symbol} (3 retry sonrası bırakıldı):`, message);
+      console.error(`❌ [Jupiter] ALIM hatası ${symbol} (tek deneme başarısız):`, message);
       return position;
     } finally {
       this.inFlight.delete(`buy:${mintAddress}`);
@@ -381,40 +374,36 @@ export class JupiterTrader {
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     try {
-      // 3 deneme, denemeler arası 500ms bekleme — timeout yok
+      // 1 deneme — tek TX gönderilir, multiple TX sorunu önlenir
       const sig = await this.withRetry(
         () => this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol }),
-        `PumpSwap Buy ${symbol}`
+        `PumpSwap Buy ${symbol}`,
+        1
       );
 
-      // Pozisyonu hemen "open" olarak işaretle — bakiye arka planda çekilir
-      position = { ...position, status: "open", buyTxSignature: sig };
-      this.updateAndEmit(position);
-      console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | tx ${sig.slice(0, 16)}...`);
-
-      // TX indexer'a yansısın diye arka planda bekle, pozisyonu güncelle (bloklamıyor)
-      (async () => {
-        for (const delay of [2000, 3000, 5000]) {
-          await new Promise((r) => setTimeout(r, delay));
-          try {
-            const bal = await this.getTokenBalance(mintAddress);
-            if (bal && bal.uiAmount > 0) {
-              const updated = { ...this.store.getById(position.id)!, buyTokenAmount: bal.uiAmount };
-              this.updateAndEmit(updated);
-              console.log(`🪙 [PumpSwap] Token bakiyesi güncellendi: ${bal.uiAmount.toLocaleString()} ${symbol}`);
-              return;
-            }
-          } catch { /* sessizce devam et */ }
+      // TX gönderildi — her 500ms'de bakiye kontrol (max 4 = 2s)
+      let tokensReceived = 0;
+      for (let c = 0; c < 4; c++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const bal = await this.getTokenBalance(mintAddress);
+        if (bal && bal.uiAmount > 0) {
+          tokensReceived = bal.uiAmount;
+          break;
         }
-      })();
+        console.log(`⏳ [PumpSwap] Token bekleniyor... (${c + 1}/4)`);
+      }
+
+      position = { ...position, status: "open", buyTxSignature: sig, ...(tokensReceived > 0 ? { buyTokenAmount: tokensReceived } : {}) };
+      this.updateAndEmit(position);
+      console.log(`✅ [PumpSwap] ALIM tamam: ${symbol}${tokensReceived > 0 ? ` | ${tokensReceived.toLocaleString()} token` : ""} | tx ${sig.slice(0, 16)}...`);
 
       return position;
     } catch (err) {
-      // 3 retry sonrası hâlâ başarısız → "failed", tekrar denenmez
+      // Tek deneme başarısız → "failed", tekrar denenmez
       const message = (err as Error).message || String(err);
       position = { ...position, status: "failed", error: message };
       this.updateAndEmit(position);
-      console.error(`❌ [PumpSwap] ALIM hatası ${symbol} (3 retry sonrası bırakıldı):`, message);
+      console.error(`❌ [PumpSwap] ALIM hatası ${symbol} (tek deneme başarısız):`, message);
       return position;
     } finally {
       this.inFlight.delete(`buy:${mintAddress}`);
