@@ -93,14 +93,15 @@ export class JupiterTrader {
   // Varsayılan: 3 deneme, denemeler arası 500ms bekleme
   private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 3, delayMs = 500): Promise<T> {
     let lastErr: Error = new Error("Bilinmeyen hata");
-    for (let i = 0; i <= retries; i++) {
+    // retries=3 → tam 3 deneme (düzeltildi: eskisi i<=retries ile 4 deneme yapıyordu)
+    for (let i = 0; i < retries; i++) {
       try {
         return await fn();
       }
       catch (err) {
         lastErr = err as Error;
-        if (i < retries) {
-          console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries + 1} başarısız — ${delayMs}ms bekleniyor... (${lastErr.message})`);
+        if (i < retries - 1) {
+          console.warn(`⏳ [${label}] Deneme ${i + 1}/${retries} başarısız — ${delayMs}ms bekleniyor... (${lastErr.message})`);
           await new Promise((r) => setTimeout(r, delayMs));
         }
       }
@@ -187,15 +188,27 @@ export class JupiterTrader {
 
     const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, "base64"));
     tx.sign([this.keypair]);
+
+    // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
-    // "processed" commitment en hızlı onay (~400ms) — max 1s timeout, aşılırsa retry
+
+    // Confirm BACKGROUND'DA — throw etmez, withRetry'ı tetiklemez
+    // Alım başarısı bakiye kontrolüyle, satış başarısı verifySellBalance ile doğrulanır
     const latest = await this.connection.getLatestBlockhash("processed");
-    const conf = await this.withTimeout(
-      this.connection.confirmTransaction({ signature, ...latest }, "processed"),
-      1000,
-      "Jupiter confirmTransaction"
-    );
-    if (conf.value.err) throw new Error(`TX hata: ${JSON.stringify(conf.value.err)}`);
+    ;(async () => {
+      try {
+        const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
+        if (conf.value.err) {
+          console.error(`❌ [Jupiter] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
+        } else {
+          console.log(`✅ [Jupiter] TX onaylandı (background): ${signature.slice(0, 16)}...`);
+        }
+      } catch (err) {
+        console.error(`❌ [Jupiter] TX confirm timeout (background): ${(err as Error).message}`);
+      }
+    })();
+
+    // Sig hemen döner — TX ağda, withRetry break yapar, tekrar TX atmaz
     return signature;
   }
 
@@ -238,15 +251,25 @@ export class JupiterTrader {
     const tx = VersionedTransaction.deserialize(new Uint8Array(buf));
     tx.sign([this.keypair]);
 
+    // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
-    // max 1s timeout — aşılırsa retry
+
+    // Confirm BACKGROUND'DA — throw etmez, withRetry'ı tetiklemez
     const latest = await this.connection.getLatestBlockhash("processed");
-    const conf = await this.withTimeout(
-      this.connection.confirmTransaction({ signature, ...latest }, "processed"),
-      1000,
-      "PumpSwap confirmTransaction"
-    );
-    if (conf.value.err) throw new Error(`PumpSwap TX hata: ${JSON.stringify(conf.value.err)}`);
+    ;(async () => {
+      try {
+        const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
+        if (conf.value.err) {
+          console.error(`❌ [PumpSwap] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
+        } else {
+          console.log(`✅ [PumpSwap] TX onaylandı (background): ${signature.slice(0, 16)}...`);
+        }
+      } catch (err) {
+        console.error(`❌ [PumpSwap] TX confirm timeout (background): ${(err as Error).message}`);
+      }
+    })();
+
+    // Sig hemen döner — TX ağda, withRetry break yapar, tekrar TX atmaz
     return signature;
   }
 
