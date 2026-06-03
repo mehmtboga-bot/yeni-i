@@ -122,7 +122,7 @@ export class JupiterTrader {
     return dec;
   }
 
-  private async getTokenBalance(mint: string): Promise<{ uiAmount: number; raw: string; decimals: number } | null> {
+  private async getTokenBalance(mint: string): Promise<{ uiAmount: number; rawBigInt: bigint; raw: string; decimals: number } | null> {
     if (!this.keypair || !this.connection) return null;
     try {
       const res = await this.connection.getParsedTokenAccountsByOwner(this.keypair.publicKey, { mint: new PublicKey(mint) });
@@ -134,8 +134,10 @@ export class JupiterTrader {
         decimals = info.decimals ?? decimals;
         totalRaw += BigInt(info.amount);
       }
-      const uiAmount = Number(totalRaw) / Math.pow(10, decimals);
-      return { uiAmount, raw: totalRaw.toString(), decimals };
+      // Display-only: convert to Number only for UI/logging — all internal math uses rawBigInt
+      const divisor = BigInt(10 ** decimals);
+      const uiAmount = Number(totalRaw * 1_000_000n / divisor) / 1_000_000;
+      return { uiAmount, rawBigInt: totalRaw, raw: totalRaw.toString(), decimals };
     } catch (err) {
       console.error("❌ Token bakiye okunamadı:", (err as Error).message);
       return null;
@@ -294,7 +296,8 @@ export class JupiterTrader {
     this.inFlight.add(`buy:${mintAddress}`);
     const config = this.store.getConfig();
     const actualSolAmount = solAmount ?? config.solAmount;
-    const lamports = Math.floor(actualSolAmount * 1e9);
+    // Lamports as BigInt — avoids floating-point rounding on large SOL amounts
+    const lamports = BigInt(Math.round(actualSolAmount * 1e9));
     const id = `pos-${mintAddress}-${Date.now()}`;
     let position: Position = {
       id, mintAddress, name, symbol, dex: "jupiter",
@@ -310,16 +313,20 @@ export class JupiterTrader {
       // 1 deneme — tek TX gönderilir, multiple TX sorunu önlenir
       // 2.5s swap timeout içinde TX onaylanırsa başarılı
       const result = await this.withRetry(async () => {
-        const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+        const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: lamports.toString(), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
-        const pricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
+        // BigInt precision: price = lamportsIn / outAmount (both in raw units), then scale to SOL/token
+        const outAmountBig = BigInt(quote.outAmount);
+        const pricePerToken = outAmountBig > 0n
+          ? Number(lamports * BigInt(10 ** decimals) * 1_000_000n / (outAmountBig * 1_000_000_000n)) / 1_000_000
+          : 0;
         const sig = await this.swap(quote, config.priorityFeeMicroLamports);
 
         // TX gönderildi — her 500ms'de bakiye kontrol (max 4 = 2s)
         for (let c = 0; c < 4; c++) {
           await new Promise((r) => setTimeout(r, 500));
           const bal = await this.getTokenBalance(mintAddress);
-          if (bal && bal.uiAmount > 0) {
+          if (bal && bal.rawBigInt > 0n) {
             return { sig, tokensOut: bal.uiAmount, pricePerToken };
           }
           console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/4)`);
@@ -386,8 +393,8 @@ export class JupiterTrader {
       for (let c = 0; c < 4; c++) {
         await new Promise((r) => setTimeout(r, 500));
         const bal = await this.getTokenBalance(mintAddress);
-        if (bal && bal.uiAmount > 0) {
-          tokensReceived = bal.uiAmount;
+        if (bal && bal.rawBigInt > 0n) {
+          tokensReceived = bal.uiAmount; // display-only Number
           break;
         }
         console.log(`⏳ [PumpSwap] Token bekleniyor... (${c + 1}/4)`);
@@ -431,16 +438,16 @@ export class JupiterTrader {
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     // Bakiye kontrolü — sıfırsa RUG_PULL fırlatır
-    const fetchBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
+    const fetchBalance = async (): Promise<{ uiAmount: number; rawBigInt: bigint; raw: string; decimals: number }> => {
       const bal = await this.getTokenBalance(pos.mintAddress);
-      if (bal && bal.uiAmount > 0) return bal;
+      if (bal && bal.rawBigInt > 0n) return bal;
       throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
     };
 
     // Satış öncesi bakiye kontrolü — rug pull erken tespiti
     try {
       const preBal = await this.getTokenBalance(pos.mintAddress);
-      if (!preBal || preBal.uiAmount <= 0) {
+      if (!preBal || preBal.rawBigInt <= 0n) {
         const rugPullLoss = -(pos.buySolAmount ?? 0);
         updated = {
           ...pos,
@@ -470,7 +477,7 @@ export class JupiterTrader {
           const sig = await this.pumpSwapTx({
             action: "sell",
             mint: pos.mintAddress,
-            amount: balance.uiAmount,
+            amount: balance.uiAmount, // PumpPortal API requires Number
             denominatedInSol: false,
             slippagePct,
             priorityFeeSol,
@@ -487,17 +494,30 @@ export class JupiterTrader {
         try {
           const result = await this.withRetry(async () => {
             const balance = await fetchBalance();
-            if (BigInt(balance.raw) === 0n) throw new Error("Cüzdanda token bakiyesi yok");
+            if (balance.rawBigInt === 0n) throw new Error("Cüzdanda token bakiyesi yok");
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
-            const solOut = Number(quote.outAmount) / 1e9;
-            const sellPriceSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
+            // BigInt precision: outAmount is in lamports (9 decimals)
+            const outLamports = BigInt(quote.outAmount);
+            // solOut as Number only at display boundary
+            const solOut = Number(outLamports) / 1e9;
+            // sellPriceSol = outLamports / (rawBigInt / 10^tokenDecimals) / 1e9
+            //              = outLamports * 10^tokenDecimals / (rawBigInt * 1e9)
+            const tokenDecimals = balance.decimals;
+            const sellPriceSol = balance.rawBigInt > 0n
+              ? Number(outLamports * BigInt(10 ** tokenDecimals) * 1_000_000n / (balance.rawBigInt * 1_000_000_000n)) / 1_000_000
+              : 0;
             const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-            return { sig, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
+            return { sig, outLamports, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
           }, `Jupiter Sell ${pos.symbol}`);
 
           jupiterOk = true;
-          const pnlSol = result.solOut - (pos.buySolAmount ?? 0);
-          const pnlPct = (pos.buySolAmount ?? 0) > 0 ? (pnlSol / pos.buySolAmount!) * 100 : 0;
+          // PnL in BigInt lamports, then convert to SOL for display/store
+          const buySolLamports = BigInt(Math.round((pos.buySolAmount ?? 0) * 1e9));
+          const pnlLamports = result.outLamports - buySolLamports;
+          const pnlSol = Number(pnlLamports) / 1e9;
+          const pnlPct = buySolLamports > 0n
+            ? Number(pnlLamports * 1_000_000n / buySolLamports) / 10_000
+            : 0;
           updated = {
             ...updated,
             status: "closed",
@@ -582,16 +602,16 @@ export class JupiterTrader {
     const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
 
     // Bakiye kontrolü — sıfırsa RUG_PULL fırlatır
-    const fetchBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
+    const fetchBalance = async (): Promise<{ uiAmount: number; rawBigInt: bigint; raw: string; decimals: number }> => {
       const bal = await this.getTokenBalance(pos.mintAddress);
-      if (bal && bal.uiAmount > 0) return bal;
+      if (bal && bal.rawBigInt > 0n) return bal;
       throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
     };
 
     // Satış öncesi bakiye kontrolü — rug pull erken tespiti
     try {
       const preBal = await this.getTokenBalance(pos.mintAddress);
-      if (!preBal || preBal.uiAmount <= 0) {
+      if (!preBal || preBal.rawBigInt <= 0n) {
         const rugPullLoss = -(pos.buySolAmount ?? 0);
         const updated: Position = {
           ...pos,
@@ -619,7 +639,9 @@ export class JupiterTrader {
         // PumpSwap yarı satışı — 3 deneme, denemeler arası 500ms bekleme — timeout yok
         const result = await this.withRetry(async () => {
           const balance = await fetchBalance();
-          const halfAmount = balance.uiAmount / 2;
+          // halfRaw in BigInt — integer division, no float rounding
+          const halfRawBig = balance.rawBigInt / 2n;
+          const halfAmount = Number(halfRawBig * 1_000_000n / BigInt(10 ** balance.decimals)) / 1_000_000;
           console.log(`🔍 [PumpSwap] Yarısı satılacak: ${halfAmount.toLocaleString()} ${pos.symbol} (toplam: ${balance.uiAmount.toLocaleString()})`);
           const sig = await this.pumpSwapTx({
             action: "sell",
@@ -647,14 +669,23 @@ export class JupiterTrader {
         try {
           const result = await this.withRetry(async () => {
             const balance = await fetchBalance();
-            const halfRaw = (BigInt(balance.raw) / 2n).toString();
-            if (BigInt(halfRaw) === 0n) throw new Error("Yarı bakiye sıfır");
+            // BigInt integer division — no float rounding on half-split
+            const halfRawBig = balance.rawBigInt / 2n;
+            if (halfRawBig === 0n) throw new Error("Yarı bakiye sıfır");
+            const halfRaw = halfRawBig.toString();
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: halfRaw, slippageBps: config.slippageBps });
-            const solOut = Number(quote.outAmount) / 1e9;
-            const halfUiAmount = balance.uiAmount / 2;
-            const sellPriceSol = halfUiAmount > 0 ? solOut / halfUiAmount : 0;
+            // BigInt precision for outAmount (lamports)
+            const outLamports = BigInt(quote.outAmount);
+            const solOut = Number(outLamports) / 1e9;
+            // sellPriceSol = outLamports * 10^tokenDecimals / (halfRawBig * 1e9)
+            const tokenDecimals = balance.decimals;
+            const sellPriceSol = halfRawBig > 0n
+              ? Number(outLamports * BigInt(10 ** tokenDecimals) * 1_000_000n / (halfRawBig * 1_000_000_000n)) / 1_000_000
+              : 0;
+            // halfUiAmount for display only
+            const halfUiAmount = Number(halfRawBig * 1_000_000n / BigInt(10 ** tokenDecimals)) / 1_000_000;
             const sig = await this.swap(quote, config.priorityFeeMicroLamports);
-            return { sig, solOut, sellPriceSol, halfUiAmount };
+            return { sig, outLamports, solOut, sellPriceSol, halfUiAmount };
           }, `Jupiter HalfSell ${pos.symbol}`);
 
           jupiterOk = true;
@@ -673,7 +704,9 @@ export class JupiterTrader {
           console.warn(`⚠️ [Jupiter] YARI SATIŞ başarısız, PumpSwap'a geçiliyor: ${(jupErr as Error).message}`);
           const result = await this.withRetry(async () => {
             const balance = await fetchBalance();
-            const halfAmount = balance.uiAmount / 2;
+            // BigInt integer division for half-split, then convert to Number for PumpPortal API
+            const halfRawBig = balance.rawBigInt / 2n;
+            const halfAmount = Number(halfRawBig * 1_000_000n / BigInt(10 ** balance.decimals)) / 1_000_000;
             console.log(`🔍 [PumpSwap Fallback] Yarısı satılacak: ${halfAmount.toLocaleString()} ${pos.symbol}`);
             const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: halfAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
             return { sig, halfAmount };
