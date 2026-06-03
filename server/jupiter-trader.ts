@@ -77,8 +77,20 @@ export class JupiterTrader {
 
   getPublicKey(): string | undefined { return this.keypair?.publicKey.toBase58(); }
 
+  // --- Timeout yardımcısı ---
+  // Verilen promise'i ms milisaniye içinde tamamlamazsa "Timeout" hatası fırlatır
+  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`Timeout (${ms}ms): ${label}`)), ms);
+      promise.then(
+        (v) => { clearTimeout(timer); resolve(v); },
+        (e) => { clearTimeout(timer); reject(e); }
+      );
+    });
+  }
+
   // --- Retry yardımcısı ---
-  // Varsayılan: 3 deneme, denemeler arası 500ms bekleme — timeout yok
+  // Varsayılan: 3 deneme, denemeler arası 500ms bekleme
   private async withRetry<T>(fn: () => Promise<T>, label: string, retries = 3, delayMs = 500): Promise<T> {
     let lastErr: Error = new Error("Bilinmeyen hata");
     for (let i = 0; i <= retries; i++) {
@@ -141,7 +153,7 @@ export class JupiterTrader {
     url.searchParams.set("asLegacyTransaction", "false");
     url.searchParams.set("restrictIntermediateTokens", "true");
 
-    const res = await fetch(url.toString());
+    const res = await this.withTimeout(fetch(url.toString()), 1000, "getQuote fetch");
     const bodyText = await res.text();
     if (!res.ok) throw new Error(`Jupiter quote ${res.status}: ${bodyText.slice(0, 200)}`);
     const json = JSON.parse(bodyText) as QuoteResponse;
@@ -160,11 +172,15 @@ export class JupiterTrader {
         priorityLevelWithMaxLamports: { maxLamports: Math.max(priorityFeeMicroLamports, 1), priorityLevel: "veryHigh" },
       },
     };
-    const swapRes = await fetch(JUP_SWAP, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(swapBody),
-    });
+    const swapRes = await this.withTimeout(
+      fetch(JUP_SWAP, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(swapBody),
+      }),
+      1000,
+      "getSwapInstructions fetch"
+    );
     if (!swapRes.ok) throw new Error(`Jupiter swap ${swapRes.status}: ${(await swapRes.text()).slice(0, 200)}`);
     const { swapTransaction } = (await swapRes.json()) as { swapTransaction: string };
     if (!swapTransaction) throw new Error("swapTransaction alınamadı");
@@ -172,9 +188,13 @@ export class JupiterTrader {
     const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, "base64"));
     tx.sign([this.keypair]);
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
-    // "processed" commitment en hızlı onay (~400ms) — confirmed (~1.5s) beklemeye gerek yok
+    // "processed" commitment en hızlı onay (~400ms) — max 1s timeout, aşılırsa retry
     const latest = await this.connection.getLatestBlockhash("processed");
-    const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+    const conf = await this.withTimeout(
+      this.connection.confirmTransaction({ signature, ...latest }, "processed"),
+      1000,
+      "Jupiter confirmTransaction"
+    );
     if (conf.value.err) throw new Error(`TX hata: ${JSON.stringify(conf.value.err)}`);
     return signature;
   }
@@ -203,11 +223,15 @@ export class JupiterTrader {
       pool: "pumpswap",
     };
 
-    const res = await fetch(PUMP_TRADE_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const res = await this.withTimeout(
+      fetch(PUMP_TRADE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      1000,
+      "pumpSwapTx fetch"
+    );
     if (!res.ok) throw new Error(`PumpPortal API ${res.status}: ${(await res.text()).slice(0, 200)}`);
 
     const buf = await res.arrayBuffer();
@@ -215,8 +239,13 @@ export class JupiterTrader {
     tx.sign([this.keypair]);
 
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    // max 1s timeout — aşılırsa retry
     const latest = await this.connection.getLatestBlockhash("processed");
-    const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+    const conf = await this.withTimeout(
+      this.connection.confirmTransaction({ signature, ...latest }, "processed"),
+      1000,
+      "PumpSwap confirmTransaction"
+    );
     if (conf.value.err) throw new Error(`PumpSwap TX hata: ${JSON.stringify(conf.value.err)}`);
     return signature;
   }
