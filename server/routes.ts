@@ -471,11 +471,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (mintAddress) {
             const nm = name || "Bilinmiyor";
             const sym = symbol || "?";
+            const config = tradeStore.getConfig();
+            const solAmount = config.solAmount;
             if (dex === "pumpswap") {
-              trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym })
+              trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
                 .catch((err) => console.error("buyPumpSwap hatası:", err));
             } else {
-              trader.buy({ mintAddress, name: nm, symbol: sym })
+              trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
                 .catch((err) => console.error("buy_token hatası:", err));
             }
           }
