@@ -335,8 +335,8 @@ export class JupiterTrader {
     const lamports = Math.floor(actualSolAmount * 1e9);
     // Manuel/otomatik alım için ayrı priority fee kullan
     const priorityFee = isAuto
-      ? (config.priorityFeeAutoMicroLamports ?? config.priorityFeeMicroLamports)
-      : (config.priorityFeeManualMicroLamports ?? config.priorityFeeMicroLamports);
+      ? config.priorityFeeAutoMicroLamports
+      : config.priorityFeeManualMicroLamports;
     const id = `pos-${mintAddress}-${Date.now()}`;
     let position: Position = {
       id, mintAddress, name, symbol, dex: "jupiter",
@@ -416,8 +416,8 @@ export class JupiterTrader {
     // Manuel/otomatik alım için ayrı priority fee kullan
     // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
     const rawFee = isAuto
-      ? (config.priorityFeeAutoMicroLamports ?? config.priorityFeeMicroLamports)
-      : (config.priorityFeeManualMicroLamports ?? config.priorityFeeMicroLamports);
+      ? config.priorityFeeAutoMicroLamports
+      : config.priorityFeeManualMicroLamports;
     const priorityFeeSol = rawFee / 1_000_000_000;
 
     try {
@@ -481,7 +481,7 @@ export class JupiterTrader {
 
     const slippagePct = Math.floor(config.slippageBps / 100);
     // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
-    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
+    const priorityFeeSol = config.priorityFeeManualMicroLamports / 1_000_000_000;
 
     // Bakiye kontrolü — sıfırsa RUG_PULL fırlatır
     const fetchBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
@@ -557,7 +557,7 @@ export class JupiterTrader {
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
             const solOut = Number(quote.outAmount) / 1e9;
             const sellPriceSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
-            const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+            const sig = await this.swap(quote, config.priorityFeeManualMicroLamports);
             return { sig, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
           }, `Jupiter Sell ${pos.symbol}`);
 
@@ -666,7 +666,7 @@ export class JupiterTrader {
 
     const slippagePct = Math.floor(config.slippageBps / 100);
     // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
-    const priorityFeeSol = config.priorityFeeMicroLamports / 1_000_000_000;
+    const priorityFeeSol = config.priorityFeeManualMicroLamports / 1_000_000_000;
 
     // Bakiye kontrolü — sıfırsa RUG_PULL fırlatır
     const fetchBalance = async (): Promise<{ uiAmount: number; raw: string; decimals: number }> => {
@@ -745,7 +745,7 @@ export class JupiterTrader {
             const solOut = Number(quote.outAmount) / 1e9;
             const halfUiAmount = balance.uiAmount / 2;
             const sellPriceSol = halfUiAmount > 0 ? solOut / halfUiAmount : 0;
-            const sig = await this.swap(quote, config.priorityFeeMicroLamports);
+            const sig = await this.swap(quote, config.priorityFeeManualMicroLamports);
             return { sig, solOut, sellPriceSol, halfUiAmount };
           }, `Jupiter HalfSell ${pos.symbol}`);
 

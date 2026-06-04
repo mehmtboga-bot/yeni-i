@@ -493,11 +493,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }).catch((err) => console.error("sell_token hatası:", err));
           }
         } else if (message.type === "trade_config_update") {
-          const { solAmount, slippageBps, priorityFeeMicroLamports, priorityFeeManualMicroLamports, priorityFeeAutoMicroLamports, takeProfitPct } = message.data || {};
+          const { solAmount, slippageBps, priorityFeeManualMicroLamports, priorityFeeAutoMicroLamports, takeProfitPct } = message.data || {};
           const partial: Record<string, number> = {};
           if (typeof solAmount === "number" && solAmount > 0) partial.solAmount = solAmount;
           if (typeof slippageBps === "number" && slippageBps >= 50) partial.slippageBps = slippageBps;
-          if (typeof priorityFeeMicroLamports === "number" && priorityFeeMicroLamports >= 0) partial.priorityFeeMicroLamports = priorityFeeMicroLamports;
           if (typeof priorityFeeManualMicroLamports === "number" && priorityFeeManualMicroLamports >= 0) partial.priorityFeeManualMicroLamports = priorityFeeManualMicroLamports;
           if (typeof priorityFeeAutoMicroLamports === "number" && priorityFeeAutoMicroLamports >= 0) partial.priorityFeeAutoMicroLamports = priorityFeeAutoMicroLamports;
           if (typeof takeProfitPct === "number" && takeProfitPct >= 0) partial.takeProfitPct = takeProfitPct;
