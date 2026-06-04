@@ -680,6 +680,9 @@ export class JupiterTrader {
           if (_retryCount >= MAX_SELL_RETRIES) {
             throw new Error(`FINAL: ${MAX_SELL_RETRIES} deneme sonrası token hala var (${tokenRemaining.toLocaleString()})`);
           }
+          // [YENİ] Position status'unu "open" olarak geri set et — tekrar satış yapılabilsin
+          const reopened: Position = { ...updated, status: "open", error: undefined };
+          this.updateAndEmit(reopened);
           console.warn(`⚠️ [PumpSwap] Token hala var (${tokenRemaining.toLocaleString()}), tekrar satış çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
           return this.sell(positionId, _retryCount + 1);
         }
@@ -746,6 +749,9 @@ export class JupiterTrader {
             if (_retryCount >= MAX_SELL_RETRIES) {
               throw new Error(`FINAL: ${MAX_SELL_RETRIES} deneme sonrası token hala var (${tokenRemainingJup.toLocaleString()})`);
             }
+            // [YENİ] Position status'unu "open" olarak geri set et — tekrar satış yapılabilsin
+            const reopened: Position = { ...updated, status: "open", error: undefined };
+            this.updateAndEmit(reopened);
             console.warn(`⚠️ [Jupiter] Token hala var (${tokenRemainingJup.toLocaleString()}), tekrar satış çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
             return this.sell(positionId, _retryCount + 1);
           }
@@ -793,6 +799,9 @@ export class JupiterTrader {
             if (_retryCount >= MAX_SELL_RETRIES) {
               throw new Error(`FINAL: ${MAX_SELL_RETRIES} deneme sonrası token hala var (${tokenRemainingFallback.toLocaleString()})`);
             }
+            // [YENİ] Position status'unu "open" olarak geri set et — tekrar satış yapılabilsin
+            const reopened: Position = { ...updated, status: "open", error: undefined };
+            this.updateAndEmit(reopened);
             console.warn(`⚠️ [PumpSwap Fallback] Token hala var (${tokenRemainingFallback.toLocaleString()}), tekrar satış çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
             return this.sell(positionId, _retryCount + 1);
           }
@@ -961,6 +970,9 @@ export class JupiterTrader {
           if (_retryCount >= MAX_SELL_RETRIES) {
             throw new Error(`FINAL: ${MAX_SELL_RETRIES} deneme sonrası token hala var (${halfTokenRemaining.toLocaleString()})`);
           }
+          // [YENİ] Position status'unu "open" olarak geri set et — tekrar satış yapılabilsin
+          const reopened: Position = { ...updated, status: "open", error: undefined };
+          this.updateAndEmit(reopened);
           console.warn(`⚠️ [PumpSwap] Yarı satış sonrası token fazla (${halfTokenRemaining.toLocaleString()} > beklenen ~${expectedRemaining.toLocaleString()}), tekrar çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
           return this.sellHalf(positionId, _retryCount + 1);
         }
@@ -1013,6 +1025,9 @@ export class JupiterTrader {
             if (_retryCount >= MAX_SELL_RETRIES) {
               throw new Error(`FINAL: ${MAX_SELL_RETRIES} deneme sonrası token hala var (${halfTokenRemainingJup.toLocaleString()})`);
             }
+            // [YENİ] Position status'unu "open" olarak geri set et — tekrar satış yapılabilsin
+            const reopened: Position = { ...updated, status: "open", error: undefined };
+            this.updateAndEmit(reopened);
             console.warn(`⚠️ [Jupiter] Yarı satış sonrası token fazla (${halfTokenRemainingJup.toLocaleString()} > beklenen ~${expectedRemainingJup.toLocaleString()}), tekrar çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
             return this.sellHalf(positionId, _retryCount + 1);
           }
@@ -1061,6 +1076,9 @@ export class JupiterTrader {
             if (_retryCount >= MAX_SELL_RETRIES) {
               throw new Error(`FINAL: ${MAX_SELL_RETRIES} deneme sonrası token hala var (${halfTokenRemainingFallback.toLocaleString()})`);
             }
+            // [YENİ] Position status'unu "open" olarak geri set et — tekrar satış yapılabilsin
+            const reopened: Position = { ...updated, status: "open", error: undefined };
+            this.updateAndEmit(reopened);
             console.warn(`⚠️ [PumpSwap Fallback] Yarı satış sonrası token fazla (${halfTokenRemainingFallback.toLocaleString()} > beklenen ~${expectedRemainingFallback.toLocaleString()}), tekrar çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
             return this.sellHalf(positionId, _retryCount + 1);
           }
