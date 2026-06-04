@@ -74,7 +74,8 @@ export class PositionPricer {
           continue;
         }
         
-        data = await res.json();
+        const json = await res.json();
+        data = json?.data ?? json; // API { "data": { ... } } veya { ... } döndürebilir
         if (!data || Object.keys(data).length === 0) {
           console.warn(`⚠️ [Pricer] Boş API yanıtı (deneme ${attempt}/3)`);
           if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
@@ -101,7 +102,8 @@ export class PositionPricer {
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
-      const currentPriceUsd = priceData?.usdPrice ?? priceData?.price ?? 0;
+      const currentPriceUsd = priceData?.usdPrice ?? priceData?.price ?? (typeof priceData === "number" ? priceData : 0);
+      // Eğer priceData sayı ise doğrudan kullan (bazı API'ler sadece fiyat döndürüyor)
       
       // Veri gelmediyse
       if (!currentPriceUsd || currentPriceUsd <= 0) {
@@ -132,9 +134,14 @@ export class PositionPricer {
       let buyPriceSol = pos.buyPriceSol;
       let updated: Position = { ...pos };
       if (!buyPriceSol || buyPriceSol <= 0) {
-        buyPriceSol = currentPriceSol;
+        // Alım sırasında set edilmesi gerekiyordu — fallback olarak hesapla
+        if (pos.buySolAmount && pos.buyTokenAmount && pos.buyTokenAmount > 0) {
+          buyPriceSol = pos.buySolAmount / pos.buyTokenAmount;
+        } else {
+          buyPriceSol = currentPriceSol; // Son çare
+        }
         updated = { ...updated, buyPriceSol };
-        console.log(`📌 [Pricer] İlk fiyat: ${pos.symbol} = $${currentPriceUsd.toFixed(6)}`);
+        console.log(`📌 [Pricer] İlk fiyat: ${pos.symbol} = ${currentPriceUsd.toFixed(6)}`);
       }
 
       const unrealizedPnlSol =
