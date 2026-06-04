@@ -494,6 +494,7 @@ export class JupiterTrader {
     try {
       const preBal = await this.getTokenBalance(pos.mintAddress);
       if (!preBal || preBal.uiAmount <= 0) {
+        // Tam rug pull — bakiye tamamen sıfır
         const rugPullLoss = -(pos.buySolAmount ?? 0);
         updated = {
           ...pos,
@@ -508,6 +509,16 @@ export class JupiterTrader {
         this.updateAndEmit(updated);
         console.error(`🚨 [Rug Pull] ${pos.symbol} — bakiye sıfır, -%100 zarar olarak kapatıldı`);
         return updated;
+      } else if (pos.buyTokenAmount && pos.buyTokenAmount > 0) {
+        // Kısmi rug pull kontrolü — alım sonrası token miktarı beklenenden çok düşükse uyar
+        const tokenLossPct = ((pos.buyTokenAmount - preBal.uiAmount) / pos.buyTokenAmount) * 100;
+        if (tokenLossPct > 50) {
+          console.warn(
+            `⚠️ [Rug Pull Warning] ${pos.symbol} — %${tokenLossPct.toFixed(1)} token kaybı tespit edildi` +
+            ` (mevcut: ${preBal.uiAmount.toLocaleString()} / alınan: ${pos.buyTokenAmount.toLocaleString()})` +
+            ` — satış devam ediyor`
+          );
+        }
       }
     } catch {
       // Bakiye okunamazsa satışa devam et
@@ -736,6 +747,7 @@ export class JupiterTrader {
     try {
       const preBal = await this.getTokenBalance(pos.mintAddress);
       if (!preBal || preBal.uiAmount <= 0) {
+        // Tam rug pull — bakiye tamamen sıfır
         const rugPullLoss = -(pos.buySolAmount ?? 0);
         const updated: Position = {
           ...pos,
@@ -750,6 +762,16 @@ export class JupiterTrader {
         this.updateAndEmit(updated);
         console.error(`🚨 [Rug Pull] ${pos.symbol} — bakiye sıfır, -%100 zarar olarak kapatıldı`);
         return updated;
+      } else if (pos.buyTokenAmount && pos.buyTokenAmount > 0) {
+        // Kısmi rug pull kontrolü — alım sonrası token miktarı beklenenden çok düşükse uyar
+        const tokenLossPct = ((pos.buyTokenAmount - preBal.uiAmount) / pos.buyTokenAmount) * 100;
+        if (tokenLossPct > 50) {
+          console.warn(
+            `⚠️ [Rug Pull Warning] ${pos.symbol} — %${tokenLossPct.toFixed(1)} token kaybı tespit edildi` +
+            ` (mevcut: ${preBal.uiAmount.toLocaleString()} / alınan: ${pos.buyTokenAmount.toLocaleString()})` +
+            ` — yarı satış devam ediyor`
+          );
+        }
       }
     } catch {
       // Bakiye okunamazsa satışa devam et
