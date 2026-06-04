@@ -665,11 +665,11 @@ export class JupiterTrader {
           return { sig, tokenAmount: balance.uiAmount };
         }, `PumpSwap Sell ${pos.symbol}`);
 
-        // [YENİ] Satış TX sonrası token bakiyesi kontrol (2 deneme, 1 saniye ara)
+        // [YENİ] Satış TX sonrası token bakiyesi kontrol (4 deneme, 1.5 saniye ara)
         // TX gönderildi ama swap başarısız olmuş olabilir — bakiye hala varsa tekrar sat
         let tokenRemaining = 0;
-        for (let c = 0; c < 2; c++) {
-          await new Promise((r) => setTimeout(r, 1000));
+        for (let c = 0; c < 4; c++) {
+          await new Promise((r) => setTimeout(r, 1500));
           const bal = await this.getTokenBalance(pos.mintAddress);
           if (bal && bal.uiAmount > 0) {
             tokenRemaining = bal.uiAmount;
@@ -734,11 +734,11 @@ export class JupiterTrader {
           this.updateAndEmit(updated);
           console.log(`✅ [Jupiter] SATIŞ tamam: ${pos.symbol} | ${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%)`);
 
-          // [YENİ] Satış TX sonrası token bakiyesi kontrol (2 deneme, 1 saniye ara)
+          // [YENİ] Satış TX sonrası token bakiyesi kontrol (4 deneme, 1.5 saniye ara)
           // TX gönderildi ama swap başarısız olmuş olabilir — bakiye hala varsa tekrar sat
           let tokenRemainingJup = 0;
-          for (let c = 0; c < 2; c++) {
-            await new Promise((r) => setTimeout(r, 1000));
+          for (let c = 0; c < 4; c++) {
+            await new Promise((r) => setTimeout(r, 1500));
             const bal = await this.getTokenBalance(pos.mintAddress);
             if (bal && bal.uiAmount > 0) {
               tokenRemainingJup = bal.uiAmount;
@@ -784,11 +784,11 @@ export class JupiterTrader {
           this.updateAndEmit(updated);
           console.log(`✅ [PumpSwap Fallback] SATIŞ tamam: ${pos.symbol} | ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
 
-          // [YENİ] Satış TX sonrası token bakiyesi kontrol (2 deneme, 1 saniye ara)
+          // [YENİ] Satış TX sonrası token bakiyesi kontrol (4 deneme, 1.5 saniye ara)
           // TX gönderildi ama swap başarısız olmuş olabilir — bakiye hala varsa tekrar sat
           let tokenRemainingFallback = 0;
-          for (let c = 0; c < 2; c++) {
-            await new Promise((r) => setTimeout(r, 1000));
+          for (let c = 0; c < 4; c++) {
+            await new Promise((r) => setTimeout(r, 1500));
             const bal = await this.getTokenBalance(pos.mintAddress);
             if (bal && bal.uiAmount > 0) {
               tokenRemainingFallback = bal.uiAmount;
@@ -953,11 +953,11 @@ export class JupiterTrader {
         this.updateAndEmit(updated);
         console.log(`✅ [PumpSwap] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfAmount.toLocaleString()} token → ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
 
-        // [YENİ] Yarı satış TX sonrası token bakiyesi kontrol (2 deneme, 1 saniye ara)
+        // [YENİ] Yarı satış TX sonrası token bakiyesi kontrol (4 deneme, 1.5 saniye ara)
         // Gerçek kalan bakiyeyi oku — TX başarısız olduysa hala yarıdan fazla token olabilir
         let halfTokenRemaining = 0;
-        for (let c = 0; c < 2; c++) {
-          await new Promise((r) => setTimeout(r, 1000));
+        for (let c = 0; c < 4; c++) {
+          await new Promise((r) => setTimeout(r, 1500));
           const bal = await this.getTokenBalance(pos.mintAddress);
           if (bal && bal.uiAmount > 0) {
             halfTokenRemaining = bal.uiAmount;
@@ -1008,11 +1008,11 @@ export class JupiterTrader {
           this.updateAndEmit(updated);
           console.log(`✅ [Jupiter] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfUiAmount.toFixed(4)} token → ${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
 
-          // [YENİ] Yarı satış TX sonrası token bakiyesi kontrol (2 deneme, 1 saniye ara)
+          // [YENİ] Yarı satış TX sonrası token bakiyesi kontrol (4 deneme, 1.5 saniye ara)
           // Gerçek kalan bakiyeyi oku — TX başarısız olduysa hala yarıdan fazla token olabilir
           let halfTokenRemainingJup = 0;
-          for (let c = 0; c < 2; c++) {
-            await new Promise((r) => setTimeout(r, 1000));
+          for (let c = 0; c < 4; c++) {
+            await new Promise((r) => setTimeout(r, 1500));
             const bal = await this.getTokenBalance(pos.mintAddress);
             if (bal && bal.uiAmount > 0) {
               halfTokenRemainingJup = bal.uiAmount;
@@ -1059,11 +1059,11 @@ export class JupiterTrader {
           this.updateAndEmit(updated);
           console.log(`✅ [PumpSwap Fallback] YARI SATIŞ tamam: ${pos.symbol} | ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
 
-          // [YENİ] Yarı satış TX sonrası token bakiyesi kontrol (2 deneme, 1 saniye ara)
+          // [YENİ] Yarı satış TX sonrası token bakiyesi kontrol (4 deneme, 1.5 saniye ara)
           // Gerçek kalan bakiyeyi oku — TX başarısız olduysa hala yarıdan fazla token olabilir
           let halfTokenRemainingFallback = 0;
-          for (let c = 0; c < 2; c++) {
-            await new Promise((r) => setTimeout(r, 1000));
+          for (let c = 0; c < 4; c++) {
+            await new Promise((r) => setTimeout(r, 1500));
             const bal = await this.getTokenBalance(pos.mintAddress);
             if (bal && bal.uiAmount > 0) {
               halfTokenRemainingFallback = bal.uiAmount;
