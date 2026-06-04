@@ -39,7 +39,7 @@ export class AutoTraderEngine {
   private sellCheckInterval: NodeJS.Timeout | null = null;
   private processedLPs: Set<string> = new Set();
   private seenTokenSymbols: Set<string> = new Set();
-  private recentlyClosedTrades: Array<{ symbol: string; closedAt: number }> = [];
+  private recentlyClosedTrades: Array<{ mintAddress: string; symbol: string; closedAt: number }> = [];
   private readonly MAX_RECENT_TRADES = 7;
   private liquidityDropInFlight: Set<string> = new Set();
 
@@ -99,15 +99,15 @@ export class AutoTraderEngine {
       return;
     }
 
-    const tokenKey = `${symbol}:${name}`.toLowerCase();
-    if (this.seenTokenSymbols.has(tokenKey)) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} (${name}) daha önce görüldü, atlanıyor`);
+    // mintAddress ile kontrol et (name değişse bile aynı token)
+    if (this.seenTokenSymbols.has(mintAddress)) {
+      console.log(`⏭️ [Auto-Trader] ${symbol} daha önce görüldü, atlanıyor`);
       return;
     }
-    this.seenTokenSymbols.add(tokenKey);
+    this.seenTokenSymbols.add(mintAddress);
 
     if (config.skipRecentlyTradedSymbols) {
-      const isRecentlyTraded = this.recentlyClosedTrades.some((t) => t.symbol === symbol);
+      const isRecentlyTraded = this.recentlyClosedTrades.some((t) => t.mintAddress === mintAddress);
       if (isRecentlyTraded) {
         console.log(`⏭️ [Auto-Trader] ${symbol} son 7 işlemde var, atlanıyor`);
         return;
@@ -331,9 +331,8 @@ export class AutoTraderEngine {
         record.pnlPct = pnlPct;
         this.emit("auto_trade_record_updated", record);
         console.log(`✅ [Auto-Trader] Satış tamamlandı: ${record.tokenSymbol} | PnL: ${pnlSol?.toFixed(4) || "?"} SOL (${pnlPct?.toFixed(1) || "?"}%)`);
-        const tokenKey = `${record.tokenSymbol}:${record.tokenName}`.toLowerCase();
-        this.seenTokenSymbols.add(tokenKey);
-        this.recentlyClosedTrades.push({ symbol: record.tokenSymbol, closedAt: Date.now() });
+        this.seenTokenSymbols.add(record.mintAddress);
+        this.recentlyClosedTrades.push({ mintAddress: record.mintAddress, symbol: record.tokenSymbol, closedAt: Date.now() });
         if (this.recentlyClosedTrades.length > this.MAX_RECENT_TRADES) this.recentlyClosedTrades.shift();
         this.sellInProgress.delete(mintAddress);
         break;
