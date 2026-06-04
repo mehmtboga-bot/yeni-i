@@ -174,18 +174,12 @@ export class AutoTraderEngine {
 
       const config = this.configStore.getConfig();
 
-      // ─── Kar hedefi kontrolü ───
-      const shouldSellForProfit =
-        config.profitTargetPct > 0 && (position.unrealizedPnlPct ?? 0) >= config.profitTargetPct;
-
       // ─── Süre doldu mu? ───
       const shouldSellForTime = now >= record.shouldSellAt;
 
-      if (!shouldSellForProfit && !shouldSellForTime) continue;
+      if (!shouldSellForTime) continue;
 
-      const reason = shouldSellForProfit
-        ? `Kar hedefi: +${(position.unrealizedPnlPct ?? 0).toFixed(1)}% (Hedef: ${config.profitTargetPct}%)`
-        : `Tutma süresi doldu (${((now - record.buyTimestamp) / 1000).toFixed(0)}s)`;
+      const reason = `Tutma süresi doldu (${((now - record.buyTimestamp) / 1000).toFixed(0)}s)`;
 
       console.log(`💰 [Auto-Trader] Satış tetiklendi: ${record.tokenSymbol} — ${reason}`);
 
