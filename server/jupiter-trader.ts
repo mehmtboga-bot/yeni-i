@@ -519,6 +519,7 @@ export class JupiterTrader {
         const result = await this.withRetry(async () => {
           const balance = await fetchBalance();
           console.log(`🔍 [PumpSwap] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
+          const solBefore = await this.getSolBalance();
           const sig = await this.pumpSwapTx({
             action: "sell",
             mint: pos.mintAddress,
@@ -527,26 +528,44 @@ export class JupiterTrader {
             slippagePct,
             priorityFeeSol,
           });
-          return { sig, tokenAmount: balance.uiAmount };
+
+          // SOL bakiyesi kontrol (max 4 = 2s)
+          let solReceived = 0;
+          for (let c = 0; c < 4; c++) {
+            await new Promise((r) => setTimeout(r, 500));
+            const solAfter = await this.getSolBalance();
+            if (solAfter > solBefore) {
+              solReceived = solAfter - solBefore;
+              break;
+            }
+            console.log(`⏳ [PumpSwap] SOL bekleniyor... (${c + 1}/4)`);
+          }
+
+          // SOL gelmezse FINAL hata fırlat
+          if (solReceived === 0) {
+            throw new Error(`FINAL: TX gönderildi fakat SOL bakiyesi artmadı (sig: ${sig.slice(0, 16)}...)`);
+          }
+
+          return { sig, tokenAmount: balance.uiAmount, solReceived };
         }, `PumpSwap Sell ${pos.symbol}`);
 
-        const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.tokenAmount);
-        const pnlSol = estimatedSolOut - (pos.buySolAmount ?? 0);
+        const actualSolOut = result.solReceived;
+        const pnlSol = actualSolOut - (pos.buySolAmount ?? 0);
         const pnlPct = (pos.buySolAmount ?? 0) > 0 ? (pnlSol / pos.buySolAmount!) * 100 : 0;
-        const sellPriceSol = result.tokenAmount > 0 ? estimatedSolOut / result.tokenAmount : 0;
+        const sellPriceSol = result.tokenAmount > 0 ? actualSolOut / result.tokenAmount : 0;
 
         updated = {
           ...updated,
           status: "closed",
           sellTimestamp: Date.now(),
-          sellSolAmount: estimatedSolOut,
+          sellSolAmount: actualSolOut,
           sellPriceSol,
           sellTxSignature: result.sig,
           pnlSol,
           pnlPct,
         };
         this.updateAndEmit(updated);
-        console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
+        console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | ${actualSolOut.toFixed(4)} SOL (gerçek) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
       } else {
         // Jupiter satışı — route yoksa PumpSwap'a fallback
         let jupiterOk = false;
@@ -555,10 +574,28 @@ export class JupiterTrader {
             const balance = await fetchBalance();
             if (BigInt(balance.raw) === 0n) throw new Error("Cüzdanda token bakiyesi yok");
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
-            const solOut = Number(quote.outAmount) / 1e9;
-            const sellPriceSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
+            const solBefore = await this.getSolBalance();
             const sig = await this.swap(quote, config.priorityFeeManualMicroLamports);
-            return { sig, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
+
+            // SOL bakiyesi kontrol (max 4 = 2s)
+            let solReceived = 0;
+            for (let c = 0; c < 4; c++) {
+              await new Promise((r) => setTimeout(r, 500));
+              const solAfter = await this.getSolBalance();
+              if (solAfter > solBefore) {
+                solReceived = solAfter - solBefore;
+                break;
+              }
+              console.log(`⏳ [Jupiter] SOL bekleniyor... (${c + 1}/4)`);
+            }
+
+            // SOL gelmezse FINAL hata fırlat
+            if (solReceived === 0) {
+              throw new Error(`FINAL: TX gönderildi fakat SOL bakiyesi artmadı (sig: ${sig.slice(0, 16)}...)`);
+            }
+
+            const sellPriceSol = balance.uiAmount > 0 ? solReceived / balance.uiAmount : 0;
+            return { sig, solOut: solReceived, sellPriceSol, tokenAmount: balance.uiAmount };
           }, `Jupiter Sell ${pos.symbol}`);
 
           jupiterOk = true;
@@ -583,27 +620,46 @@ export class JupiterTrader {
           const result = await this.withRetry(async () => {
             const balance = await fetchBalance();
             console.log(`🔍 [PumpSwap Fallback] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
+            const solBefore = await this.getSolBalance();
             const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
-            return { sig, tokenAmount: balance.uiAmount };
+
+            // SOL bakiyesi kontrol (max 4 = 2s)
+            let solReceived = 0;
+            for (let c = 0; c < 4; c++) {
+              await new Promise((r) => setTimeout(r, 500));
+              const solAfter = await this.getSolBalance();
+              if (solAfter > solBefore) {
+                solReceived = solAfter - solBefore;
+                break;
+              }
+              console.log(`⏳ [PumpSwap Fallback] SOL bekleniyor... (${c + 1}/4)`);
+            }
+
+            // SOL gelmezse FINAL hata fırlat
+            if (solReceived === 0) {
+              throw new Error(`FINAL: TX gönderildi fakat SOL bakiyesi artmadı (sig: ${sig.slice(0, 16)}...)`);
+            }
+
+            return { sig, tokenAmount: balance.uiAmount, solReceived };
           }, `PumpSwap Fallback Sell ${pos.symbol}`);
 
-          const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.tokenAmount);
-          const pnlSol = estimatedSolOut - (pos.buySolAmount ?? 0);
+          const actualSolOut = result.solReceived;
+          const pnlSol = actualSolOut - (pos.buySolAmount ?? 0);
           const pnlPct = (pos.buySolAmount ?? 0) > 0 ? (pnlSol / pos.buySolAmount!) * 100 : 0;
-          const sellPriceSol = result.tokenAmount > 0 ? estimatedSolOut / result.tokenAmount : 0;
+          const sellPriceSol = result.tokenAmount > 0 ? actualSolOut / result.tokenAmount : 0;
 
           updated = {
             ...updated,
             status: "closed",
             sellTimestamp: Date.now(),
-            sellSolAmount: estimatedSolOut,
+            sellSolAmount: actualSolOut,
             sellPriceSol,
             sellTxSignature: result.sig,
             pnlSol,
             pnlPct,
           };
           this.updateAndEmit(updated);
-          console.log(`✅ [PumpSwap Fallback] SATIŞ tamam: ${pos.symbol} | ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
+          console.log(`✅ [PumpSwap Fallback] SATIŞ tamam: ${pos.symbol} | ${actualSolOut.toFixed(4)} SOL (gerçek) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
         }
       }
       return updated;
@@ -707,6 +763,7 @@ export class JupiterTrader {
           const balance = await fetchBalance();
           const halfAmount = balance.uiAmount / 2;
           console.log(`🔍 [PumpSwap] Yarısı satılacak: ${halfAmount.toLocaleString()} ${pos.symbol} (toplam: ${balance.uiAmount.toLocaleString()})`);
+          const solBefore = await this.getSolBalance();
           const sig = await this.pumpSwapTx({
             action: "sell",
             mint: pos.mintAddress,
@@ -715,13 +772,31 @@ export class JupiterTrader {
             slippagePct,
             priorityFeeSol,
           });
-          return { sig, halfAmount };
+
+          // SOL bakiyesi kontrol (max 4 = 2s)
+          let solReceived = 0;
+          for (let c = 0; c < 4; c++) {
+            await new Promise((r) => setTimeout(r, 500));
+            const solAfter = await this.getSolBalance();
+            if (solAfter > solBefore) {
+              solReceived = solAfter - solBefore;
+              break;
+            }
+            console.log(`⏳ [PumpSwap] YARI SATIŞ SOL bekleniyor... (${c + 1}/4)`);
+          }
+
+          // SOL gelmezse FINAL hata fırlat
+          if (solReceived === 0) {
+            throw new Error(`FINAL: TX gönderildi fakat SOL bakiyesi artmadı (sig: ${sig.slice(0, 16)}...)`);
+          }
+
+          return { sig, halfAmount, solReceived };
         }, `PumpSwap HalfSell ${pos.symbol}`);
 
-        const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.halfAmount);
+        const actualSolOut = result.solReceived;
         const remainingAmount = (pos.buyTokenAmount ?? 0) / 2;
         const halfBuyCost = (pos.buySolAmount ?? 0) / 2;
-        const pnlSol = estimatedSolOut - halfBuyCost;
+        const pnlSol = actualSolOut - halfBuyCost;
         const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
         updated = {
           ...pos,
@@ -732,7 +807,7 @@ export class JupiterTrader {
           pnlPct,
         };
         this.updateAndEmit(updated);
-        console.log(`✅ [PumpSwap] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfAmount.toLocaleString()} token → ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
+        console.log(`✅ [PumpSwap] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfAmount.toLocaleString()} token → ${actualSolOut.toFixed(4)} SOL (gerçek) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
       } else {
         // Jupiter yarı satışı — route yoksa PumpSwap'a fallback
         let jupiterOk = false;
@@ -742,11 +817,29 @@ export class JupiterTrader {
             const halfRaw = (BigInt(balance.raw) / 2n).toString();
             if (BigInt(halfRaw) === 0n) throw new Error("Yarı bakiye sıfır");
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: halfRaw, slippageBps: config.slippageBps });
-            const solOut = Number(quote.outAmount) / 1e9;
             const halfUiAmount = balance.uiAmount / 2;
-            const sellPriceSol = halfUiAmount > 0 ? solOut / halfUiAmount : 0;
+            const solBefore = await this.getSolBalance();
             const sig = await this.swap(quote, config.priorityFeeManualMicroLamports);
-            return { sig, solOut, sellPriceSol, halfUiAmount };
+
+            // SOL bakiyesi kontrol (max 4 = 2s)
+            let solReceived = 0;
+            for (let c = 0; c < 4; c++) {
+              await new Promise((r) => setTimeout(r, 500));
+              const solAfter = await this.getSolBalance();
+              if (solAfter > solBefore) {
+                solReceived = solAfter - solBefore;
+                break;
+              }
+              console.log(`⏳ [Jupiter] YARI SATIŞ SOL bekleniyor... (${c + 1}/4)`);
+            }
+
+            // SOL gelmezse FINAL hata fırlat
+            if (solReceived === 0) {
+              throw new Error(`FINAL: TX gönderildi fakat SOL bakiyesi artmadı (sig: ${sig.slice(0, 16)}...)`);
+            }
+
+            const sellPriceSol = halfUiAmount > 0 ? solReceived / halfUiAmount : 0;
+            return { sig, solOut: solReceived, sellPriceSol, halfUiAmount };
           }, `Jupiter HalfSell ${pos.symbol}`);
 
           jupiterOk = true;
@@ -772,14 +865,33 @@ export class JupiterTrader {
             const balance = await fetchBalance();
             const halfAmount = balance.uiAmount / 2;
             console.log(`🔍 [PumpSwap Fallback] Yarısı satılacak: ${halfAmount.toLocaleString()} ${pos.symbol}`);
+            const solBefore = await this.getSolBalance();
             const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: halfAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
-            return { sig, halfAmount };
+
+            // SOL bakiyesi kontrol (max 4 = 2s)
+            let solReceived = 0;
+            for (let c = 0; c < 4; c++) {
+              await new Promise((r) => setTimeout(r, 500));
+              const solAfter = await this.getSolBalance();
+              if (solAfter > solBefore) {
+                solReceived = solAfter - solBefore;
+                break;
+              }
+              console.log(`⏳ [PumpSwap Fallback] YARI SATIŞ SOL bekleniyor... (${c + 1}/4)`);
+            }
+
+            // SOL gelmezse FINAL hata fırlat
+            if (solReceived === 0) {
+              throw new Error(`FINAL: TX gönderildi fakat SOL bakiyesi artmadı (sig: ${sig.slice(0, 16)}...)`);
+            }
+
+            return { sig, halfAmount, solReceived };
           }, `PumpSwap Fallback HalfSell ${pos.symbol}`);
 
-          const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.halfAmount);
+          const actualSolOut = result.solReceived;
           const remainingAmount = (pos.buyTokenAmount ?? 0) / 2;
           const halfBuyCost = (pos.buySolAmount ?? 0) / 2;
-          const pnlSol = estimatedSolOut - halfBuyCost;
+          const pnlSol = actualSolOut - halfBuyCost;
           const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
           updated = {
             ...pos,
@@ -790,7 +902,7 @@ export class JupiterTrader {
             pnlPct,
           };
           this.updateAndEmit(updated);
-          console.log(`✅ [PumpSwap Fallback] YARI SATIŞ tamam: ${pos.symbol} | ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
+          console.log(`✅ [PumpSwap Fallback] YARI SATIŞ tamam: ${pos.symbol} | ${actualSolOut.toFixed(4)} SOL (gerçek) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
         }
       }
 
