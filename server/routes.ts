@@ -500,7 +500,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (typeof priorityFeeManualMicroLamports === "number" && priorityFeeManualMicroLamports >= 0) partial.priorityFeeManualMicroLamports = priorityFeeManualMicroLamports;
           if (typeof priorityFeeAutoMicroLamports === "number" && priorityFeeAutoMicroLamports >= 0) partial.priorityFeeAutoMicroLamports = priorityFeeAutoMicroLamports;
           if (typeof takeProfitPct === "number" && takeProfitPct >= 0) partial.takeProfitPct = takeProfitPct;
-          if (Object.keys(partial).length) trader.updateConfig(partial as any);
+          if (Object.keys(partial).length) {
+            const updatedConfig = tradeStore.updateConfig(partial as any);
+            broadcastToClients({
+              type: "trade_config_update",
+              data: { config: updatedConfig },
+            });
+          }
 
         } else if (message.type === "auto_trader_config_update") {
           // Otomatik trader konfigürasyonu güncelle
