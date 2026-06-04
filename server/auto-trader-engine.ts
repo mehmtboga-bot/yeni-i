@@ -198,6 +198,9 @@ export class AutoTraderEngine {
         this.trader.sell(position.id)
           .catch((err: any) => {
             console.error(`❌ [Auto-Trader] ${record.tokenSymbol} sell() başlatma hatası: ${err?.message ?? err}`);
+          })
+          .finally(() => {
+            this.sellInProgress.delete(record.mintAddress);
           });
       } else {
         // Trader direkt bağlı değil — event yayınla
