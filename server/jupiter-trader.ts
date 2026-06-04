@@ -333,10 +333,11 @@ export class JupiterTrader {
     const config = this.store.getConfig();
     const actualSolAmount = solAmount ?? config.solAmount;
     const lamports = Math.floor(actualSolAmount * 1e9);
-    // Manuel/otomatik alım için ayrı priority fee kullan
-    const priorityFee = isAuto
+    // Auto alım için priority fee'yi 2x artır (block height expiry önlemek için)
+    const baseFee = isAuto
       ? config.priorityFeeAutoMicroLamports
       : config.priorityFeeManualMicroLamports;
+    const priorityFee = isAuto ? baseFee * 2 : baseFee;
     const id = `pos-${mintAddress}-${Date.now()}`;
     let position: Position = {
       id, mintAddress, name, symbol, dex: "jupiter",
@@ -356,14 +357,14 @@ export class JupiterTrader {
         const pricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
         const sig = await this.swap(quote, priorityFee);
 
-        // TX gönderildi — her 500ms'de bakiye kontrol (max 4 = 2s)
-        for (let c = 0; c < 4; c++) {
+        // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
+        for (let c = 0; c < 8; c++) {
           await new Promise((r) => setTimeout(r, 500));
           const bal = await this.getTokenBalance(mintAddress);
           if (bal && bal.uiAmount > 0) {
             return { sig, tokensOut: bal.uiAmount, pricePerToken };
           }
-          console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/4)`);
+          console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/8)`);
         }
 
         // Token gelmedi — FINAL hata (retry yok, tek TX garantisi)
@@ -413,12 +414,13 @@ export class JupiterTrader {
     await new Promise((r) => setTimeout(r, 650));
 
     const slippagePct = Math.floor(config.slippageBps / 100);
-    // Manuel/otomatik alım için ayrı priority fee kullan
+    // Auto alım için priority fee'yi 2x artır (block height expiry önlemek için)
     // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
     const rawFee = isAuto
       ? config.priorityFeeAutoMicroLamports
       : config.priorityFeeManualMicroLamports;
-    const priorityFeeSol = rawFee / 1_000_000_000;
+    const adjustedFee = isAuto ? rawFee * 2 : rawFee;
+    const priorityFeeSol = adjustedFee / 1_000_000_000;
 
     try {
       const sig = await this.withRetry(
@@ -428,16 +430,16 @@ export class JupiterTrader {
       );
 
 
-      // TX gönderildi — her 500ms'de bakiye kontrol (max 4 = 2s)
+      // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
       let tokensReceived = 0;
-      for (let c = 0; c < 4; c++) {
+      for (let c = 0; c < 8; c++) {
         await new Promise((r) => setTimeout(r, 500));
         const bal = await this.getTokenBalance(mintAddress);
         if (bal && bal.uiAmount > 0) {
           tokensReceived = bal.uiAmount;
           break;
         }
-        console.log(`⏳ [PumpSwap] Token bekleniyor... (${c + 1}/4)`);
+        console.log(`⏳ [PumpSwap] Token bekleniyor... (${c + 1}/8)`);
       }
 
       // Token hiç gelmezse FINAL hata fırlat (yarı satışta amount:0 sorununu önler)
