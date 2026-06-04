@@ -79,14 +79,13 @@ export function TradePanel({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [solAmountInput, setSolAmountInput] = useState(String(config.solAmount));
   const [slippageInput, setSlippageInput] = useState(String(config.slippageBps));
-  const [priorityInput, setPriorityInput] = useState(String(config.priorityFeeMicroLamports));
   const [priorityManualInput, setPriorityManualInput] = useState(() => {
     const saved = localStorage.getItem("priorityFeeManualMicroLamports");
-    return saved ?? String(config.priorityFeeManualMicroLamports ?? config.priorityFeeMicroLamports);
+    return saved ?? String(config.priorityFeeManualMicroLamports);
   });
   const [priorityAutoInput, setPriorityAutoInput] = useState(() => {
     const saved = localStorage.getItem("priorityFeeAutoMicroLamports");
-    return saved ?? String(config.priorityFeeAutoMicroLamports ?? config.priorityFeeMicroLamports);
+    return saved ?? String(config.priorityFeeAutoMicroLamports);
   });
   const [takeProfitInput, setTakeProfitInput] = useState(String(config.takeProfitPct ?? 0));
 
@@ -128,14 +127,12 @@ export function TradePanel({
   const saveConfig = () => {
     const sol = parseFloat(solAmountInput);
     const slip = parseInt(slippageInput, 10);
-    const prio = parseInt(priorityInput, 10);
     const prioManual = parseInt(priorityManualInput, 10);
     const prioAuto = parseInt(priorityAutoInput, 10);
     const tp = parseFloat(takeProfitInput);
     const partial: Partial<TradeConfig> = {};
     if (!Number.isNaN(sol) && sol > 0) partial.solAmount = sol;
     if (!Number.isNaN(slip) && slip >= 50) partial.slippageBps = slip;
-    if (!Number.isNaN(prio) && prio >= 0) partial.priorityFeeMicroLamports = prio;
     if (!Number.isNaN(prioManual) && prioManual >= 0) {
       partial.priorityFeeManualMicroLamports = prioManual;
       localStorage.setItem("priorityFeeManualMicroLamports", String(prioManual));
@@ -235,7 +232,7 @@ export function TradePanel({
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="priority-manual" className="text-xs">Manuel Fee (µLamports)</Label>
               <Input id="priority-manual" type="number" step="100000" min="0" value={priorityManualInput}
@@ -250,14 +247,6 @@ export function TradePanel({
                 onChange={(e) => setPriorityAutoInput(e.target.value)} data-testid="input-priority-auto" />
               <p className="text-[10px] text-muted-foreground">
                 Otomatik alım · {(parseInt(priorityAutoInput || "0") / 1_000_000_000).toFixed(6)} SOL
-              </p>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="priority" className="text-xs">Fallback Fee (µLamports)</Label>
-              <Input id="priority" type="number" step="100000" min="0" value={priorityInput}
-                onChange={(e) => setPriorityInput(e.target.value)} data-testid="input-priority" />
-              <p className="text-[10px] text-muted-foreground">
-                Genel fallback · {(parseInt(priorityInput || "0") / 1_000_000_000).toFixed(6)} SOL
               </p>
             </div>
           </div>
