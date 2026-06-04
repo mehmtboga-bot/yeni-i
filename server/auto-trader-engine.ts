@@ -195,9 +195,20 @@ export class AutoTraderEngine {
       this.emit("auto_trade_record_updated", record);
 
       if (this.trader) {
-        this.trader.sell(position.id)
+        // Kar hedefi ile tetiklendiyse profitTargetPct'yi sell()'e ilet — fiyat geri düşerse iptal edilsin
+        const targetPct = shouldSellForProfit ? config.profitTargetPct : 0;
+        this.trader.sell(position.id, 0, targetPct)
           .catch((err: any) => {
-            console.error(`❌ [Auto-Trader] ${record.tokenSymbol} sell() başlatma hatası: ${err?.message ?? err}`);
+            const errMsg: string = err?.message ?? String(err);
+            // Kar hedefi artık karşılanmıyorsa record'u "active"e geri döndür — tekrar denenebilsin
+            if (errMsg.includes("Profit target no longer met")) {
+              console.warn(`⚠️ [Auto-Trader] ${record.tokenSymbol} kar hedefi geri düştü — satış iptal, tekrar izleniyor`);
+              record.status = "active";
+              this.emit("auto_trade_record_updated", record);
+              this.sellInProgress.delete(record.mintAddress);
+            } else {
+              console.error(`❌ [Auto-Trader] ${record.tokenSymbol} sell() başlatma hatası: ${errMsg}`);
+            }
           });
       } else {
         // Trader direkt bağlı değil — event yayınla

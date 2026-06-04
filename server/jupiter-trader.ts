@@ -582,11 +582,22 @@ export class JupiterTrader {
   // Satış başarısız olursa status "open" kalır, exponential backoff ile tekrar denenir.
   // MAX_SELL_RETRIES aşılırsa "failed" olarak işaretlenir.
   // Bakiye sıfırsa (rug pull) → "closed" pnlPct:-100. Başarılıysa → "closed".
-  async sell(positionId: string, _retryCount = 0): Promise<Position | null> {
+  // profitTargetPct: Otomatik satışlarda kar hedefi kontrolü için (0 = devre dışı).
+  async sell(positionId: string, _retryCount = 0, profitTargetPct = 0): Promise<Position | null> {
     const pos = this.store.getById(positionId);
     if (!pos) { console.warn(`⚠️ Pozisyon bulunamadı: ${positionId}`); return null; }
     if (!["open", "pending_sell"].includes(pos.status)) { console.warn(`⚠️ Satışa uygun değil (${pos.status}): ${pos.symbol}`); return pos; }
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — satış atlandı"); return null; }
+
+    // Kar hedefi kontrolü — quote almadan ÖNCE, fiyat geri düştüyse satışı iptal et
+    if (profitTargetPct > 0 && _retryCount === 0) {
+      const currentPnlPct = pos.unrealizedPnlPct ?? 0;
+      if (currentPnlPct < profitTargetPct) {
+        console.warn(`⚠️ [${pos.symbol}] Kar hedefi artık karşılanmıyor (${currentPnlPct.toFixed(1)}% < ${profitTargetPct}%) — satış iptal edildi`);
+        throw new Error(`Profit target no longer met`);
+      }
+    }
+
     if (this.inFlight.has(`sell:${pos.id}`)) return pos;
     this.inFlight.add(`sell:${pos.id}`);
 
