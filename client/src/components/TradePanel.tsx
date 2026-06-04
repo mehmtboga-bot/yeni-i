@@ -83,10 +83,6 @@ export function TradePanel({
     const saved = localStorage.getItem("priorityFeeManualMicroLamports");
     return saved ?? String(config.priorityFeeManualMicroLamports);
   });
-  const [priorityAutoInput, setPriorityAutoInput] = useState(() => {
-    const saved = localStorage.getItem("priorityFeeAutoMicroLamports");
-    return saved ?? String(config.priorityFeeAutoMicroLamports);
-  });
   const [takeProfitInput, setTakeProfitInput] = useState(String(config.takeProfitPct ?? 0));
 
   const copyAddress = async (address: string, id: string) => {
@@ -128,7 +124,6 @@ export function TradePanel({
     const sol = parseFloat(solAmountInput);
     const slip = parseInt(slippageInput, 10);
     const prioManual = parseInt(priorityManualInput, 10);
-    const prioAuto = parseInt(priorityAutoInput, 10);
     const tp = parseFloat(takeProfitInput);
     const partial: Partial<TradeConfig> = {};
     if (!Number.isNaN(sol) && sol > 0) partial.solAmount = sol;
@@ -136,10 +131,6 @@ export function TradePanel({
     if (!Number.isNaN(prioManual) && prioManual >= 0) {
       partial.priorityFeeManualMicroLamports = prioManual;
       localStorage.setItem("priorityFeeManualMicroLamports", String(prioManual));
-    }
-    if (!Number.isNaN(prioAuto) && prioAuto >= 0) {
-      partial.priorityFeeAutoMicroLamports = prioAuto;
-      localStorage.setItem("priorityFeeAutoMicroLamports", String(prioAuto));
     }
     if (!Number.isNaN(tp) && tp >= 0) partial.takeProfitPct = tp;
     if (Object.keys(partial).length) onUpdateConfig(partial);
@@ -232,21 +223,13 @@ export function TradePanel({
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <div className="space-y-1">
               <Label htmlFor="priority-manual" className="text-xs">Manuel Fee (µLamports)</Label>
               <Input id="priority-manual" type="number" step="100000" min="0" value={priorityManualInput}
                 onChange={(e) => setPriorityManualInput(e.target.value)} data-testid="input-priority-manual" />
               <p className="text-[10px] text-muted-foreground">
                 Manuel alım · {(parseInt(priorityManualInput || "0") / 1_000_000_000).toFixed(6)} SOL
-              </p>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="priority-auto" className="text-xs">Otomatik Fee (µLamports)</Label>
-              <Input id="priority-auto" type="number" step="100000" min="0" value={priorityAutoInput}
-                onChange={(e) => setPriorityAutoInput(e.target.value)} data-testid="input-priority-auto" />
-              <p className="text-[10px] text-muted-foreground">
-                Otomatik alım · {(parseInt(priorityAutoInput || "0") / 1_000_000_000).toFixed(6)} SOL
               </p>
             </div>
           </div>
