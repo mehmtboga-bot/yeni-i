@@ -11,8 +11,8 @@ import type { Position, TradeConfig } from "@shared/schema";
 
 const HELIUS_API_KEY = secrets.HELIUS_API_KEY;
 const RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
-const JUP_QUOTE = "https://lite-api.jup.ag/swap/v1/quote";
-const JUP_SWAP  = "https://lite-api.jup.ag/swap/v1/swap";
+const JUP_QUOTE = "https://api.jup.ag/swap/v1/quote";
+const JUP_SWAP  = "https://api.jup.ag/swap/v1/swap";
 const JUP_PRICE = "https://lite-api.jup.ag/price/v3";
 const PUMP_TRADE_API = "https://pumpportal.fun/api/trade-local";
 
