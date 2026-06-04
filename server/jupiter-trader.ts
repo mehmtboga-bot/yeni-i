@@ -195,7 +195,7 @@ export class JupiterTrader {
     return json;
   }
 
-  private async swap(quote: QuoteResponse, priorityFeeMicroLamports: number): Promise<string> {
+  private async swap(quote: QuoteResponse, priorityFeeMicroLamports: number, confirmForeground = false): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
     const swapBody = {
       quoteResponse: quote,
@@ -225,19 +225,29 @@ export class JupiterTrader {
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
 
-    // Confirm BACKGROUND'DA — throw etmez, withRetry'ı tetiklemez
-    ;(async () => {
-      try {
-        const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
-        if (conf.value.err) {
-          console.error(`❌ [Jupiter] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
-        } else {
-          console.log(`✅ [Jupiter] TX onaylandı (background): ${signature.slice(0, 16)}...`);
-        }
-      } catch (err) {
-        console.error(`❌ [Jupiter] TX confirm timeout (background): ${(err as Error).message}`);
+    if (confirmForeground) {
+      // Satış TX'leri için FOREGROUND confirm — onaylanmadan devam etme
+      // TX başarısız veya timeout olursa throw eder, withRetry yeni TX gönderir
+      const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+      if (conf.value.err) {
+        throw new Error(`Jupiter TX başarısız: ${JSON.stringify(conf.value.err)} (sig: ${signature.slice(0, 16)}...)`);
       }
-    })();
+      console.log(`✅ [Jupiter] TX onaylandı: ${signature.slice(0, 16)}...`);
+    } else {
+      // Alım TX'leri için BACKGROUND confirm — bakiye polling zaten onayı bekler
+      ;(async () => {
+        try {
+          const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
+          if (conf.value.err) {
+            console.error(`❌ [Jupiter] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
+          } else {
+            console.log(`✅ [Jupiter] TX onaylandı (background): ${signature.slice(0, 16)}...`);
+          }
+        } catch (err) {
+          console.error(`❌ [Jupiter] TX confirm timeout (background): ${(err as Error).message}`);
+        }
+      })();
+    }
 
     return signature;
   }
@@ -250,6 +260,7 @@ export class JupiterTrader {
     denominatedInSol: boolean;
     slippagePct: number;
     priorityFeeSol: number;
+    confirmForeground?: boolean;
   }): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
 
@@ -298,19 +309,29 @@ export class JupiterTrader {
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
     const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
 
-    // Confirm BACKGROUND'DA — throw etmez, withRetry'ı tetiklemez
-    ;(async () => {
-      try {
-        const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
-        if (conf.value.err) {
-          console.error(`❌ [PumpSwap] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
-        } else {
-          console.log(`✅ [PumpSwap] TX onaylandı (background): ${signature.slice(0, 16)}...`);
-        }
-      } catch (err) {
-        console.error(`❌ [PumpSwap] TX confirm timeout (background): ${(err as Error).message}`);
+    if (opts.confirmForeground) {
+      // Satış TX'leri için FOREGROUND confirm — onaylanmadan devam etme
+      // TX başarısız veya timeout olursa throw eder, withRetry yeni TX gönderir
+      const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+      if (conf.value.err) {
+        throw new Error(`PumpSwap TX başarısız: ${JSON.stringify(conf.value.err)} (sig: ${signature.slice(0, 16)}...)`);
       }
-    })();
+      console.log(`✅ [PumpSwap] TX onaylandı: ${signature.slice(0, 16)}...`);
+    } else {
+      // Alım TX'leri için BACKGROUND confirm — bakiye polling zaten onayı bekler
+      ;(async () => {
+        try {
+          const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
+          if (conf.value.err) {
+            console.error(`❌ [PumpSwap] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
+          } else {
+            console.log(`✅ [PumpSwap] TX onaylandı (background): ${signature.slice(0, 16)}...`);
+          }
+        } catch (err) {
+          console.error(`❌ [PumpSwap] TX confirm timeout (background): ${(err as Error).message}`);
+        }
+      })();
+    }
 
     return signature;
   }
@@ -661,6 +682,7 @@ export class JupiterTrader {
             denominatedInSol: false,
             slippagePct,
             priorityFeeSol,
+            confirmForeground: true,
           });
           return { sig, tokenAmount: balance.uiAmount };
         }, `PumpSwap Sell ${pos.symbol}`);
@@ -714,7 +736,7 @@ export class JupiterTrader {
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
             const solOut = Number(quote.outAmount) / 1e9;
             const sellPriceSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
-            const sig = await this.swap(quote, config.priorityFeeManualMicroLamports);
+            const sig = await this.swap(quote, config.priorityFeeManualMicroLamports, true);
             return { sig, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
           }, `Jupiter Sell ${pos.symbol}`);
 
@@ -762,7 +784,7 @@ export class JupiterTrader {
           const result = await this.withRetry(async () => {
             const balance = await fetchBalance();
             console.log(`🔍 [PumpSwap Fallback] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
-            const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
+            const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: balance.uiAmount, denominatedInSol: false, slippagePct, priorityFeeSol, confirmForeground: true });
             return { sig, tokenAmount: balance.uiAmount };
           }, `PumpSwap Fallback Sell ${pos.symbol}`);
 
@@ -933,6 +955,7 @@ export class JupiterTrader {
             denominatedInSol: false,
             slippagePct,
             priorityFeeSol,
+            confirmForeground: true,
           });
           return { sig, halfAmount };
         }, `PumpSwap HalfSell ${pos.symbol}`);
@@ -988,7 +1011,7 @@ export class JupiterTrader {
             const solOut = Number(quote.outAmount) / 1e9;
             const halfUiAmount = balance.uiAmount / 2;
             const sellPriceSol = halfUiAmount > 0 ? solOut / halfUiAmount : 0;
-            const sig = await this.swap(quote, config.priorityFeeManualMicroLamports);
+            const sig = await this.swap(quote, config.priorityFeeManualMicroLamports, true);
             return { sig, solOut, sellPriceSol, halfUiAmount };
           }, `Jupiter HalfSell ${pos.symbol}`);
 
@@ -1039,7 +1062,7 @@ export class JupiterTrader {
             const balance = await fetchBalance();
             const halfAmount = balance.uiAmount / 2;
             console.log(`🔍 [PumpSwap Fallback] Yarısı satılacak: ${halfAmount.toLocaleString()} ${pos.symbol}`);
-            const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: halfAmount, denominatedInSol: false, slippagePct, priorityFeeSol });
+            const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: halfAmount, denominatedInSol: false, slippagePct, priorityFeeSol, confirmForeground: true });
             return { sig, halfAmount };
           }, `PumpSwap Fallback HalfSell ${pos.symbol}`);
 
