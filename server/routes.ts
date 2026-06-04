@@ -245,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sym = symbol || "?";
         const autoConfig = autoTraderConfigStore.getConfig();
         const solAmount = autoConfig.solAmountPerTrade;
-        console.log(`⏳ [Auto-Trader] ${sym} 500ms bekleniyor... (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
+        console.log(`⏳ [Auto-Trader] ${sym} 750ms bekleniyor... (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
         setTimeout(() => {
           console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
           if (dex === "pumpswap") {
@@ -261,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 autoTraderEngine.markRecordFailed(mintAddress, String(err));
               });
           }
-        }, 500);
+        }, 750);
 
       } else if (event === "auto_sell_ready") {
         if (data.forceClose) {
