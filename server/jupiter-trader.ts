@@ -614,24 +614,35 @@ export class JupiterTrader {
       throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
     };
 
-    // Satış öncesi bakiye kontrolü — rug pull erken tespiti
+    // Satış öncesi bakiye kontrolü — rug pull erken tespiti (3 retry)
     try {
-      const preBal = await this.getTokenBalance(pos.mintAddress);
+      let preBal = await this.getTokenBalance(pos.mintAddress);
       if (!preBal || preBal.uiAmount <= 0) {
-        const rugPullLoss = -(pos.buySolAmount ?? 0);
-        updated = {
-          ...pos,
-          status: "closed",
-          sellTimestamp: Date.now(),
-          sellSolAmount: 0,
-          sellPriceSol: 0,
-          pnlSol: rugPullLoss,
-          pnlPct: -100,
-          error: "Rug Pull Detected",
-        };
-        this.updateAndEmit(updated);
-        console.error(`🚨 [Rug Pull] ${pos.symbol} — bakiye sıfır, -%100 zarar olarak kapatıldı`);
-        return updated;
+        // RPC timeout / network hatası olabilir — 3 kez daha dene
+        let retryCount = 0;
+        while (retryCount < 3 && (!preBal || preBal.uiAmount <= 0)) {
+          await new Promise((r) => setTimeout(r, 500));
+          preBal = await this.getTokenBalance(pos.mintAddress);
+          retryCount++;
+          console.warn(`⚠️ [Rug Pull Kontrol] ${pos.symbol} bakiye sıfır — yeniden deneniyor (${retryCount}/3)...`);
+        }
+        // 3 deneme sonrası hala bakiye yoksa rug pull olarak kapat
+        if (!preBal || preBal.uiAmount <= 0) {
+          const rugPullLoss = -(pos.buySolAmount ?? 0);
+          updated = {
+            ...pos,
+            status: "closed",
+            sellTimestamp: Date.now(),
+            sellSolAmount: 0,
+            sellPriceSol: 0,
+            pnlSol: rugPullLoss,
+            pnlPct: -100,
+            error: "Rug Pull Detected",
+          };
+          this.updateAndEmit(updated);
+          console.error(`🚨 [Rug Pull] ${pos.symbol} — 3 denemede bakiye sıfır, -%100 zarar olarak kapatıldı`);
+          return updated;
+        }
       }
     } catch {
       // Bakiye okunamazsa satışa devam et
@@ -863,24 +874,35 @@ export class JupiterTrader {
       throw new Error(`RUG_PULL: Cüzdanda ${pos.symbol} bakiyesi bulunamadı`);
     };
 
-    // Satış öncesi bakiye kontrolü — rug pull erken tespiti
+    // Satış öncesi bakiye kontrolü — rug pull erken tespiti (3 retry)
     try {
-      const preBal = await this.getTokenBalance(pos.mintAddress);
+      let preBal = await this.getTokenBalance(pos.mintAddress);
       if (!preBal || preBal.uiAmount <= 0) {
-        const rugPullLoss = -(pos.buySolAmount ?? 0);
-        const updated: Position = {
-          ...pos,
-          status: "closed",
-          sellTimestamp: Date.now(),
-          sellSolAmount: 0,
-          sellPriceSol: 0,
-          pnlSol: rugPullLoss,
-          pnlPct: -100,
-          error: "Rug Pull Detected",
-        };
-        this.updateAndEmit(updated);
-        console.error(`🚨 [Rug Pull] ${pos.symbol} — bakiye sıfır, -%100 zarar olarak kapatıldı`);
-        return updated;
+        // RPC timeout / network hatası olabilir — 3 kez daha dene
+        let retryCount = 0;
+        while (retryCount < 3 && (!preBal || preBal.uiAmount <= 0)) {
+          await new Promise((r) => setTimeout(r, 500));
+          preBal = await this.getTokenBalance(pos.mintAddress);
+          retryCount++;
+          console.warn(`⚠️ [Rug Pull Kontrol] ${pos.symbol} bakiye sıfır — yeniden deneniyor (${retryCount}/3)...`);
+        }
+        // 3 deneme sonrası hala bakiye yoksa rug pull olarak kapat
+        if (!preBal || preBal.uiAmount <= 0) {
+          const rugPullLoss = -(pos.buySolAmount ?? 0);
+          const updated: Position = {
+            ...pos,
+            status: "closed",
+            sellTimestamp: Date.now(),
+            sellSolAmount: 0,
+            sellPriceSol: 0,
+            pnlSol: rugPullLoss,
+            pnlPct: -100,
+            error: "Rug Pull Detected",
+          };
+          this.updateAndEmit(updated);
+          console.error(`🚨 [Rug Pull] ${pos.symbol} — 3 denemede bakiye sıfır, -%100 zarar olarak kapatıldı`);
+          return updated;
+        }
       }
     } catch {
       // Bakiye okunamazsa satışa devam et
