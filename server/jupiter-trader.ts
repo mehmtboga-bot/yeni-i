@@ -46,6 +46,7 @@ export class JupiterTrader {
   private connection: Connection | null = null;
   private decimalsCache: Map<string, number> = new Map();
   private inFlight: Set<string> = new Set();
+  private balanceCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(store: TradeStore, emit: Emitter) {
     this.store = store;
@@ -373,6 +374,64 @@ export class JupiterTrader {
       position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
       console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
+
+      // Alım sonrası sürekli bakiye izleme — rug pull erken tespiti
+      const capturedPosition = position;
+      const balanceInterval = setInterval(async () => {
+        // Pozisyon artık "open" değilse (satış başladı veya kapandı) interval'i durdur
+        const currentPos = this.store.getById(capturedPosition.id);
+        if (!currentPos || currentPos.status !== "open") {
+          clearInterval(balanceInterval);
+          this.balanceCheckIntervals.delete(capturedPosition.id);
+          return;
+        }
+        try {
+          const currentBal = await this.getTokenBalance(capturedPosition.mintAddress);
+          if (!currentBal || currentBal.uiAmount <= 0) {
+            // Tam rug pull — bakiye sıfır
+            clearInterval(balanceInterval);
+            this.balanceCheckIntervals.delete(capturedPosition.id);
+            const rugPullPos: Position = {
+              ...currentPos,
+              status: "closed",
+              sellTimestamp: Date.now(),
+              sellSolAmount: 0,
+              sellPriceSol: 0,
+              pnlSol: -(currentPos.buySolAmount ?? 0),
+              pnlPct: -100,
+              error: "Rug Pull Detected (continuous monitoring)",
+            };
+            this.updateAndEmit(rugPullPos);
+            console.error(`🚨 [Rug Pull] ${capturedPosition.symbol} — bakiye sıfır, hemen kapatıldı`);
+            return;
+          }
+          // Kısmi rug pull kontrolü — %80'den fazla kayıp
+          const initialAmount = capturedPosition.buyTokenAmount ?? 0;
+          if (initialAmount > 0) {
+            const tokenLossPct = ((initialAmount - currentBal.uiAmount) / initialAmount) * 100;
+            if (tokenLossPct >= 80) {
+              clearInterval(balanceInterval);
+              this.balanceCheckIntervals.delete(capturedPosition.id);
+              const rugPullPos: Position = {
+                ...currentPos,
+                status: "closed",
+                sellTimestamp: Date.now(),
+                sellSolAmount: 0,
+                sellPriceSol: 0,
+                pnlSol: -(currentPos.buySolAmount ?? 0),
+                pnlPct: -100,
+                error: `Rug Pull Detected: %${tokenLossPct.toFixed(1)} loss`,
+              };
+              this.updateAndEmit(rugPullPos);
+              console.error(`🚨 [Rug Pull] ${capturedPosition.symbol} — %${tokenLossPct.toFixed(1)} kayıp, hemen kapatıldı`);
+            }
+          }
+        } catch {
+          // Bakiye okunamadı, bir sonraki döngüde tekrar dene
+        }
+      }, 2000);
+      this.balanceCheckIntervals.set(position.id, balanceInterval);
+
       return position;
 
     } catch (err) {
@@ -448,6 +507,64 @@ export class JupiterTrader {
       position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived };
       this.updateAndEmit(position);
       console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | tx ${sig.slice(0, 16)}...`);
+
+      // Alım sonrası sürekli bakiye izleme — rug pull erken tespiti
+      const capturedPosition = position;
+      const balanceInterval = setInterval(async () => {
+        // Pozisyon artık "open" değilse (satış başladı veya kapandı) interval'i durdur
+        const currentPos = this.store.getById(capturedPosition.id);
+        if (!currentPos || currentPos.status !== "open") {
+          clearInterval(balanceInterval);
+          this.balanceCheckIntervals.delete(capturedPosition.id);
+          return;
+        }
+        try {
+          const currentBal = await this.getTokenBalance(capturedPosition.mintAddress);
+          if (!currentBal || currentBal.uiAmount <= 0) {
+            // Tam rug pull — bakiye sıfır
+            clearInterval(balanceInterval);
+            this.balanceCheckIntervals.delete(capturedPosition.id);
+            const rugPullPos: Position = {
+              ...currentPos,
+              status: "closed",
+              sellTimestamp: Date.now(),
+              sellSolAmount: 0,
+              sellPriceSol: 0,
+              pnlSol: -(currentPos.buySolAmount ?? 0),
+              pnlPct: -100,
+              error: "Rug Pull Detected (continuous monitoring)",
+            };
+            this.updateAndEmit(rugPullPos);
+            console.error(`🚨 [Rug Pull] ${capturedPosition.symbol} — bakiye sıfır, hemen kapatıldı`);
+            return;
+          }
+          // Kısmi rug pull kontrolü — %80'den fazla kayıp
+          const initialAmount = capturedPosition.buyTokenAmount ?? 0;
+          if (initialAmount > 0) {
+            const tokenLossPct = ((initialAmount - currentBal.uiAmount) / initialAmount) * 100;
+            if (tokenLossPct >= 80) {
+              clearInterval(balanceInterval);
+              this.balanceCheckIntervals.delete(capturedPosition.id);
+              const rugPullPos: Position = {
+                ...currentPos,
+                status: "closed",
+                sellTimestamp: Date.now(),
+                sellSolAmount: 0,
+                sellPriceSol: 0,
+                pnlSol: -(currentPos.buySolAmount ?? 0),
+                pnlPct: -100,
+                error: `Rug Pull Detected: %${tokenLossPct.toFixed(1)} loss`,
+              };
+              this.updateAndEmit(rugPullPos);
+              console.error(`🚨 [Rug Pull] ${capturedPosition.symbol} — %${tokenLossPct.toFixed(1)} kayıp, hemen kapatıldı`);
+            }
+          }
+        } catch {
+          // Bakiye okunamadı, bir sonraki döngüde tekrar dene
+        }
+      }, 2000);
+      this.balanceCheckIntervals.set(position.id, balanceInterval);
+
       return position;
     } catch (err) {
       const message = (err as Error).message || String(err);
@@ -472,6 +589,13 @@ export class JupiterTrader {
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — satış atlandı"); return null; }
     if (this.inFlight.has(`sell:${pos.id}`)) return pos;
     this.inFlight.add(`sell:${pos.id}`);
+
+    // Bakiye izleme interval'ini durdur — satış başladı
+    const existingInterval = this.balanceCheckIntervals.get(pos.id);
+    if (existingInterval) {
+      clearInterval(existingInterval);
+      this.balanceCheckIntervals.delete(pos.id);
+    }
 
     const config = this.store.getConfig();
     let updated: Position = { ...pos, status: "pending_sell", error: undefined };
@@ -717,6 +841,13 @@ export class JupiterTrader {
     if (this.inFlight.has(`sell:${pos.id}`)) return pos;
     this.inFlight.add(`sell:${pos.id}`);
 
+    // Bakiye izleme interval'ini geçici olarak durdur — yarı satış sırasında çakışma önlenir
+    const existingHalfInterval = this.balanceCheckIntervals.get(pos.id);
+    if (existingHalfInterval) {
+      clearInterval(existingHalfInterval);
+      this.balanceCheckIntervals.delete(pos.id);
+    }
+
     const config = this.store.getConfig();
     const dexLabel = pos.dex === "pumpswap" ? "PumpSwap" : "Jupiter";
     console.log(`💸 [${dexLabel}] YARI SATIŞ başlatılıyor: ${pos.symbol}`);
@@ -912,6 +1043,62 @@ export class JupiterTrader {
             return this.sellHalf(positionId, _retryCount + 1);
           }
         }
+      }
+
+      // Yarı satış başarılı — kalan token için bakiye izlemeyi yeniden başlat
+      if (updated! && updated.status === "open" && updated.buyTokenAmount && updated.buyTokenAmount > 0) {
+        const capturedUpdated = updated;
+        const halfBalanceInterval = setInterval(async () => {
+          const currentPos = this.store.getById(capturedUpdated.id);
+          if (!currentPos || currentPos.status !== "open") {
+            clearInterval(halfBalanceInterval);
+            this.balanceCheckIntervals.delete(capturedUpdated.id);
+            return;
+          }
+          try {
+            const currentBal = await this.getTokenBalance(capturedUpdated.mintAddress);
+            if (!currentBal || currentBal.uiAmount <= 0) {
+              clearInterval(halfBalanceInterval);
+              this.balanceCheckIntervals.delete(capturedUpdated.id);
+              const rugPullPos: Position = {
+                ...currentPos,
+                status: "closed",
+                sellTimestamp: Date.now(),
+                sellSolAmount: 0,
+                sellPriceSol: 0,
+                pnlSol: -(currentPos.buySolAmount ?? 0),
+                pnlPct: -100,
+                error: "Rug Pull Detected (continuous monitoring)",
+              };
+              this.updateAndEmit(rugPullPos);
+              console.error(`🚨 [Rug Pull] ${capturedUpdated.symbol} — bakiye sıfır, hemen kapatıldı`);
+              return;
+            }
+            const initialAmount = capturedUpdated.buyTokenAmount ?? 0;
+            if (initialAmount > 0) {
+              const tokenLossPct = ((initialAmount - currentBal.uiAmount) / initialAmount) * 100;
+              if (tokenLossPct >= 80) {
+                clearInterval(halfBalanceInterval);
+                this.balanceCheckIntervals.delete(capturedUpdated.id);
+                const rugPullPos: Position = {
+                  ...currentPos,
+                  status: "closed",
+                  sellTimestamp: Date.now(),
+                  sellSolAmount: 0,
+                  sellPriceSol: 0,
+                  pnlSol: -(currentPos.buySolAmount ?? 0),
+                  pnlPct: -100,
+                  error: `Rug Pull Detected: %${tokenLossPct.toFixed(1)} loss`,
+                };
+                this.updateAndEmit(rugPullPos);
+                console.error(`🚨 [Rug Pull] ${capturedUpdated.symbol} — %${tokenLossPct.toFixed(1)} kayıp, hemen kapatıldı`);
+              }
+            }
+          } catch {
+            // Bakiye okunamadı, bir sonraki döngüde tekrar dene
+          }
+        }, 2000);
+        this.balanceCheckIntervals.set(capturedUpdated.id, halfBalanceInterval);
       }
 
       return updated!;
