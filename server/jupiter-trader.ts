@@ -7,6 +7,7 @@ import {
 import bs58 from "bs58";
 import { TradeStore } from "./trade-store";
 import { secrets } from "./secrets-loader";
+import { RugpullDetector } from "./rugpull-detector";
 import type { Position, TradeConfig } from "@shared/schema";
 
 const HELIUS_API_KEY = secrets.HELIUS_API_KEY;
@@ -47,6 +48,9 @@ export class JupiterTrader {
   private decimalsCache: Map<string, number> = new Map();
   private inFlight: Set<string> = new Set();
   private balanceCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private rugpullDetector: RugpullDetector = new RugpullDetector();
+  // Token başına pool SOL miktarı (Helius monitor'dan güncellenir)
+  private poolSolCache: Map<string, number> = new Map();
 
   constructor(store: TradeStore, emit: Emitter) {
     this.store = store;
@@ -341,6 +345,98 @@ export class JupiterTrader {
     this.emit("position_update", position);
   }
 
+  /**
+   * Rug check interval — her 1 saniyede 3 kriteri kontrol eder:
+   * 1. Jupiter quote hataları (5 kez üst üste → rug pull)
+   * 2. Pool liquidity (< 2 SOL → rug pull)
+   * 3. Zararlı pozisyon (%-80 veya daha kötü → rug pull, satış yapılmaz)
+   *
+   * Alım başarılı olsun veya olmasın başlatılır.
+   */
+  private startRugCheckInterval(position: Position, slippageBps: number) {
+    // Zaten bir interval varsa temizle
+    const existing = this.balanceCheckIntervals.get(position.id);
+    if (existing) {
+      clearInterval(existing);
+      this.balanceCheckIntervals.delete(position.id);
+    }
+
+    const capturedPosition = position;
+    let jupiterErrorCount = 0; // Üst üste Jupiter quote hata sayacı
+
+    const rugInterval = setInterval(async () => {
+      // Pozisyon hala izlenebilir durumda mı?
+      const currentPos = this.store.getById(capturedPosition.id);
+      if (!currentPos || !["open", "pending_buy", "failed"].includes(currentPos.status)) {
+        clearInterval(rugInterval);
+        this.balanceCheckIntervals.delete(capturedPosition.id);
+        return;
+      }
+
+      const { symbol, mintAddress } = capturedPosition;
+
+      try {
+        // Token bakiyesini al — raw amount için gerekli
+        const currentBal = await this.getTokenBalance(mintAddress);
+        const tokenAmountRaw = currentBal
+          ? String(Math.floor(currentBal.uiAmount * Math.pow(10, currentBal.decimals)))
+          : "1000000"; // Fallback: quote için sembolik miktar
+
+        // ── Kriter 1: Jupiter Quote Hatası ──────────────────────────────────
+        const quoteError = await this.rugpullDetector.checkJupiterQuoteError(
+          mintAddress,
+          tokenAmountRaw,
+          slippageBps
+        );
+
+        if (quoteError) {
+          jupiterErrorCount++;
+          console.warn(`⚠️ [Rug Check] ${symbol} — Jupiter quote hatası (${jupiterErrorCount}/5)`);
+        } else {
+          jupiterErrorCount = 0; // Başarılı quote → sayacı sıfırla
+        }
+
+        // ── Kriter 2: Pool Liquidity ─────────────────────────────────────────
+        const poolSol = this.poolSolCache.get(mintAddress);
+
+        // ── Kriter 3: Zararlı Pozisyon ───────────────────────────────────────
+        const unrealizedPnlPct = currentPos.unrealizedPnlPct;
+
+        // Tüm kriterleri detectRugpull ile değerlendir
+        const rugAlert = await this.rugpullDetector.detectRugpull({
+          symbol,
+          mintAddress,
+          tokenAmountRaw,
+          slippageBps,
+          jupiterErrorCount,
+          poolSol,
+          unrealizedPnlPct,
+        });
+
+        if (rugAlert) {
+          clearInterval(rugInterval);
+          this.balanceCheckIntervals.delete(capturedPosition.id);
+
+          const rugPullPos: Position = {
+            ...currentPos,
+            status: "closed",
+            sellTimestamp: Date.now(),
+            sellSolAmount: 0,
+            sellPriceSol: 0,
+            pnlSol: -(currentPos.buySolAmount ?? 0),
+            pnlPct: -100,
+            error: `Rug Pull Detected: ${rugAlert.detail}`,
+          };
+          this.updateAndEmit(rugPullPos);
+        }
+      } catch (err) {
+        console.error(`❌ [Rug Check] ${capturedPosition.symbol} hata:`, (err as Error).message);
+      }
+    }, 1000);
+
+    this.balanceCheckIntervals.set(capturedPosition.id, rugInterval);
+  }
+
   async buy(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; isAuto?: boolean }): Promise<Position | null> {
     const { mintAddress, name, symbol, solAmount, isAuto = false } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — alım atlandı"); return null; }
@@ -396,80 +492,8 @@ export class JupiterTrader {
       this.updateAndEmit(position);
       console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
 
-      // Alım sonrası bakiye izleme — rug pull tespiti
-      const capturedPosition = position;
-      let rugCheckCount = 0;  // Rug pull kontrol sayacı
-      const balanceInterval = setInterval(async () => {
-        const currentPos = this.store.getById(capturedPosition.id);
-        if (!currentPos || currentPos.status !== "open") {
-          clearInterval(balanceInterval);
-          this.balanceCheckIntervals.delete(capturedPosition.id);
-          return;
-        }
-
-        try {
-          const currentBal = await this.getTokenBalance(capturedPosition.mintAddress);
-          if (!currentBal) {
-            console.warn(`⚠️ [Rug Check] ${capturedPosition.symbol} bakiye okunamadı`);
-            rugCheckCount++;
-            if (rugCheckCount >= 3) {
-              // 3 kez okunamadı → rug pull
-              clearInterval(balanceInterval);
-              this.balanceCheckIntervals.delete(capturedPosition.id);
-              const rugPullPos: Position = {
-                ...currentPos,
-                status: "closed",
-                sellTimestamp: Date.now(),
-                sellSolAmount: 0,
-                sellPriceSol: 0,
-                pnlSol: -(currentPos.buySolAmount ?? 0),
-                pnlPct: -100,
-                error: "Rug Pull Detected (bakiye okunamadı 3 kez)",
-              };
-              this.updateAndEmit(rugPullPos);
-              console.error(`🚨 [Rug Pull] ${capturedPosition.symbol} — bakiye 3 kez okunamadı, rug pull olarak kapatıldı`);
-            }
-            return;
-          }
-
-          const initialAmount = capturedPosition.buyTokenAmount ?? 0;
-          if (initialAmount <= 0) {
-            return;
-          }
-
-          // Kısmi rug pull — %80'den fazla kayıp
-          const tokenLossPct = ((initialAmount - currentBal.uiAmount) / initialAmount) * 100;
-          if (tokenLossPct >= 80) {
-            rugCheckCount++;
-            console.warn(`⚠️ [Rug Check] ${capturedPosition.symbol} — %${tokenLossPct.toFixed(1)} kayıp (${rugCheckCount}/3)`);
-
-            if (rugCheckCount >= 3) {
-              // 3 kez %80+ kayıp → rug pull
-              clearInterval(balanceInterval);
-              this.balanceCheckIntervals.delete(capturedPosition.id);
-              const rugPullPos: Position = {
-                ...currentPos,
-                status: "closed",
-                sellTimestamp: Date.now(),
-                sellSolAmount: 0,
-                sellPriceSol: 0,
-                pnlSol: -(currentPos.buySolAmount ?? 0),
-                pnlPct: -100,
-                error: `Rug Pull Detected: %${tokenLossPct.toFixed(1)} loss (3 kez)`,
-              };
-              this.updateAndEmit(rugPullPos);
-              console.error(`🚨 [Rug Pull] ${capturedPosition.symbol} — %${tokenLossPct.toFixed(1)} kayıp 3 kez, rug pull olarak kapatıldı`);
-            }
-          } else {
-            // Kayıp %80'den az → sayaç reset
-            rugCheckCount = 0;
-          }
-        } catch (err) {
-          console.error(`❌ [Rug Check] ${capturedPosition.symbol} hata:`, (err as Error).message);
-        }
-      }, 2000);
-
-      this.balanceCheckIntervals.set(position.id, balanceInterval);
+      // Alım sonrası rug check interval — alım başarılı olsun veya olmasın başlatılır
+      this.startRugCheckInterval(position, config.slippageBps);
 
       return position;
 
@@ -478,6 +502,11 @@ export class JupiterTrader {
       position = { ...position, status: "failed", error: message };
       this.updateAndEmit(position);
       console.error(`❌ [Jupiter] ALIM hatası ${symbol}:`, message);
+
+      // Alım başarısız olsa bile rug check interval başlat
+      // (TX gönderilmiş olabilir, token gelmiş olabilir)
+      this.startRugCheckInterval(position, config.slippageBps);
+
       return position;
     } finally {
       // [DÜZELTİLDİ] inFlight temizliği sadece finally'de — catch içinde tekrar silmeye gerek yok
@@ -547,80 +576,8 @@ export class JupiterTrader {
       this.updateAndEmit(position);
       console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | tx ${sig.slice(0, 16)}...`);
 
-      // Alım sonrası bakiye izleme — rug pull tespiti
-      const capturedPosition = position;
-      let rugCheckCount = 0;  // Rug pull kontrol sayacı
-      const balanceInterval = setInterval(async () => {
-        const currentPos = this.store.getById(capturedPosition.id);
-        if (!currentPos || currentPos.status !== "open") {
-          clearInterval(balanceInterval);
-          this.balanceCheckIntervals.delete(capturedPosition.id);
-          return;
-        }
-
-        try {
-          const currentBal = await this.getTokenBalance(capturedPosition.mintAddress);
-          if (!currentBal) {
-            console.warn(`⚠️ [Rug Check] ${capturedPosition.symbol} bakiye okunamadı`);
-            rugCheckCount++;
-            if (rugCheckCount >= 3) {
-              // 3 kez okunamadı → rug pull
-              clearInterval(balanceInterval);
-              this.balanceCheckIntervals.delete(capturedPosition.id);
-              const rugPullPos: Position = {
-                ...currentPos,
-                status: "closed",
-                sellTimestamp: Date.now(),
-                sellSolAmount: 0,
-                sellPriceSol: 0,
-                pnlSol: -(currentPos.buySolAmount ?? 0),
-                pnlPct: -100,
-                error: "Rug Pull Detected (bakiye okunamadı 3 kez)",
-              };
-              this.updateAndEmit(rugPullPos);
-              console.error(`🚨 [Rug Pull] ${capturedPosition.symbol} — bakiye 3 kez okunamadı, rug pull olarak kapatıldı`);
-            }
-            return;
-          }
-
-          const initialAmount = capturedPosition.buyTokenAmount ?? 0;
-          if (initialAmount <= 0) {
-            return;
-          }
-
-          // Kısmi rug pull — %80'den fazla kayıp
-          const tokenLossPct = ((initialAmount - currentBal.uiAmount) / initialAmount) * 100;
-          if (tokenLossPct >= 80) {
-            rugCheckCount++;
-            console.warn(`⚠️ [Rug Check] ${capturedPosition.symbol} — %${tokenLossPct.toFixed(1)} kayıp (${rugCheckCount}/3)`);
-
-            if (rugCheckCount >= 3) {
-              // 3 kez %80+ kayıp → rug pull
-              clearInterval(balanceInterval);
-              this.balanceCheckIntervals.delete(capturedPosition.id);
-              const rugPullPos: Position = {
-                ...currentPos,
-                status: "closed",
-                sellTimestamp: Date.now(),
-                sellSolAmount: 0,
-                sellPriceSol: 0,
-                pnlSol: -(currentPos.buySolAmount ?? 0),
-                pnlPct: -100,
-                error: `Rug Pull Detected: %${tokenLossPct.toFixed(1)} loss (3 kez)`,
-              };
-              this.updateAndEmit(rugPullPos);
-              console.error(`🚨 [Rug Pull] ${capturedPosition.symbol} — %${tokenLossPct.toFixed(1)} kayıp 3 kez, rug pull olarak kapatıldı`);
-            }
-          } else {
-            // Kayıp %80'den az → sayaç reset
-            rugCheckCount = 0;
-          }
-        } catch (err) {
-          console.error(`❌ [Rug Check] ${capturedPosition.symbol} hata:`, (err as Error).message);
-        }
-      }, 2000);
-
-      this.balanceCheckIntervals.set(position.id, balanceInterval);
+      // Alım sonrası rug check interval — alım başarılı olsun veya olmasın başlatılır
+      this.startRugCheckInterval(position, config.slippageBps);
 
       return position;
     } catch (err) {
@@ -628,6 +585,11 @@ export class JupiterTrader {
       position = { ...position, status: "failed", error: message };
       this.updateAndEmit(position);
       console.error(`❌ [PumpSwap] ALIM hatası ${symbol}:`, message);
+
+      // Alım başarısız olsa bile rug check interval başlat
+      // (TX gönderilmiş olabilir, token gelmiş olabilir)
+      this.startRugCheckInterval(position, config.slippageBps);
+
       return position;
     } finally {
       // [DÜZELTİLDİ] inFlight temizliği sadece finally'de
@@ -1144,60 +1106,10 @@ export class JupiterTrader {
         }
       }
 
-      // Yarı satış başarılı — kalan token için bakiye izlemeyi yeniden başlat
+      // Yarı satış başarılı — kalan token için rug check interval'i yeniden başlat
       if (updated! && updated.status === "open" && updated.buyTokenAmount && updated.buyTokenAmount > 0) {
-        const capturedUpdated = updated;
-        const halfBalanceInterval = setInterval(async () => {
-          const currentPos = this.store.getById(capturedUpdated.id);
-          if (!currentPos || currentPos.status !== "open") {
-            clearInterval(halfBalanceInterval);
-            this.balanceCheckIntervals.delete(capturedUpdated.id);
-            return;
-          }
-          try {
-            const currentBal = await this.getTokenBalance(capturedUpdated.mintAddress);
-            if (!currentBal || currentBal.uiAmount <= 0) {
-              clearInterval(halfBalanceInterval);
-              this.balanceCheckIntervals.delete(capturedUpdated.id);
-              const rugPullPos: Position = {
-                ...currentPos,
-                status: "closed",
-                sellTimestamp: Date.now(),
-                sellSolAmount: 0,
-                sellPriceSol: 0,
-                pnlSol: -(currentPos.buySolAmount ?? 0),
-                pnlPct: -100,
-                error: "Rug Pull Detected (continuous monitoring)",
-              };
-              this.updateAndEmit(rugPullPos);
-              console.error(`🚨 [Rug Pull] ${capturedUpdated.symbol} — bakiye sıfır, hemen kapatıldı`);
-              return;
-            }
-            const initialAmount = capturedUpdated.buyTokenAmount ?? 0;
-            if (initialAmount > 0) {
-              const tokenLossPct = ((initialAmount - currentBal.uiAmount) / initialAmount) * 100;
-              if (tokenLossPct >= 80) {
-                clearInterval(halfBalanceInterval);
-                this.balanceCheckIntervals.delete(capturedUpdated.id);
-                const rugPullPos: Position = {
-                  ...currentPos,
-                  status: "closed",
-                  sellTimestamp: Date.now(),
-                  sellSolAmount: 0,
-                  sellPriceSol: 0,
-                  pnlSol: -(currentPos.buySolAmount ?? 0),
-                  pnlPct: -100,
-                  error: `Rug Pull Detected: %${tokenLossPct.toFixed(1)} loss`,
-                };
-                this.updateAndEmit(rugPullPos);
-                console.error(`🚨 [Rug Pull] ${capturedUpdated.symbol} — %${tokenLossPct.toFixed(1)} kayıp, hemen kapatıldı`);
-              }
-            }
-          } catch {
-            // Bakiye okunamadı, bir sonraki döngüde tekrar dene
-          }
-        }, 2000);
-        this.balanceCheckIntervals.set(capturedUpdated.id, halfBalanceInterval);
+        const config = this.store.getConfig();
+        this.startRugCheckInterval(updated, config.slippageBps);
       }
 
       return updated!;
@@ -1247,5 +1159,13 @@ export class JupiterTrader {
     const cfg = this.store.updateConfig(partial);
     this.emit("trade_config_update", cfg);
     return cfg;
+  }
+
+  /**
+   * Helius monitor'dan gelen pool SOL miktarını günceller.
+   * Rug check interval'inde pool liquidity kontrolü için kullanılır.
+   */
+  setPoolSol(mintAddress: string, poolSol: number) {
+    this.poolSolCache.set(mintAddress, poolSol);
   }
 }
