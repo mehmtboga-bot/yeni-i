@@ -493,7 +493,10 @@ export class JupiterTrader {
       console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
 
       // Alım sonrası rug check interval — alım başarılı olsun veya olmasın başlatılır
-      this.startRugCheckInterval(position, config.slippageBps);
+      // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
+      setTimeout(() => {
+        this.startRugCheckInterval(position, config.slippageBps);
+      }, 10000);
 
       return position;
 
@@ -505,7 +508,10 @@ export class JupiterTrader {
 
       // Alım başarısız olsa bile rug check interval başlat
       // (TX gönderilmiş olabilir, token gelmiş olabilir)
-      this.startRugCheckInterval(position, config.slippageBps);
+      // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
+      setTimeout(() => {
+        this.startRugCheckInterval(position, config.slippageBps);
+      }, 10000);
 
       return position;
     } finally {
@@ -577,7 +583,10 @@ export class JupiterTrader {
       console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | tx ${sig.slice(0, 16)}...`);
 
       // Alım sonrası rug check interval — alım başarılı olsun veya olmasın başlatılır
-      this.startRugCheckInterval(position, config.slippageBps);
+      // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
+      setTimeout(() => {
+        this.startRugCheckInterval(position, config.slippageBps);
+      }, 10000);
 
       return position;
     } catch (err) {
@@ -588,7 +597,10 @@ export class JupiterTrader {
 
       // Alım başarısız olsa bile rug check interval başlat
       // (TX gönderilmiş olabilir, token gelmiş olabilir)
-      this.startRugCheckInterval(position, config.slippageBps);
+      // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
+      setTimeout(() => {
+        this.startRugCheckInterval(position, config.slippageBps);
+      }, 10000);
 
       return position;
     } finally {
