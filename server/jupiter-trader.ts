@@ -468,25 +468,35 @@ export class JupiterTrader {
       let swapPricePerToken = 0;
 
       // retries=2 → Deneme 1: Quote al → TX gönder → Bakiye polling
-      //              Deneme 2: Quote al (YENİ) → Yeni TX gönder → Bakiye polling
+      //              Deneme 2: Önce mevcut bakiye kontrol (önceki TX başardıysa), yoksa yeni TX gönder
       const result = await this.withRetry(async () => {
+        // [DÜZELTİLDİ] Retry'da çift TX'i önle: önceki deneme TX'i onaylanmış olabilir.
+        // Yeni TX göndermeden önce cüzdanda bakiye var mı kontrol et.
+        if (swapSignature !== null) {
+          const existing = await this.getTokenBalance(mintAddress);
+          if (existing && existing.uiAmount > 0) {
+            console.log(`✅ [Jupiter] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
+            return { sig: swapSignature, tokensOut: existing.uiAmount, pricePerToken: swapPricePerToken };
+          }
+        }
+
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
         swapPricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
 
-        // Her deneme yeni TX gönder
         swapSignature = await this.swap(quote, priorityFee);
         // TX ağda yayılması için 750ms bekle
         await new Promise((r) => setTimeout(r, 750));
 
-        // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
-        for (let c = 0; c < 8; c++) {
+        // TX gönderildi — her 500ms'de bakiye kontrol (max 20 = 10s)
+        // [DÜZELTİLDİ] 8→20: Mainnet'te yeni token hesabı oluşumu + RPC yayılımı 5-15s sürebilir
+        for (let c = 0; c < 20; c++) {
           await new Promise((r) => setTimeout(r, 500));
           const bal = await this.getTokenBalance(mintAddress);
           if (bal && bal.uiAmount > 0) {
             return { sig: swapSignature!, tokensOut: bal.uiAmount, pricePerToken: swapPricePerToken };
           }
-          console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/8)`);
+          console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/20)`);
         }
 
         // Token gelmedi — retry izin ver
@@ -562,21 +572,30 @@ export class JupiterTrader {
       let swapSignature: string | null = null;
 
       // retries=2 → Deneme 1: TX gönder → Bakiye polling
-      //              Deneme 2: Yeni TX gönder → Bakiye polling
-      const sig = await this.withRetry(async () => {
-        // Her deneme yeni TX gönder
+      //              Deneme 2: Önce mevcut bakiye kontrol (önceki TX başardıysa), yoksa yeni TX gönder
+      const { sig, tokensReceived } = await this.withRetry(async () => {
+        // [DÜZELTİLDİ] Retry'da çift TX'i önle: önceki deneme TX'i onaylanmış olabilir.
+        if (swapSignature !== null) {
+          const existing = await this.getTokenBalance(mintAddress);
+          if (existing && existing.uiAmount > 0) {
+            console.log(`✅ [PumpSwap] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
+            return { sig: swapSignature, tokensReceived: existing.uiAmount };
+          }
+        }
+
         swapSignature = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
 
-        // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
+        // TX gönderildi — her 500ms'de bakiye kontrol (max 20 = 10s)
+        // [DÜZELTİLDİ] 8→20: Mainnet'te yeni token hesabı oluşumu + RPC yayılımı 5-15s sürebilir
         let tokensReceived = 0;
-        for (let c = 0; c < 8; c++) {
+        for (let c = 0; c < 20; c++) {
           await new Promise((r) => setTimeout(r, 500));
           const bal = await this.getTokenBalance(mintAddress);
           if (bal && bal.uiAmount > 0) {
             tokensReceived = bal.uiAmount;
             break;
           }
-          console.log(`⏳ [PumpSwap] Token bekleniyor... (${c + 1}/8)`);
+          console.log(`⏳ [PumpSwap] Token bekleniyor... (${c + 1}/20)`);
         }
 
         // Token gelmedi — retry izin ver
@@ -584,11 +603,10 @@ export class JupiterTrader {
           throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
         }
 
-        return swapSignature!;
+        return { sig: swapSignature!, tokensReceived };
       }, `PumpSwap Buy ${symbol}`, 2);
 
-      const tokensReceived = (await this.getTokenBalance(mintAddress))?.uiAmount ?? 0;
-
+      // [DÜZELTİLDİ] withRetry'dan dönen tokensReceived kullanılıyor — gereksiz tekrar sorgu kaldırıldı
       position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived };
       this.updateAndEmit(position);
       console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | tx ${sig.slice(0, 16)}...`);
@@ -1130,9 +1148,9 @@ export class JupiterTrader {
       }
 
       // Yarı satış başarılı — kalan token için rug check interval'i yeniden başlat
+      // [DÜZELTİLDİ] startRugCheckInterval sadece 1 parametre alır — fazladan argüman kaldırıldı
       if (updated! && updated.status === "open" && updated.buyTokenAmount && updated.buyTokenAmount > 0) {
-        const config = this.store.getConfig();
-        this.startRugCheckInterval(updated, config.slippageBps);
+        this.startRugCheckInterval(updated);
       }
 
       return updated!;
