@@ -272,7 +272,7 @@ export class JupiterTrader {
       publicKey: this.keypair.publicKey.toBase58(),
       action: opts.action,
       mint: opts.mint,
-      denominatedInSol: opts.denominatedInSol ? "true" : "false",
+      denominatedInSol: opts.denominatedInSol,
       amount: opts.amount,
       slippage: opts.slippagePct,
       priorityFee: opts.priorityFeeSol,
@@ -283,7 +283,7 @@ export class JupiterTrader {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      timeoutMs: 1000,
+      timeoutMs: 3000,
     });
 
     if (!res.ok) throw new Error(`PumpPortal API ${res.status}: ${(await res.text()).slice(0, 200)}`);
