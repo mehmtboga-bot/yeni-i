@@ -479,9 +479,9 @@ export class JupiterTrader {
         // TX ağda yayılması için 750ms bekle
         await new Promise((r) => setTimeout(r, 750));
 
-        // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
+        // TX gönderildi — her 1000ms'de bakiye kontrol (max 8 = 8s)
         for (let c = 0; c < 8; c++) {
-          await new Promise((r) => setTimeout(r, 500));
+          await new Promise((r) => setTimeout(r, 1000));
           const bal = await this.getTokenBalance(mintAddress);
           if (bal && bal.uiAmount > 0) {
             return { sig: swapSignature!, tokensOut: bal.uiAmount, pricePerToken: swapPricePerToken };
@@ -567,10 +567,10 @@ export class JupiterTrader {
         // Her deneme yeni TX gönder
         swapSignature = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
 
-        // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
+        // TX gönderildi — her 1000ms'de bakiye kontrol (max 8 = 8s)
         let tokensReceived = 0;
         for (let c = 0; c < 8; c++) {
-          await new Promise((r) => setTimeout(r, 500));
+          await new Promise((r) => setTimeout(r, 1000));
           const bal = await this.getTokenBalance(mintAddress);
           if (bal && bal.uiAmount > 0) {
             tokensReceived = bal.uiAmount;
