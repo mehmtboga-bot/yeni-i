@@ -129,7 +129,7 @@ export class JupiterTrader {
     return dec;
   }
 
-  private async getTokenBalance(mint: string): Promise<{ uiAmount: number; raw: string; decimals: number } | null> {
+  private async getTokenBalance(mint: string, label?: string): Promise<{ uiAmount: number; raw: string; decimals: number } | null> {
     if (!this.keypair || !this.connection) return null;
     try {
       const res = await this.connection.getParsedTokenAccountsByOwner(this.keypair.publicKey, { mint: new PublicKey(mint) });
@@ -144,7 +144,12 @@ export class JupiterTrader {
       const uiAmount = Number(totalRaw) / Math.pow(10, decimals);
       return { uiAmount, raw: totalRaw.toString(), decimals };
     } catch (err) {
-      console.error("❌ Token bakiye okunamadı:", (err as Error).message);
+      const errMsg = (err as Error).message;
+      if (label) {
+        console.error(`❌ [${label}] Token polling: RPC hatası — ${errMsg}`);
+      } else {
+        console.error("❌ Token bakiye okunamadı:", errMsg);
+      }
       return null;
     }
   }
@@ -226,15 +231,47 @@ export class JupiterTrader {
     // Blockhash TX gönderiminden ÖNCE alınır — confirmation window daha uzun olur
     const latest = await this.connection.getLatestBlockhash("processed");
 
+    // TX'in içindeki blockhash'i kontrol et — eski ise logla
+    const txBlockhash = (tx.message as any).recentBlockhash as string | undefined;
+    if (txBlockhash && txBlockhash !== latest.blockhash) {
+      console.warn(`⚠️ [Jupiter] TX blockhash güncel değil — TX: ${txBlockhash?.slice(0, 8)}... / RPC: ${latest.blockhash.slice(0, 8)}... (blockhash expired riski)`);
+    }
+
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
-    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    let signature: string;
+    try {
+      signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    } catch (sendErr) {
+      const sendErrMsg = (sendErr as Error).message;
+      const isBlockhashErr = sendErrMsg.toLowerCase().includes("block height exceeded") || sendErrMsg.toLowerCase().includes("blockhash");
+      if (isBlockhashErr) {
+        console.error(`❌ [Jupiter] TX gönderme hatası: Blockhash expired — ${sendErrMsg}`);
+      } else {
+        console.error(`❌ [Jupiter] TX gönderme hatası: RPC/network — ${sendErrMsg}`);
+      }
+      throw sendErr;
+    }
 
     if (confirmForeground) {
       // Satış TX'leri için FOREGROUND confirm — onaylanmadan devam etme
       // TX başarısız veya timeout olursa throw eder, withRetry yeni TX gönderir
-      const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+      let conf: Awaited<ReturnType<Connection["confirmTransaction"]>>;
+      try {
+        conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+      } catch (confirmErr) {
+        const confirmErrMsg = (confirmErr as Error).message;
+        const isBlockhashErr = confirmErrMsg.toLowerCase().includes("block height exceeded") || confirmErrMsg.toLowerCase().includes("blockhash");
+        if (isBlockhashErr) {
+          console.error(`❌ [Jupiter] Blockhash expired: block height exceeded (sig: ${signature.slice(0, 16)}...)`);
+        } else {
+          console.error(`❌ [Jupiter] TX confirm timeout/hata: ${confirmErrMsg} (sig: ${signature.slice(0, 16)}...)`);
+        }
+        throw confirmErr;
+      }
       if (conf.value.err) {
-        throw new Error(`Jupiter TX başarısız: ${JSON.stringify(conf.value.err)} (sig: ${signature.slice(0, 16)}...)`);
+        const instrErr = JSON.stringify(conf.value.err);
+        console.error(`❌ [Jupiter] TX instruction hatası: ${instrErr} (sig: ${signature.slice(0, 16)}...)`);
+        throw new Error(`Jupiter TX başarısız: ${instrErr} (sig: ${signature.slice(0, 16)}...)`);
       }
       console.log(`✅ [Jupiter] TX onaylandı: ${signature.slice(0, 16)}...`);
     } else {
@@ -243,12 +280,19 @@ export class JupiterTrader {
         try {
           const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
           if (conf.value.err) {
-            console.error(`❌ [Jupiter] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
+            const instrErr = JSON.stringify(conf.value.err);
+            console.error(`❌ [Jupiter] TX instruction hatası (background): ${instrErr} (sig: ${signature.slice(0, 16)}...)`);
           } else {
             console.log(`✅ [Jupiter] TX onaylandı (background): ${signature.slice(0, 16)}...`);
           }
         } catch (err) {
-          console.error(`❌ [Jupiter] TX confirm timeout (background): ${(err as Error).message}`);
+          const confirmErrMsg = (err as Error).message;
+          const isBlockhashErr = confirmErrMsg.toLowerCase().includes("block height exceeded") || confirmErrMsg.toLowerCase().includes("blockhash");
+          if (isBlockhashErr) {
+            console.error(`❌ [Jupiter] Blockhash expired (background): block height exceeded (sig: ${signature.slice(0, 16)}...)`);
+          } else {
+            console.error(`❌ [Jupiter] TX confirm timeout (background): ${confirmErrMsg} (sig: ${signature.slice(0, 16)}...)`);
+          }
         }
       })();
     }
@@ -310,15 +354,47 @@ export class JupiterTrader {
     // Blockhash TX gönderiminden ÖNCE alınır — confirmation window daha uzun olur
     const latest = await this.connection.getLatestBlockhash("processed");
 
+    // TX'in içindeki blockhash'i kontrol et — eski ise logla
+    const txBlockhash = (tx.message as any).recentBlockhash as string | undefined;
+    if (txBlockhash && txBlockhash !== latest.blockhash) {
+      console.warn(`⚠️ [PumpSwap] TX blockhash güncel değil — TX: ${txBlockhash?.slice(0, 8)}... / RPC: ${latest.blockhash.slice(0, 8)}... (blockhash expired riski)`);
+    }
+
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
-    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    let signature: string;
+    try {
+      signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    } catch (sendErr) {
+      const sendErrMsg = (sendErr as Error).message;
+      const isBlockhashErr = sendErrMsg.toLowerCase().includes("block height exceeded") || sendErrMsg.toLowerCase().includes("blockhash");
+      if (isBlockhashErr) {
+        console.error(`❌ [PumpSwap] TX gönderme hatası: Blockhash expired — ${sendErrMsg}`);
+      } else {
+        console.error(`❌ [PumpSwap] TX gönderme hatası: RPC/network — ${sendErrMsg}`);
+      }
+      throw sendErr;
+    }
 
     if (opts.confirmForeground) {
       // Satış TX'leri için FOREGROUND confirm — onaylanmadan devam etme
       // TX başarısız veya timeout olursa throw eder, withRetry yeni TX gönderir
-      const conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+      let conf: Awaited<ReturnType<Connection["confirmTransaction"]>>;
+      try {
+        conf = await this.connection.confirmTransaction({ signature, ...latest }, "processed");
+      } catch (confirmErr) {
+        const confirmErrMsg = (confirmErr as Error).message;
+        const isBlockhashErr = confirmErrMsg.toLowerCase().includes("block height exceeded") || confirmErrMsg.toLowerCase().includes("blockhash");
+        if (isBlockhashErr) {
+          console.error(`❌ [PumpSwap] Blockhash expired: block height exceeded (sig: ${signature.slice(0, 16)}...)`);
+        } else {
+          console.error(`❌ [PumpSwap] TX confirm timeout/hata: ${confirmErrMsg} (sig: ${signature.slice(0, 16)}...)`);
+        }
+        throw confirmErr;
+      }
       if (conf.value.err) {
-        throw new Error(`PumpSwap TX başarısız: ${JSON.stringify(conf.value.err)} (sig: ${signature.slice(0, 16)}...)`);
+        const instrErr = JSON.stringify(conf.value.err);
+        console.error(`❌ [PumpSwap] TX instruction hatası: ${instrErr} (sig: ${signature.slice(0, 16)}...)`);
+        throw new Error(`PumpSwap TX başarısız: ${instrErr} (sig: ${signature.slice(0, 16)}...)`);
       }
       console.log(`✅ [PumpSwap] TX onaylandı: ${signature.slice(0, 16)}...`);
     } else {
@@ -327,12 +403,19 @@ export class JupiterTrader {
         try {
           const conf = await this.connection!.confirmTransaction({ signature, ...latest }, "processed");
           if (conf.value.err) {
-            console.error(`❌ [PumpSwap] TX hata (background): ${signature.slice(0, 16)}... — ${JSON.stringify(conf.value.err)}`);
+            const instrErr = JSON.stringify(conf.value.err);
+            console.error(`❌ [PumpSwap] TX instruction hatası (background): ${instrErr} (sig: ${signature.slice(0, 16)}...)`);
           } else {
             console.log(`✅ [PumpSwap] TX onaylandı (background): ${signature.slice(0, 16)}...`);
           }
         } catch (err) {
-          console.error(`❌ [PumpSwap] TX confirm timeout (background): ${(err as Error).message}`);
+          const confirmErrMsg = (err as Error).message;
+          const isBlockhashErr = confirmErrMsg.toLowerCase().includes("block height exceeded") || confirmErrMsg.toLowerCase().includes("blockhash");
+          if (isBlockhashErr) {
+            console.error(`❌ [PumpSwap] Blockhash expired (background): block height exceeded (sig: ${signature.slice(0, 16)}...)`);
+          } else {
+            console.error(`❌ [PumpSwap] TX confirm timeout (background): ${confirmErrMsg} (sig: ${signature.slice(0, 16)}...)`);
+          }
         }
       })();
     }
@@ -469,39 +552,59 @@ export class JupiterTrader {
 
       // retries=2 → Deneme 1: Quote al → TX gönder → Bakiye polling
       //              Deneme 2: Önce mevcut bakiye kontrol (önceki TX başardıysa), yoksa yeni TX gönder
+      const label = `Jupiter Buy ${symbol}`;
       const result = await this.withRetry(async () => {
         // [DÜZELTİLDİ] Retry'da çift TX'i önle: önceki deneme TX'i onaylanmış olabilir.
         // Yeni TX göndermeden önce cüzdanda bakiye var mı kontrol et.
         if (swapSignature !== null) {
-          const existing = await this.getTokenBalance(mintAddress);
+          const existing = await this.getTokenBalance(mintAddress, label);
           if (existing && existing.uiAmount > 0) {
-            console.log(`✅ [Jupiter] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
+            console.log(`✅ [${label}] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
             return { sig: swapSignature, tokensOut: existing.uiAmount, pricePerToken: swapPricePerToken };
           }
+          console.log(`⏳ [${label}] Retry: önceki TX (${swapSignature.slice(0, 16)}...) onaylanmadı, yeni quote + TX gönderiliyor`);
         }
 
-        const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+        // Adım 1: Quote al
+        let quote: QuoteResponse;
+        try {
+          quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+        } catch (quoteErr) {
+          const quoteErrMsg = (quoteErr as Error).message;
+          console.error(`❌ [${label}] Quote hatası: ${quoteErrMsg}`);
+          throw quoteErr;
+        }
         const decimals = await this.fetchDecimals(mintAddress);
         swapPricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
+        console.log(`📋 [${label}] Quote alındı: ${Number(quote.outAmount) / Math.pow(10, decimals)} token, priceImpact: ${quote.priceImpactPct}%`);
 
-        swapSignature = await this.swap(quote, priorityFee);
+        // Adım 2: Swap TX oluştur ve gönder
+        try {
+          swapSignature = await this.swap(quote, priorityFee);
+        } catch (swapErr) {
+          const swapErrMsg = (swapErr as Error).message;
+          console.error(`❌ [${label}] Swap TX hatası: ${swapErrMsg}`);
+          throw swapErr;
+        }
+        console.log(`📤 [${label}] TX gönderildi: ${swapSignature.slice(0, 16)}... — token polling başlıyor`);
         // TX ağda yayılması için 750ms bekle
         await new Promise((r) => setTimeout(r, 750));
 
-        // TX gönderildi — her 500ms'de bakiye kontrol (max 20 = 10s)
+        // Adım 3: Token bakiyesi polling (max 20 = 10s)
         // [DÜZELTİLDİ] 8→20: Mainnet'te yeni token hesabı oluşumu + RPC yayılımı 5-15s sürebilir
         for (let c = 0; c < 20; c++) {
           await new Promise((r) => setTimeout(r, 500));
-          const bal = await this.getTokenBalance(mintAddress);
+          const bal = await this.getTokenBalance(mintAddress, label);
           if (bal && bal.uiAmount > 0) {
             return { sig: swapSignature!, tokensOut: bal.uiAmount, pricePerToken: swapPricePerToken };
           }
-          console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/20)`);
+          console.log(`⏳ [${label}] Token bekleniyor... (${c + 1}/20) sig: ${swapSignature!.slice(0, 16)}...`);
         }
 
         // Token gelmedi — retry izin ver
+        console.error(`❌ [${label}] Token polling timeout: 10s sonunda bakiye hala 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
         throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
-      }, `Jupiter Buy ${symbol}`, 2);
+      }, label, 2);
 
       position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
@@ -573,38 +676,49 @@ export class JupiterTrader {
 
       // retries=2 → Deneme 1: TX gönder → Bakiye polling
       //              Deneme 2: Önce mevcut bakiye kontrol (önceki TX başardıysa), yoksa yeni TX gönder
+      const pumpLabel = `PumpSwap Buy ${symbol}`;
       const { sig, tokensReceived } = await this.withRetry(async () => {
         // [DÜZELTİLDİ] Retry'da çift TX'i önle: önceki deneme TX'i onaylanmış olabilir.
         if (swapSignature !== null) {
-          const existing = await this.getTokenBalance(mintAddress);
+          const existing = await this.getTokenBalance(mintAddress, pumpLabel);
           if (existing && existing.uiAmount > 0) {
-            console.log(`✅ [PumpSwap] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
+            console.log(`✅ [${pumpLabel}] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
             return { sig: swapSignature, tokensReceived: existing.uiAmount };
           }
+          console.log(`⏳ [${pumpLabel}] Retry: önceki TX (${swapSignature.slice(0, 16)}...) onaylanmadı, yeni TX gönderiliyor`);
         }
 
-        swapSignature = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
+        // Adım 1: PumpSwap TX oluştur ve gönder
+        try {
+          swapSignature = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
+        } catch (txErr) {
+          const txErrMsg = (txErr as Error).message;
+          console.error(`❌ [${pumpLabel}] TX oluşturma/gönderme hatası: ${txErrMsg}`);
+          throw txErr;
+        }
+        console.log(`📤 [${pumpLabel}] TX gönderildi: ${swapSignature.slice(0, 16)}... — token polling başlıyor`);
 
-        // TX gönderildi — her 500ms'de bakiye kontrol (max 20 = 10s)
+        // Adım 2: Token bakiyesi polling (max 20 = 10s)
         // [DÜZELTİLDİ] 8→20: Mainnet'te yeni token hesabı oluşumu + RPC yayılımı 5-15s sürebilir
         let tokensReceived = 0;
         for (let c = 0; c < 20; c++) {
           await new Promise((r) => setTimeout(r, 500));
-          const bal = await this.getTokenBalance(mintAddress);
+          const bal = await this.getTokenBalance(mintAddress, pumpLabel);
           if (bal && bal.uiAmount > 0) {
             tokensReceived = bal.uiAmount;
             break;
           }
-          console.log(`⏳ [PumpSwap] Token bekleniyor... (${c + 1}/20)`);
+          console.log(`⏳ [${pumpLabel}] Token bekleniyor... (${c + 1}/20) sig: ${swapSignature!.slice(0, 16)}...`);
         }
 
         // Token gelmedi — retry izin ver
         if (tokensReceived === 0) {
+          console.error(`❌ [${pumpLabel}] Token polling timeout: 10s sonunda bakiye hala 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
           throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
         }
 
         return { sig: swapSignature!, tokensReceived };
-      }, `PumpSwap Buy ${symbol}`, 2);
+      }, pumpLabel, 2);
 
       // [DÜZELTİLDİ] withRetry'dan dönen tokensReceived kullanılıyor — gereksiz tekrar sorgu kaldırıldı
       position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived };
