@@ -114,7 +114,7 @@ interface TokenMetadata {
 export class HeliusMonitor {
   private dexWebSocket: WebSocket | null = null;
   private processedDexSignatures: Set<string> = new Set();
-  private recentTokenSymbols: Map<string, number> = new Map(); // symbol → timestamp
+  private recentTokenSymbols: Map<string, { timestamp: number; timeoutId: NodeJS.Timeout }> = new Map(); // symbol → {timestamp, timeoutId}
   private readonly RECENT_TOKEN_WINDOW_MS = 12 * 60 * 1000; // 12 dakika
   private skippedTokens: Array<{ symbol: string; skippedAt: number; count: number }> = [];
   private readonly MAX_SKIPPED_TOKENS = 50;
@@ -352,8 +352,8 @@ export class HeliusMonitor {
       const symbol     = metadata?.symbol || "?";
 
       // Son 12 dakikada çıkan symbol mi?
-      const lastSeen = this.recentTokenSymbols.get(symbol);
-      if (lastSeen && Date.now() - lastSeen < this.RECENT_TOKEN_WINDOW_MS) {
+      const tokenRecord = this.recentTokenSymbols.get(symbol);
+      if (tokenRecord && Date.now() - tokenRecord.timestamp < this.RECENT_TOKEN_WINDOW_MS) {
         console.log(`⏭️ [LP] ${symbol} son 12 dakikada görüldü, arayüzde gösteriliyor (otomatik alım yapılmayacak)`);
 
         // Atlanan token'i kaydet
@@ -390,16 +390,16 @@ export class HeliusMonitor {
         return;
       }
 
-      // Symbol'ü kaydet
-      this.recentTokenSymbols.set(symbol, Date.now());
+      // Symbol'ü kaydet ve 13 dakika sonra otomatik sil
+      const existingTimeout = this.recentTokenSymbols.get(symbol)?.timeoutId;
+      if (existingTimeout) clearTimeout(existingTimeout);
 
-      // Eski symbol'leri temizle (12 dakikadan eski)
-      const cutoff = Date.now() - this.RECENT_TOKEN_WINDOW_MS;
-      for (const [sym, ts] of this.recentTokenSymbols.entries()) {
-        if (ts < cutoff) {
-          this.recentTokenSymbols.delete(sym);
-        }
-      }
+      const timeoutId = setTimeout(() => {
+        this.recentTokenSymbols.delete(symbol);
+        console.log(`🗑️ [Token Cleanup] ${symbol} 13 dakika sonra silindi`);
+      }, 13 * 60 * 1000);
+
+      this.recentTokenSymbols.set(symbol, { timestamp: Date.now(), timeoutId });
 
       const detectedAt = Date.now();
       const expiresAt  = detectedAt + 5 * 60 * 1000;
@@ -425,8 +425,6 @@ export class HeliusMonitor {
 
       const meetsThreshold = (tvlUsd ?? 0) >= MIN_TVL_USD_NOTIFY;
       if (!meetsThreshold) {
-        // Telegram atlanmadan ÖNCE token'i kaydet (tekrar çıkarsa "tekrar" olarak işaretlensin)
-        this.recentTokenSymbols.set(symbol, Date.now());
 
         console.log(
           `🚫 [LP] Telegram atlandı | ${symbol} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | eşik=${MIN_TVL_USD_NOTIFY}`
@@ -559,9 +557,9 @@ export class HeliusMonitor {
    * Token'in son 15 dakikada görülüp görülmediğini kontrol et
    */
   isTokenRecentlySkipped(symbol: string): boolean {
-    const lastSeen = this.recentTokenSymbols.get(symbol);
-    if (!lastSeen) return false;
-    return Date.now() - lastSeen < this.RECENT_TOKEN_WINDOW_MS;
+    const tokenRecord = this.recentTokenSymbols.get(symbol);
+    if (!tokenRecord) return false;
+    return Date.now() - tokenRecord.timestamp < this.RECENT_TOKEN_WINDOW_MS;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -583,6 +581,11 @@ export class HeliusMonitor {
     }
 
     this.processedDexSignatures.clear();
+
+    // Tüm timeout'ları temizle
+    for (const { timeoutId } of this.recentTokenSymbols.values()) {
+      clearTimeout(timeoutId);
+    }
     this.recentTokenSymbols.clear();
     this.skippedTokens = [];
     this.rateLimiter.destroy();
