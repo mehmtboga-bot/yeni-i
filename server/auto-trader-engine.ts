@@ -123,6 +123,13 @@ export class AutoTraderEngine {
     }
 
     this.processedLPs.add(mintAddress);
+
+    // 13 dakika sonra processedLPs'den sil (Helius monitor ile senkronize)
+    setTimeout(() => {
+      this.processedLPs.delete(mintAddress);
+      console.log(`🗑️ [Auto-Trader] ${symbol} processedLPs'den silindi`);
+    }, 13 * 60 * 1000);
+
     const recordId = `auto-${mintAddress}-${Date.now()}`;
     const customHoldDurationMs: number | undefined = lpData.customHoldDurationMs;
     const holdMs = customHoldDurationMs ?? config.holdDurationMs;
