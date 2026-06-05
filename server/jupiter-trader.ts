@@ -464,23 +464,20 @@ export class JupiterTrader {
     await new Promise((r) => setTimeout(r, 650));
 
     try {
-      // swapSignature: TX bir kez gönderilir, ikinci denemede yeni TX oluşturulmaz
       let swapSignature: string | null = null;
       let swapPricePerToken = 0;
 
       // retries=2 → Deneme 1: Quote al → TX gönder → Bakiye polling
-      //              Deneme 2: Quote al (YENİ) → TX gönder (1 kere, duplicate yok) → Bakiye polling
+      //              Deneme 2: Quote al (YENİ) → Yeni TX gönder → Bakiye polling
       const result = await this.withRetry(async () => {
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
         swapPricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
 
-        // TX daha önce gönderilmediyse gönder — duplicate TX yasak
-        if (!swapSignature) {
-          swapSignature = await this.swap(quote, priorityFee);
-          // TX ağda yayılması için 750ms bekle
-          await new Promise((r) => setTimeout(r, 750));
-        }
+        // Her deneme yeni TX gönder
+        swapSignature = await this.swap(quote, priorityFee);
+        // TX ağda yayılması için 750ms bekle
+        await new Promise((r) => setTimeout(r, 750));
 
         // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
         for (let c = 0; c < 8; c++) {
@@ -492,7 +489,7 @@ export class JupiterTrader {
           console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/8)`);
         }
 
-        // Token gelmedi — retry izin ver (swapSignature koruması duplicate TX'i önler)
+        // Token gelmedi — retry izin ver
         throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
       }, `Jupiter Buy ${symbol}`, 2);
 
@@ -562,16 +559,13 @@ export class JupiterTrader {
     const priorityFeeSol = rawFee / 1_000_000_000;
 
     try {
-      // swapSignature: TX bir kez gönderilir, ikinci denemede yeni TX oluşturulmaz
       let swapSignature: string | null = null;
 
       // retries=2 → Deneme 1: TX gönder → Bakiye polling
-      //              Deneme 2: TX gönder (1 kere, duplicate yok) → Bakiye polling
+      //              Deneme 2: Yeni TX gönder → Bakiye polling
       const sig = await this.withRetry(async () => {
-        // TX daha önce gönderilmediyse gönder — duplicate TX yasak
-        if (!swapSignature) {
-          swapSignature = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
-        }
+        // Her deneme yeni TX gönder
+        swapSignature = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
 
         // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
         let tokensReceived = 0;
@@ -585,7 +579,7 @@ export class JupiterTrader {
           console.log(`⏳ [PumpSwap] Token bekleniyor... (${c + 1}/8)`);
         }
 
-        // Token gelmedi — retry izin ver (swapSignature koruması duplicate TX'i önler)
+        // Token gelmedi — retry izin ver
         if (tokensReceived === 0) {
           throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
         }
