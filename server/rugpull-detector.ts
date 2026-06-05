@@ -1,24 +1,18 @@
 /**
  * Rugpull Detector
  *
- * 3 kritere göre rug pull tespiti yapar:
+ * 2 kritere göre rug pull tespiti yapar:
  *
- * 1. Jupiter Quote Hataları — 5 kez üst üste quote alınamazsa rug pull
- * 2. Pool Liquidity Kontrolü — Pool SOL < 2 SOL ise rug pull
- * 3. Zararlı Pozisyon Kontrolü — %-80 veya daha kötü zarardaysa rug pull
+ * 1. Pool Liquidity Kontrolü — Pool SOL < 2 SOL ise rug pull
+ * 2. Zararlı Pozisyon Kontrolü — %-80 veya daha kötü zarardaysa rug pull
  *
  * Eski RemoveLiquidity log analizi de korunmuştur (geriye dönük uyumluluk).
  */
 
 import type { Position } from "@shared/schema";
 
-const JUP_QUOTE = "https://api.jup.ag/swap/v1/quote";
-const SOL_MINT  = "So11111111111111111111111111111111111111112";
-
 // Pool SOL eşiği — bu değerin altındaysa rug pull
 const POOL_SOL_THRESHOLD = 2;
-// Jupiter quote hata eşiği — bu kadar üst üste hata gelirse rug pull
-const JUPITER_QUOTE_ERROR_THRESHOLD = 5;
 // Pozisyon zarar eşiği — bu kadar veya daha fazla zarardaysa rug pull
 const LOSS_THRESHOLD_PCT = 80;
 
@@ -27,7 +21,7 @@ export interface RugpullAlert {
   tokenMint: string;
   tokenName: string;
   tokenSymbol: string;
-  reason: "jupiter_quote_errors" | "pool_liquidity" | "loss_threshold" | "remove_liquidity";
+  reason: "pool_liquidity" | "loss_threshold" | "remove_liquidity";
   detail: string;
   detectedAt: number;
   // Eski alanlar (geriye dönük uyumluluk)
@@ -37,13 +31,6 @@ export interface RugpullAlert {
 }
 
 type OnRugpullDetected = (alert: RugpullAlert, affectedPositions: Position[]) => void;
-
-// ─── Yardımcı: timeout'lu fetch ───────────────────────────────────────────────
-function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
-}
 
 // ─── Ana sınıf ────────────────────────────────────────────────────────────────
 export class RugpullDetector {
@@ -55,43 +42,7 @@ export class RugpullDetector {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 1. Jupiter Quote Hataları
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Satış için Jupiter quote almayı dener.
-   * Başarılıysa false döner (rug yok).
-   * Başarısızsa true döner (bu deneme hata).
-   */
-  async checkJupiterQuoteError(
-    mintAddress: string,
-    tokenAmountRaw: string,
-    slippageBps: number
-  ): Promise<boolean> {
-    try {
-      const url = new URL(JUP_QUOTE);
-      url.searchParams.set("inputMint", mintAddress);
-      url.searchParams.set("outputMint", SOL_MINT);
-      url.searchParams.set("amount", tokenAmountRaw);
-      url.searchParams.set("slippageBps", String(Math.min(slippageBps, 9900)));
-      url.searchParams.set("onlyDirectRoutes", "false");
-      url.searchParams.set("asLegacyTransaction", "false");
-      url.searchParams.set("restrictIntermediateTokens", "true");
-
-      const res = await fetchWithTimeout(url.toString(), 3000);
-      if (!res.ok) return true; // HTTP hata → quote yok
-
-      const json = await res.json();
-      if (!json?.outAmount || BigInt(json.outAmount) === 0n) return true; // Route yok
-
-      return false; // Quote başarılı
-    } catch {
-      return true; // Timeout / ağ hatası → quote yok
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 2. Pool Liquidity Kontrolü
+  // 1. Pool Liquidity Kontrolü
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -104,7 +55,7 @@ export class RugpullDetector {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 3. Zararlı Pozisyon Kontrolü
+  // 2. Zararlı Pozisyon Kontrolü
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -117,7 +68,7 @@ export class RugpullDetector {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Rug Pull Tespiti — 3 kriteri birleştirir
+  // Rug Pull Tespiti — 2 kriteri birleştirir
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -126,39 +77,18 @@ export class RugpullDetector {
    *
    * @param symbol          Token sembolü (log için)
    * @param mintAddress     Token mint adresi
-   * @param tokenAmountRaw  Satış için raw token miktarı (string, lamport cinsinden)
-   * @param slippageBps     Slippage (Jupiter quote için)
-   * @param jupiterErrorCount  Mevcut Jupiter quote hata sayacı (dışarıdan yönetilir)
    * @param poolSol         Pool SOL miktarı (Helius monitor'dan, opsiyonel)
    * @param unrealizedPnlPct  Mevcut gerçekleşmemiş PnL yüzdesi (opsiyonel)
    */
   async detectRugpull(opts: {
     symbol: string;
     mintAddress: string;
-    tokenAmountRaw: string;
-    slippageBps: number;
-    jupiterErrorCount: number;
     poolSol?: number;
     unrealizedPnlPct?: number;
   }): Promise<RugpullAlert | null> {
-    const { symbol, mintAddress, slippageBps, jupiterErrorCount, poolSol, unrealizedPnlPct } = opts;
+    const { symbol, mintAddress, poolSol, unrealizedPnlPct } = opts;
 
-    // Kriter 1: Jupiter quote hataları
-    if (jupiterErrorCount >= JUPITER_QUOTE_ERROR_THRESHOLD) {
-      const alert: RugpullAlert = {
-        id: `rugpull-${mintAddress}-${Date.now()}`,
-        tokenMint: mintAddress,
-        tokenName: symbol,
-        tokenSymbol: symbol,
-        reason: "jupiter_quote_errors",
-        detail: `Jupiter ${jupiterErrorCount} kez üst üste quote veremedi`,
-        detectedAt: Date.now(),
-      };
-      console.error(`🚨 [Rug Pull] ${symbol} — Jupiter 5 kez quote veremedi, rug pull`);
-      return alert;
-    }
-
-    // Kriter 2: Pool liquidity
+    // Kriter 1: Pool liquidity
     if (this.checkPoolLiquidity(poolSol)) {
       const alert: RugpullAlert = {
         id: `rugpull-${mintAddress}-${Date.now()}`,
@@ -173,7 +103,7 @@ export class RugpullDetector {
       return alert;
     }
 
-    // Kriter 3: Zararlı pozisyon
+    // Kriter 2: Zararlı pozisyon
     if (this.checkLossThreshold(unrealizedPnlPct)) {
       const loss = Math.abs(unrealizedPnlPct!);
       const alert: RugpullAlert = {

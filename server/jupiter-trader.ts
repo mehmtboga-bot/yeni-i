@@ -346,14 +346,15 @@ export class JupiterTrader {
   }
 
   /**
-   * Rug check interval — her 1 saniyede 3 kriteri kontrol eder:
-   * 1. Jupiter quote hataları (5 kez üst üste → rug pull)
-   * 2. Pool liquidity (< 2 SOL → rug pull)
-   * 3. Zararlı pozisyon (%-80 veya daha kötü → rug pull, satış yapılmaz)
+   * Rug check interval — her 4 saniyede 2 kriteri kontrol eder:
+   * 1. Pool liquidity (< 2 SOL → rug pull)
+   * 2. Zararlı pozisyon (%-80 veya daha kötü → rug pull, satış yapılmaz)
    *
    * Alım başarılı olsun veya olmasın başlatılır.
+   * Satış başlarsa veya pozisyon kapanırsa interval durur.
+   * Kontrol hatalarında 2 ilave retry yapılır, sonra sayaç sıfırlanır.
    */
-  private startRugCheckInterval(position: Position, slippageBps: number) {
+  private startRugCheckInterval(position: Position) {
     // Zaten bir interval varsa temizle
     const existing = this.balanceCheckIntervals.get(position.id);
     if (existing) {
@@ -362,7 +363,8 @@ export class JupiterTrader {
     }
 
     const capturedPosition = position;
-    let jupiterErrorCount = 0; // Üst üste Jupiter quote hata sayacı
+    let consecutiveFailures = 0; // Kesin emin olmak için 2 retry
+    const MAX_CONSECUTIVE_FAILURES = 2;
 
     const rugInterval = setInterval(async () => {
       // Pozisyon hala izlenebilir durumda mı?
@@ -373,47 +375,32 @@ export class JupiterTrader {
         return;
       }
 
+      // Satış başladıysa kontrol bırak
+      if (currentPos.status === "pending_sell") {
+        clearInterval(rugInterval);
+        this.balanceCheckIntervals.delete(capturedPosition.id);
+        return;
+      }
+
       const { symbol, mintAddress } = capturedPosition;
 
       try {
-        // Token bakiyesini al — raw amount için gerekli
-        const currentBal = await this.getTokenBalance(mintAddress);
-        const tokenAmountRaw = currentBal
-          ? String(Math.floor(currentBal.uiAmount * Math.pow(10, currentBal.decimals)))
-          : "1000000"; // Fallback: quote için sembolik miktar
-
-        // ── Kriter 1: Jupiter Quote Hatası ──────────────────────────────────
-        const quoteError = await this.rugpullDetector.checkJupiterQuoteError(
-          mintAddress,
-          tokenAmountRaw,
-          slippageBps
-        );
-
-        if (quoteError) {
-          jupiterErrorCount++;
-          console.warn(`⚠️ [Rug Check] ${symbol} — Jupiter quote hatası (${jupiterErrorCount}/5)`);
-        } else {
-          jupiterErrorCount = 0; // Başarılı quote → sayacı sıfırla
-        }
-
-        // ── Kriter 2: Pool Liquidity ─────────────────────────────────────────
+        // ── Kriter 1: Pool Liquidity ─────────────────────────────────────────
         const poolSol = this.poolSolCache.get(mintAddress);
 
-        // ── Kriter 3: Zararlı Pozisyon ───────────────────────────────────────
+        // ── Kriter 2: Zararlı Pozisyon ───────────────────────────────────────
         const unrealizedPnlPct = currentPos.unrealizedPnlPct;
 
         // Tüm kriterleri detectRugpull ile değerlendir
         const rugAlert = await this.rugpullDetector.detectRugpull({
           symbol,
           mintAddress,
-          tokenAmountRaw,
-          slippageBps,
-          jupiterErrorCount,
           poolSol,
           unrealizedPnlPct,
         });
 
         if (rugAlert) {
+          // Rug bulundu → interval durdur, token kapat
           clearInterval(rugInterval);
           this.balanceCheckIntervals.delete(capturedPosition.id);
 
@@ -428,11 +415,21 @@ export class JupiterTrader {
             error: `Rug Pull Detected: ${rugAlert.detail}`,
           };
           this.updateAndEmit(rugPullPos);
+        } else {
+          // Başarılı kontrol → retry sayacı sıfırla
+          consecutiveFailures = 0;
         }
       } catch (err) {
-        console.error(`❌ [Rug Check] ${capturedPosition.symbol} hata:`, (err as Error).message);
+        // Kontrol başarısız → retry sayacı artır
+        consecutiveFailures++;
+        console.warn(`⚠️ [Rug Check] ${capturedPosition.symbol} kontrol başarısız (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`);
+
+        // 2 retry'dan sonra da başarısız olursa sayacı sıfırla, devam et
+        if (consecutiveFailures > MAX_CONSECUTIVE_FAILURES) {
+          consecutiveFailures = 0;
+        }
       }
-    }, 1000);
+    }, 4000);
 
     this.balanceCheckIntervals.set(capturedPosition.id, rugInterval);
   }
@@ -504,7 +501,7 @@ export class JupiterTrader {
       // Alım sonrası rug check interval — alım başarılı olsun veya olmasın başlatılır
       // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
       setTimeout(() => {
-        this.startRugCheckInterval(position, config.slippageBps);
+        this.startRugCheckInterval(position);
       }, 10000);
 
       return position;
@@ -519,7 +516,7 @@ export class JupiterTrader {
       // (TX gönderilmiş olabilir, token gelmiş olabilir)
       // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
       setTimeout(() => {
-        this.startRugCheckInterval(position, config.slippageBps);
+        this.startRugCheckInterval(position);
       }, 10000);
 
       return position;
@@ -603,7 +600,7 @@ export class JupiterTrader {
       // Alım sonrası rug check interval — alım başarılı olsun veya olmasın başlatılır
       // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
       setTimeout(() => {
-        this.startRugCheckInterval(position, config.slippageBps);
+        this.startRugCheckInterval(position);
       }, 10000);
 
       return position;
@@ -617,7 +614,7 @@ export class JupiterTrader {
       // (TX gönderilmiş olabilir, token gelmiş olabilir)
       // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
       setTimeout(() => {
-        this.startRugCheckInterval(position, config.slippageBps);
+        this.startRugCheckInterval(position);
       }, 10000);
 
       return position;
