@@ -478,6 +478,8 @@ export class JupiterTrader {
         // TX daha önce gönderilmediyse gönder — duplicate TX yasak
         if (!swapSignature) {
           swapSignature = await this.swap(quote, priorityFee);
+          // TX ağda yayılması için 2 saniye bekle
+          await new Promise((r) => setTimeout(r, 2000));
         }
 
         // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
@@ -569,6 +571,8 @@ export class JupiterTrader {
         // TX daha önce gönderilmediyse gönder — duplicate TX yasak
         if (!swapSignature) {
           swapSignature = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
+          // TX ağda yayılması için 2 saniye bekle
+          await new Promise((r) => setTimeout(r, 2000));
         }
 
         // TX gönderildi — her 500ms'de bakiye kontrol (max 8 = 4s)
