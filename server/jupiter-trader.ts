@@ -277,6 +277,19 @@ export class JupiterTrader {
       pool: "pumpswap",
     };
 
+    console.log(`🔍 [PumpSwap] Request body:`, JSON.stringify({
+      publicKey: body.publicKey,
+      action: body.action,
+      mint: body.mint,
+      denominatedInSol: body.denominatedInSol,
+      amount: body.amount,
+      slippage: body.slippage,
+      slippageType: typeof body.slippage,
+      priorityFee: body.priorityFee,
+      priorityFeeType: typeof body.priorityFee,
+      pool: body.pool,
+    }, null, 2));
+
     const res = await this.fetchWithTimeout(PUMP_TRADE_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
