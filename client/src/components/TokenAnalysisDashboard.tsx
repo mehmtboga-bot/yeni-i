@@ -503,12 +503,13 @@ function AllTokensTab({
   analysis: TokenAnalysis[];
   onSelect?: (mintAddress: string, symbol: string) => void;
 }) {
-  const [filter, setFilter] = useState<"all" | "buy" | "caution" | "avoid">(
+  const [filter, setFilter] = useState<"all" | "buy" | "caution" | "avoid" | "rug">(
     "all"
   );
 
   const filtered = analysis.filter((t) => {
     if (filter === "all") return true;
+    if (filter === "rug") return t.rugPullDetected;
     return t.recommendation.toLowerCase() === filter;
   });
 
@@ -517,6 +518,7 @@ function AllTokensTab({
     buy: analysis.filter((t) => t.recommendation === "BUY").length,
     caution: analysis.filter((t) => t.recommendation === "CAUTION").length,
     avoid: analysis.filter((t) => t.recommendation === "AVOID").length,
+    rug: analysis.filter((t) => t.rugPullDetected).length,
   };
 
   const filterButtons: {
@@ -539,6 +541,11 @@ function AllTokensTab({
       key: "avoid",
       label: `🚫 Kaçın (${counts.avoid})`,
       color: "text-orange-400",
+    },
+    {
+      key: "rug",
+      label: `💀 Rug (${counts.rug})`,
+      color: "text-red-400",
     },
   ];
 
