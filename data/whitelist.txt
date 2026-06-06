@@ -1,8 +1,11 @@
 # Bölüm 1: Normal tokenler (global hold duration kullanılır)
-PEPE
-DOGE
-SHIB
-FLOKI
+CDOF
+ISOR
+SAOS
+USA250
+WORLDCUP
+GDP
+USWR
 
 ---ÖZEL SÜRELİ---
 # Bölüm 2: Özel süreli tokenler (TOKEN:SANIYE formatı)
