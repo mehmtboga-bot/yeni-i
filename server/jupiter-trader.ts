@@ -279,6 +279,11 @@ export class JupiterTrader {
       pool: "pumpswap",
     };
 
+    const apiAmount = opts.denominatedInSol ? opts.amount : opts.amount;
+    console.log(`📤 [PumpSwap] ${opts.action.toUpperCase()} | publicKey: ${this.keypair.publicKey.toBase58().slice(0, 8)}... | mint: ${opts.mint.slice(0, 8)}... | amount: ${apiAmount} | denominatedInSol: ${opts.denominatedInSol} | slippage: ${opts.slippagePct} | priorityFee: ${opts.priorityFeeSol}`);
+    console.log(`📤 [PumpSwap] Request body:`);
+    console.log(JSON.stringify(body, null, 2));
+
     const res = await this.fetchWithTimeout(PUMP_TRADE_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -292,6 +297,7 @@ export class JupiterTrader {
     // Başarılı yanıt binary TX verisi olmalı (JSON hata mesajı değil).
     // content-type application/octet-stream veya binary olmalı; JSON gelirse hata demektir.
     const contentType = res.headers.get("content-type") ?? "";
+    console.log(`📥 [PumpSwap] Response status: ${res.status} | content-type: ${contentType}`);
     if (contentType.includes("application/json")) {
       const errBody = await res.json();
       throw new Error(`PumpPortal JSON yanıtı (TX bekleniyor): ${JSON.stringify(errBody).slice(0, 200)}`);
