@@ -434,8 +434,8 @@ export class JupiterTrader {
     this.balanceCheckIntervals.set(capturedPosition.id, rugInterval);
   }
 
-  async buy(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; isAuto?: boolean }): Promise<Position | null> {
-    const { mintAddress, name, symbol, solAmount, isAuto = false } = input;
+  async buy(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; slippagePct?: number; priorityFeeSol?: number; customHoldDurationMs?: number; isAuto?: boolean }): Promise<Position | null> {
+    const { mintAddress, name, symbol, solAmount, slippagePct: slippagePctOverride, priorityFeeSol: priorityFeeSolOverride, isAuto = false } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
     const existing = this.store.getByMint(mintAddress);
@@ -449,9 +449,16 @@ export class JupiterTrader {
     const actualSolAmount = solAmount ?? config.solAmount;
     const lamports = Math.floor(actualSolAmount * 1e9);
     // Manuel/otomatik alım için ayrı priority fee kullan
-    const priorityFee = isAuto
+    // Dışarıdan override geçilmişse onu kullan, yoksa config'den hesapla
+    const rawFeeDefault = isAuto
       ? config.priorityFeeAutoMicroLamports
       : config.priorityFeeManualMicroLamports;
+    const priorityFee = priorityFeeSolOverride !== undefined
+      ? Math.round(priorityFeeSolOverride * 1_000_000_000)
+      : rawFeeDefault;
+    const slippageBpsEffective = slippagePctOverride !== undefined
+      ? Math.round(slippagePctOverride * 100)
+      : config.slippageBps;
     const id = `pos-${mintAddress}-${Date.now()}`;
     let position: Position = {
       id, mintAddress, name, symbol, dex: "jupiter",
@@ -480,7 +487,7 @@ export class JupiterTrader {
           }
         }
 
-        const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+        const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: slippageBpsEffective });
         const decimals = await this.fetchDecimals(mintAddress);
         swapPricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
 
@@ -536,8 +543,8 @@ export class JupiterTrader {
   }
 
   // ========== PUMPSWAP ALIM ==========
-  async buyPumpSwap(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; isAuto?: boolean }): Promise<Position | null> {
-    const { mintAddress, name, symbol, solAmount, isAuto = false } = input;
+  async buyPumpSwap(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; slippagePct?: number; priorityFeeSol?: number; customHoldDurationMs?: number; isAuto?: boolean }): Promise<Position | null> {
+    const { mintAddress, name, symbol, solAmount, slippagePct: slippagePctOverride, priorityFeeSol: priorityFeeSolOverride, isAuto = false } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — PumpSwap alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
     const existing = this.store.getByMint(mintAddress);
@@ -560,13 +567,18 @@ export class JupiterTrader {
     // 650ms bekle — LP indexer'ın yayılması için
     await new Promise((r) => setTimeout(r, 650));
 
-    const slippagePct = Math.floor(config.slippageBps / 100);
+    // Dışarıdan override geçilmişse onu kullan, yoksa config'den hesapla
+    const slippagePct = slippagePctOverride !== undefined
+      ? slippagePctOverride
+      : Math.floor(config.slippageBps / 100);
     // Manuel/otomatik alım için ayrı priority fee kullan
     // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
     const rawFee = isAuto
       ? config.priorityFeeAutoMicroLamports
       : config.priorityFeeManualMicroLamports;
-    const priorityFeeSol = rawFee / 1_000_000_000;
+    const priorityFeeSol = priorityFeeSolOverride !== undefined
+      ? priorityFeeSolOverride
+      : rawFee / 1_000_000_000;
 
     try {
       let swapSignature: string | null = null;
