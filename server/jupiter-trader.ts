@@ -22,6 +22,8 @@ const SOL_DECIMALS = 9;
 
 // Satış başarısız olduğunda maksimum tekrar sayısı (sonsuz döngüyü önler)
 const MAX_SELL_RETRIES = 15;
+// Kaç başarısız satış denemesinden sonra pozisyon rug olarak kapatılır
+const MAX_SELL_FAILURES = 3;
 // Exponential backoff: delayMs * 2^deneme, bu değerin üstüne çıkmaz (ms)
 const MAX_BACKOFF_MS = 4000;
 
@@ -51,6 +53,8 @@ export class JupiterTrader {
   private rugpullDetector: RugpullDetector = new RugpullDetector();
   // Token başına pool SOL miktarı (Helius monitor'dan güncellenir)
   private poolSolCache: Map<string, number> = new Map();
+  // Pozisyon başına ardışık satış başarısızlık sayacı (MAX_SELL_FAILURES'a ulaşınca rug olarak kapatılır)
+  private sellFailureCount: Map<string, number> = new Map();
 
   constructor(store: TradeStore, emit: Emitter) {
     this.store = store;
@@ -764,6 +768,7 @@ export class JupiterTrader {
           pnlPct,
         };
         this.updateAndEmit(updated);
+        this.sellFailureCount.delete(positionId);
         console.log(`✅ [PumpSwap] SATIŞ tamam: ${pos.symbol} | ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
       } else {
         // Jupiter satışı — route yoksa PumpSwap'a fallback
@@ -793,6 +798,7 @@ export class JupiterTrader {
             pnlPct,
           };
           this.updateAndEmit(updated);
+          this.sellFailureCount.delete(positionId);
           console.log(`✅ [Jupiter] SATIŞ tamam: ${pos.symbol} | ${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%)`);
 
           // [YENİ] Satış TX sonrası token bakiyesi kontrol (2 deneme, 1 saniye ara)
@@ -843,6 +849,7 @@ export class JupiterTrader {
             pnlPct,
           };
           this.updateAndEmit(updated);
+          this.sellFailureCount.delete(positionId);
           console.log(`✅ [PumpSwap Fallback] SATIŞ tamam: ${pos.symbol} | ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
 
           // [YENİ] Satış TX sonrası token bakiyesi kontrol (2 deneme, 1 saniye ara)
@@ -886,14 +893,38 @@ export class JupiterTrader {
           error: "Rug Pull Detected",
         };
         this.updateAndEmit(updated);
+        this.sellFailureCount.delete(positionId);
         console.error(`🚨 [Rug Pull] ${pos.symbol} — -%100 zarar olarak kapatıldı`);
         return updated;
+      }
+
+      // Ardışık satış başarısızlık sayacını artır
+      const failures = (this.sellFailureCount.get(positionId) ?? 0) + 1;
+      this.sellFailureCount.set(positionId, failures);
+
+      // 3 başarısız denemeden sonra rug olarak kapat — sonsuz döngüyü önler
+      if (failures >= MAX_SELL_FAILURES) {
+        const failedPos: Position = {
+          ...pos,
+          status: "closed",
+          sellTimestamp: Date.now(),
+          sellSolAmount: 0,
+          sellPriceSol: 0,
+          pnlSol: -(pos.buySolAmount ?? 0),
+          pnlPct: -100,
+          error: "Satış başarısız (3 deneme) — Rug olarak işaretlendi",
+        };
+        this.updateAndEmit(failedPos);
+        this.sellFailureCount.delete(positionId);
+        console.error(`🚨 [Sell] ${pos.symbol} satış ${MAX_SELL_FAILURES} kez başarısız, rug olarak kapandı`);
+        return failedPos;
       }
 
       // Maksimum retry aşıldı
       if (_retryCount >= MAX_SELL_RETRIES) {
         updated = { ...pos, status: "failed", error: `${MAX_SELL_RETRIES} deneme sonrası satış başarısız: ${message}` };
         this.updateAndEmit(updated);
+        this.sellFailureCount.delete(positionId);
         console.error(`❌ [${dexLabel}] SATIŞ ${MAX_SELL_RETRIES} denemede başarısız, "failed": ${pos.symbol}`);
         return updated;
       }
@@ -902,7 +933,7 @@ export class JupiterTrader {
       const retryDelay = Math.min(1000 * Math.pow(2, _retryCount), MAX_BACKOFF_MS);
       updated = { ...pos, status: "open", error: message };
       this.updateAndEmit(updated);
-      console.warn(`⚠️ [${dexLabel}] SATIŞ başarısız (${pos.symbol}) [${_retryCount + 1}/${MAX_SELL_RETRIES}]: ${message} — ${retryDelay}ms sonra tekrar...`);
+      console.warn(`⚠️ [${dexLabel}] SATIŞ başarısız (${pos.symbol}) [${_retryCount + 1}/${MAX_SELL_RETRIES}] [hata ${failures}/${MAX_SELL_FAILURES}]: ${message} — ${retryDelay}ms sonra tekrar...`);
       setTimeout(() => this.sell(positionId, _retryCount + 1), retryDelay);
       return updated;
     } finally {
