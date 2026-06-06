@@ -12,6 +12,7 @@ import { WhitelistManager } from "./whitelist-manager";
 import fs from "fs";
 import path from "path";
 import { EventStore } from "./event-store";
+import { LiquidityMonitor } from "./liquidity-monitor";
 
 const ROOT = process.cwd();
 
@@ -181,10 +182,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ---- Trade store + Jupiter ----
   const tradeStore = new TradeStore();
+
+  // Map of positionId → LiquidityMonitor (one per open position)
+  const liquidityMonitors = new Map<string, LiquidityMonitor>();
+
+  // Helper: mark a position as rug pull (used by both manual and auto detection)
+  const markAsRugPull = (positionId: string) => {
+    const pos = tradeStore.getById(positionId);
+    if (!pos || (pos.status !== "open" && pos.status !== "pending_buy" && pos.status !== "pending_sell")) return;
+    const rugLoss = -(pos.buySolAmount ?? 0);
+    const closed = {
+      ...pos,
+      status: "closed" as const,
+      sellTimestamp: Date.now(),
+      sellSolAmount: 0,
+      sellPriceSol: 0,
+      pnlSol: rugLoss,
+      pnlPct: -100,
+      error: "Rug Pull",
+    };
+    tradeStore.upsert(closed);
+    autoTraderEngine.markRecordClosed(pos.mintAddress);
+    broadcastToClients({ type: "position_update", data: closed });
+    console.log(`🚨 [Rug Pull] ${pos.symbol} rug pull olarak kapatıldı (-%100)`);
+    // Clean up monitor entry
+    liquidityMonitors.delete(positionId);
+  };
+
   const trader = new JupiterTrader(tradeStore, (event, data) => {
     if (event === "position_update") {
       broadcastToClients({ type: "position_update", data });
-      
+
       // Auto-trader'a pozisyon güncellemesini bildir
       if (data.status === "open" && data.buyTxSignature) {
         autoTraderEngine.updateRecordAfterBuy(
@@ -193,6 +221,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data.buyPriceSol,
           data.buyTokenAmount
         );
+
+        // Start liquidity monitoring for this position (if not already running)
+        if (!liquidityMonitors.has(data.id)) {
+          const lm = new LiquidityMonitor(
+            data.id,
+            data.mintAddress,
+            data.symbol,
+            (positionId) => markAsRugPull(positionId),
+          );
+          liquidityMonitors.set(data.id, lm);
+        }
       }
       if (data.status === "closed" && data.sellTxSignature) {
         autoTraderEngine.updateRecordAfterSell(
@@ -203,14 +242,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data.pnlPct
         );
       }
-      // Manuel satış veya rug pull tespiti — auto-trader record'unu kapat
-      if (data.status === "closed") {
+      // Position closed or failed — stop liquidity monitor
+      if (data.status === "closed" || data.status === "failed") {
         autoTraderEngine.markRecordClosed(data.mintAddress);
+        const lm = liquidityMonitors.get(data.id);
+        if (lm) {
+          lm.stop();
+          liquidityMonitors.delete(data.id);
+        }
       }
     } else if (event === "trade_config_update") {
       broadcastToClients({ type: "trade_config_update", data });
     }
   });
+
 
   const sendPositionsSnapshot = (ws: WebSocket) => {
     ws.send(
@@ -528,25 +573,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Rug Pull: pozisyonu "closed" olarak işaretle, pnlPct=-100, silme
           const { positionId } = message.data || {};
           if (positionId) {
-            const pos = tradeStore.getById(positionId);
-            if (pos && (pos.status === "open" || pos.status === "pending_buy" || pos.status === "pending_sell")) {
-              const rugLoss = -(pos.buySolAmount ?? 0);
-              const closed = {
-                ...pos,
-                status: "closed" as const,
-                sellTimestamp: Date.now(),
-                sellSolAmount: 0,
-                sellPriceSol: 0,
-                pnlSol: rugLoss,
-                pnlPct: -100,
-                error: "Rug Pull",
-              };
-              tradeStore.upsert(closed);
-              autoTraderEngine.markRecordClosed(pos.mintAddress);
-              broadcastToClients({ type: "position_update", data: closed });
-              console.log(`🚨 [Rug Pull] ${pos.symbol} manuel rug pull olarak kapatıldı (-%100)`);
+            // Stop liquidity monitor if running
+            const lm = liquidityMonitors.get(positionId);
+            if (lm) {
+              lm.stop();
+              liquidityMonitors.delete(positionId);
             }
+            markAsRugPull(positionId);
+            console.log(`🚨 [Rug Pull] Manuel rug pull işaretlendi: ${positionId}`);
           }
+
         } else if (message.type === "delete_position") {
           const { positionId } = message.data || {};
           if (positionId) {
