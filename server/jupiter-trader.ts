@@ -434,8 +434,8 @@ export class JupiterTrader {
     this.balanceCheckIntervals.set(capturedPosition.id, rugInterval);
   }
 
-  async buy(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; isAuto?: boolean }): Promise<Position | null> {
-    const { mintAddress, name, symbol, solAmount, isAuto = false } = input;
+  async buy(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; slippageBps?: number; priorityFeeMicroLamports?: number; isAuto?: boolean }): Promise<Position | null> {
+    const { mintAddress, name, symbol, solAmount, slippageBps: slippageBpsOverride, priorityFeeMicroLamports: priorityFeeOverride, isAuto = false } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
     const existing = this.store.getByMint(mintAddress);
@@ -448,10 +448,11 @@ export class JupiterTrader {
     const config = this.store.getConfig();
     const actualSolAmount = solAmount ?? config.solAmount;
     const lamports = Math.floor(actualSolAmount * 1e9);
-    // Manuel/otomatik alım için ayrı priority fee kullan
-    const priorityFee = isAuto
+    // Caller'dan gelen override varsa kullan, yoksa config'ten al (manuel/otomatik ayrımı)
+    const priorityFee = priorityFeeOverride ?? (isAuto
       ? config.priorityFeeAutoMicroLamports
-      : config.priorityFeeManualMicroLamports;
+      : config.priorityFeeManualMicroLamports);
+    const effectiveSlippageBps = slippageBpsOverride ?? config.slippageBps;
     const id = `pos-${mintAddress}-${Date.now()}`;
     let position: Position = {
       id, mintAddress, name, symbol, dex: "jupiter",
@@ -480,7 +481,7 @@ export class JupiterTrader {
           }
         }
 
-        const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+        const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: effectiveSlippageBps });
         const decimals = await this.fetchDecimals(mintAddress);
         swapPricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
 
@@ -536,8 +537,8 @@ export class JupiterTrader {
   }
 
   // ========== PUMPSWAP ALIM ==========
-  async buyPumpSwap(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; isAuto?: boolean }): Promise<Position | null> {
-    const { mintAddress, name, symbol, solAmount, isAuto = false } = input;
+  async buyPumpSwap(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; slippageBps?: number; priorityFeeMicroLamports?: number; isAuto?: boolean }): Promise<Position | null> {
+    const { mintAddress, name, symbol, solAmount, slippageBps: slippageBpsOverride, priorityFeeMicroLamports: priorityFeeOverride, isAuto = false } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — PumpSwap alım atlandı"); return null; }
     if (this.inFlight.has(`buy:${mintAddress}`)) { console.warn(`⏳ ${symbol} alım zaten devam ediyor`); return null; }
     const existing = this.store.getByMint(mintAddress);
@@ -560,12 +561,13 @@ export class JupiterTrader {
     // 650ms bekle — LP indexer'ın yayılması için
     await new Promise((r) => setTimeout(r, 650));
 
-    const slippagePct = Math.floor(config.slippageBps / 100);
-    // Manuel/otomatik alım için ayrı priority fee kullan
+    // Caller'dan gelen override varsa kullan, yoksa config'ten al (manuel/otomatik ayrımı)
+    const effectiveSlippageBps = slippageBpsOverride ?? config.slippageBps;
+    const slippagePct = Math.floor(effectiveSlippageBps / 100);
     // Birim dönüşümü: micro-lamport → SOL (1 SOL = 10^9 lamports, 1 lamport = 10^6 micro-lamports → 1 SOL = 10^15 micro-lamports, ama API SOL bekler: / 10^9)
-    const rawFee = isAuto
+    const rawFee = priorityFeeOverride ?? (isAuto
       ? config.priorityFeeAutoMicroLamports
-      : config.priorityFeeManualMicroLamports;
+      : config.priorityFeeManualMicroLamports);
     const priorityFeeSol = rawFee / 1_000_000_000;
 
     try {
