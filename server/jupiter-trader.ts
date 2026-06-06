@@ -346,13 +346,13 @@ export class JupiterTrader {
   }
 
   /**
-   * Rug check interval — her 4 saniyede 2 kriteri kontrol eder:
-   * 1. Pool liquidity (< 2 SOL → rug pull)
-   * 2. Zararlı pozisyon (%-80 veya daha kötü → rug pull, satış yapılmaz)
+   * Rug check interval — her 5 saniyede 2 bağımsız kriteri kontrol eder:
+   * 1. DexScreener Likidite (< $2000 USD → rug pull)
+   * 2. Satış Başarısızlığı (3 ardışık API hatası → rug pull)
    *
    * Alım başarılı olsun veya olmasın başlatılır.
    * Satış başlarsa veya pozisyon kapanırsa interval durur.
-   * Kontrol hatalarında 2 ilave retry yapılır, sonra sayaç sıfırlanır.
+   * Her iki sinyal bağımsız olarak çalışır.
    */
   private startRugCheckInterval(position: Position) {
     // Zaten bir interval varsa temizle
@@ -363,8 +363,8 @@ export class JupiterTrader {
     }
 
     const capturedPosition = position;
-    let consecutiveFailures = 0; // Kesin emin olmak için 2 retry
-    const MAX_CONSECUTIVE_FAILURES = 2;
+    let consecutiveSellFailures = 0; // Ardışık satış başarısızlığı sayacı
+    const MAX_SELL_FAILURES = 3;     // 3 kez başarısız = rug pull
 
     const rugInterval = setInterval(async () => {
       // Pozisyon hala izlenebilir durumda mı?
@@ -385,22 +385,11 @@ export class JupiterTrader {
       const { symbol, mintAddress } = capturedPosition;
 
       try {
-        // ── Kriter 1: Pool Liquidity ─────────────────────────────────────────
-        const poolSol = this.poolSolCache.get(mintAddress);
-
-        // ── Kriter 2: Zararlı Pozisyon ───────────────────────────────────────
-        const unrealizedPnlPct = currentPos.unrealizedPnlPct;
-
-        // Tüm kriterleri detectRugpull ile değerlendir
-        const rugAlert = await this.rugpullDetector.detectRugpull({
-          symbol,
-          mintAddress,
-          poolSol,
-          unrealizedPnlPct,
-        });
+        // ── Sinyal 1: DexScreener Likidite Kontrolü ──────────────────────────
+        const rugAlert = await this.rugpullDetector.checkLiquidityRugpull(mintAddress);
 
         if (rugAlert) {
-          // Rug bulundu → interval durdur, token kapat
+          // Rug bulundu → interval durdur, pozisyonu kapat
           clearInterval(rugInterval);
           this.balanceCheckIntervals.delete(capturedPosition.id);
 
@@ -412,24 +401,45 @@ export class JupiterTrader {
             sellPriceSol: 0,
             pnlSol: -(currentPos.buySolAmount ?? 0),
             pnlPct: -100,
-            error: `Rug Pull Detected: ${rugAlert.detail}`,
+            error: "Rug Pull: Liquidity < $2000",
           };
           this.updateAndEmit(rugPullPos);
-        } else {
-          // Başarılı kontrol → retry sayacı sıfırla
-          consecutiveFailures = 0;
+          console.error(`🚨 [Rug Pull] ${symbol} — Likidite < $2000, pozisyon kapatıldı`);
+          return;
         }
-      } catch (err) {
-        // Kontrol başarısız → retry sayacı artır
-        consecutiveFailures++;
-        console.warn(`⚠️ [Rug Check] ${capturedPosition.symbol} kontrol başarısız (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`);
 
-        // 2 retry'dan sonra da başarısız olursa sayacı sıfırla, devam et
-        if (consecutiveFailures > MAX_CONSECUTIVE_FAILURES) {
-          consecutiveFailures = 0;
+        // Başarılı kontrol → satış başarısızlığı sayacını sıfırla
+        consecutiveSellFailures = 0;
+
+      } catch (err) {
+        // ── Sinyal 2: Satış Başarısızlığı Kontrolü ───────────────────────────
+        // DexScreener API çağrısı başarısız → ardışık hata sayacını artır
+        consecutiveSellFailures++;
+        console.warn(
+          `⚠️ [Rug Check] ${symbol} DexScreener sorgusu başarısız ` +
+          `(${consecutiveSellFailures}/${MAX_SELL_FAILURES}): ${(err as Error).message}`
+        );
+
+        if (consecutiveSellFailures >= MAX_SELL_FAILURES) {
+          // 3 ardışık başarısızlık → rug pull sinyali
+          clearInterval(rugInterval);
+          this.balanceCheckIntervals.delete(capturedPosition.id);
+
+          const rugPullPos: Position = {
+            ...currentPos,
+            status: "closed",
+            sellTimestamp: Date.now(),
+            sellSolAmount: 0,
+            sellPriceSol: 0,
+            pnlSol: -(currentPos.buySolAmount ?? 0),
+            pnlPct: -100,
+            error: `Rug Pull: ${MAX_SELL_FAILURES} ardışık satış başarısızlığı`,
+          };
+          this.updateAndEmit(rugPullPos);
+          console.error(`🚨 [Rug Pull] ${symbol} — ${MAX_SELL_FAILURES} ardışık başarısızlık, pozisyon kapatıldı`);
         }
       }
-    }, 4000);
+    }, 5000);
 
     this.balanceCheckIntervals.set(capturedPosition.id, rugInterval);
   }
