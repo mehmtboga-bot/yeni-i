@@ -59,6 +59,7 @@ export const positionSchema = z.object({
   error: z.string().optional(),
   autoSellAt: z.number().optional(),  // Auto-trader satış zamanı (timestamp)
   customHoldDurationMs: z.number().optional(),  // Token başına özel tutma süresi (ms)
+  isAutoTrade: z.boolean().optional(),  // true = otomatik alım, false = manuel alım
 });
 
 export type Position = z.infer<typeof positionSchema>;

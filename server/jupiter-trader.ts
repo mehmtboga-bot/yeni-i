@@ -383,15 +383,19 @@ export class JupiterTrader {
       }
 
       const { symbol, mintAddress } = capturedPosition;
+      // isAutoTrade pozisyon oluşturulurken set edilir; undefined ise manuel kabul et
+      const isAutoTrade = capturedPosition.isAutoTrade === true;
 
       try {
-        // ── Kriter 1: Pool Liquidity ─────────────────────────────────────────
+        // ── Kriter 1: Pool Liquidity (her iki mod için) ──────────────────────
         const poolSol = this.poolSolCache.get(mintAddress);
 
-        // ── Kriter 2: Zararlı Pozisyon ───────────────────────────────────────
-        const unrealizedPnlPct = currentPos.unrealizedPnlPct;
+        // ── Kriter 2: Zararlı Pozisyon (yalnızca otomatik alımlar için) ──────
+        // Manuel alımlarda satış başarısızlığı sayacı kullanılmaz;
+        // sadece likidite kontrolü yapılır.
+        const unrealizedPnlPct = isAutoTrade ? currentPos.unrealizedPnlPct : undefined;
 
-        // Tüm kriterleri detectRugpull ile değerlendir
+        // Kriterleri detectRugpull ile değerlendir
         const rugAlert = await this.rugpullDetector.detectRugpull({
           symbol,
           mintAddress,
@@ -456,6 +460,7 @@ export class JupiterTrader {
     let position: Position = {
       id, mintAddress, name, symbol, dex: "jupiter",
       status: "pending_buy", buyTimestamp: Date.now(), buySolAmount: actualSolAmount,
+      isAutoTrade: isAuto,
     };
     this.updateAndEmit(position);
     console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "otomatik" : "manuel"}, fee: ${priorityFee})`);
@@ -553,10 +558,10 @@ export class JupiterTrader {
     let position: Position = {
       id, mintAddress, name, symbol, dex: "pumpswap",
       status: "pending_buy", buyTimestamp: Date.now(), buySolAmount: actualSolAmount,
+      isAutoTrade: isAuto,
     };
     this.updateAndEmit(position);
     console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "otomatik" : "manuel"})`);
-
     // 650ms bekle — LP indexer'ın yayılması için
     await new Promise((r) => setTimeout(r, 650));
 
