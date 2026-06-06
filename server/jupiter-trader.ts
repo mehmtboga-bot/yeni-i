@@ -279,6 +279,8 @@ export class JupiterTrader {
       pool: "pumpswap",
     };
 
+    console.log(`📤 [PumpSwap] Request body: ${JSON.stringify(body, null, 2)}`);
+
     const res = await this.fetchWithTimeout(PUMP_TRADE_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -286,14 +288,23 @@ export class JupiterTrader {
       timeoutMs: 3000,
     });
 
-    if (!res.ok) throw new Error(`PumpPortal API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`❌ [PumpPortal] Status: ${res.status}`);
+      console.error(`❌ [PumpPortal] Headers: ${JSON.stringify(Object.fromEntries(res.headers))}`);
+      console.error(`❌ [PumpPortal] Body: ${errText}`);
+      throw new Error(`PumpPortal API ${res.status}: ${errText.slice(0, 500)}`);
+    }
 
     // [DÜZELTİLDİ] PumpPortal response validation:
     // Başarılı yanıt binary TX verisi olmalı (JSON hata mesajı değil).
     // content-type application/octet-stream veya binary olmalı; JSON gelirse hata demektir.
     const contentType = res.headers.get("content-type") ?? "";
+    console.log(`✅ [PumpSwap] Response status: ${res.status}, content-type: ${contentType}`);
+
     if (contentType.includes("application/json")) {
       const errBody = await res.json();
+      console.error(`❌ [PumpSwap] JSON response (binary TX bekleniyor): ${JSON.stringify(errBody)}`);
       throw new Error(`PumpPortal JSON yanıtı (TX bekleniyor): ${JSON.stringify(errBody).slice(0, 200)}`);
     }
 
