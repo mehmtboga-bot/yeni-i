@@ -245,17 +245,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sym = symbol || "?";
         const autoConfig = autoTraderConfigStore.getConfig();
         const solAmount = autoConfig.solAmountPerTrade;
+        const slippageBps = autoConfig.slippageBps;
+        const priorityFeeMicroLamports = autoConfig.priorityFeeMicroLamports;
         console.log(`⏳ [Auto-Trader] ${sym} 750ms bekleniyor... (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
         setTimeout(() => {
           console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
           if (dex === "pumpswap") {
-            trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount, isAuto: true })
+            trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount, slippageBps, priorityFeeMicroLamports, isAuto: true })
               .catch((err) => {
                 console.error("Auto-buy (PumpSwap) hatası:", err);
                 autoTraderEngine.markRecordFailed(mintAddress, String(err));
               });
           } else {
-            trader.buy({ mintAddress, name: nm, symbol: sym, solAmount, isAuto: true })
+            trader.buy({ mintAddress, name: nm, symbol: sym, solAmount, slippageBps, priorityFeeMicroLamports, isAuto: true })
               .catch((err) => {
                 console.error("Auto-buy hatası:", err);
                 autoTraderEngine.markRecordFailed(mintAddress, String(err));
@@ -368,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         setTimeout(() => {
           console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | SOL: ${solAmount}${customHoldDurationMs !== undefined ? ` | Özel süre: ${(customHoldDurationMs / 1000).toFixed(0)}s` : ""}`);
 
-          const buyOpts = { mintAddress, name: nm, symbol: sym, solAmount, customHoldDurationMs, isAuto: true };
+          const buyOpts = { mintAddress, name: nm, symbol: sym, solAmount, slippageBps: autoConfig.slippageBps, priorityFeeMicroLamports: autoConfig.priorityFeeMicroLamports, customHoldDurationMs, isAuto: true };
           if (dex === "pumpswap") {
             trader.buyPumpSwap(buyOpts)
               .then((pos: any) => {
@@ -473,11 +475,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const sym = symbol || "?";
             const config = tradeStore.getConfig();
             const solAmount = config.solAmount;
+            const slippageBps = config.slippageBps;
+            const priorityFeeMicroLamports = config.priorityFeeManualMicroLamports;
             if (dex === "pumpswap") {
-              trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
+              trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount, slippageBps, priorityFeeMicroLamports })
                 .catch((err) => console.error("buyPumpSwap hatası:", err));
             } else {
-              trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
+              trader.buy({ mintAddress, name: nm, symbol: sym, solAmount, slippageBps, priorityFeeMicroLamports })
                 .catch((err) => console.error("buy_token hatası:", err));
             }
           }
