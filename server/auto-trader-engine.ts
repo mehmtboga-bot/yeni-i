@@ -215,6 +215,13 @@ export class AutoTraderEngine {
   // ─────────────────────────────────────────────
 
   private async checkLiquidityDrop(recordId: string, record: AutoTradeRecord): Promise<void> {
+    // Whitelist'teki token'ler için likidite düşüş kontrolü yapma
+    const whitelistedSymbols = ["CDOF", "ISOR", "SAOS", "USA250", "WORLDCUP", "GDP", "USWR"];
+    if (whitelistedSymbols.includes(record.tokenSymbol)) {
+      console.log(`⏭️ [Auto-Trader] ${record.tokenSymbol} whitelist'te, likidite kontrolü atlanıyor`);
+      return;
+    }
+
     try {
       const res = await fetch(
         `https://api.dexscreener.com/latest/dex/tokens/${record.mintAddress}`,
@@ -237,11 +244,13 @@ export class AutoTraderEngine {
       const initialLiq = record.initialLiquidityUsd!;
       let dropPct = ((initialLiq - currentLiquidityUsd) / initialLiq) * 100;
 
-      if (dropPct >= 80) {
-        // Yanlış okuma olabilir — 3 kez daha dene
+      console.log(`📊 [Auto-Trader] ${record.tokenSymbol} likidite kontrolü | Başlangıç: ${initialLiq.toFixed(0)} | Şimdi: ${currentLiquidityUsd.toFixed(0)} | Düşüş: %${dropPct.toFixed(1)}`);
+
+      if (dropPct >= 95) {
+        // Yanlış okuma olabilir — 5 kez daha dene
         let retryCount = 0;
         let finalLiquidityUsd = currentLiquidityUsd;
-        while (retryCount < 3 && dropPct >= 80) {
+        while (retryCount < 5 && dropPct >= 95) {
           await new Promise((r) => setTimeout(r, 500));
           try {
             const retryRes = await fetch(
@@ -265,18 +274,18 @@ export class AutoTraderEngine {
           }
           retryCount++;
           console.warn(
-            `⚠️ [Auto-Trader] %80 likidite düşüşü doğrulanıyor: ${record.tokenSymbol} | ` +
-            `Deneme ${retryCount}/3 | Şimdi: ${finalLiquidityUsd.toFixed(0)} | Düşüş: %${dropPct.toFixed(0)}`
+            `⚠️ [Auto-Trader] %95 likidite düşüşü doğrulanıyor: ${record.tokenSymbol} | ` +
+            `Deneme ${retryCount}/5 | Şimdi: ${finalLiquidityUsd.toFixed(0)} | Düşüş: %${dropPct.toFixed(1)}`
           );
         }
 
-        // 3 deneme sonrası hala %80+ düşüş varsa rug pull olarak kapat
-        if (dropPct >= 80) {
+        // 5 deneme sonrası hala %95+ düşüş varsa rug pull olarak kapat
+        if (dropPct >= 95) {
           const freshRecord = this.records.get(recordId);
           if (!freshRecord || freshRecord.status !== "active") return;
 
           console.log(
-            `🚨 [Auto-Trader] Likidite %${dropPct.toFixed(0)} düştü (3 denemede doğrulandı): ${record.tokenSymbol} | ` +
+            `🚨 [Auto-Trader] Likidite %${dropPct.toFixed(1)} düştü (5 denemede doğrulandı): ${record.tokenSymbol} | ` +
             `Başlangıç: ${initialLiq.toFixed(0)} → Şimdi: ${finalLiquidityUsd.toFixed(0)} | Rug pull`
           );
 
