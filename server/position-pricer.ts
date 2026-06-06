@@ -130,26 +130,18 @@ export class PositionPricer {
       }
       this.lastValidPrice.set(pos.mintAddress, currentPriceSol);
 
-      // buyPriceSol: bir kez kalıcı olarak ayarlandıktan sonra pricer tarafından değiştirilemez
-      let buyPriceSol = pos.buyPriceSol;
-      let updated: Position = { ...pos };
+      // buyPriceSol: alım sırasında bir kez doğru set edilir, pricer tarafından değiştirilmez
+      const buyPriceSol = pos.buyPriceSol;
       if (!buyPriceSol || buyPriceSol <= 0) {
-        // Alım sırasında set edilmesi gerekiyordu — fallback olarak hesapla
-        if (pos.buySolAmount && pos.buyTokenAmount && pos.buyTokenAmount > 0) {
-          buyPriceSol = pos.buySolAmount / pos.buyTokenAmount;
-        } else {
-          buyPriceSol = currentPriceSol; // Son çare
-        }
-        updated = { ...updated, buyPriceSol };
-        console.log(`📌 [Pricer] İlk fiyat: ${pos.symbol} = ${currentPriceUsd.toFixed(6)}`);
+        console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
+        continue;
       }
-
       const unrealizedPnlSol =
         (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
       const unrealizedPnlPct =
         buyPriceSol > 0 ? ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100 : 0;
 
-      updated = { ...updated, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
+      const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
       this.emit("position_update", updated);
 
