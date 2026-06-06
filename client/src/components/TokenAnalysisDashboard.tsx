@@ -23,9 +23,6 @@ interface TokenAnalysis {
   symbol: string;
   name: string;
   detectedAt: number;
-  rugPullDetected: boolean;
-  rugPullTime?: number;
-  rugPullRiskScore: number;
   survivedMinutes: number;
   trades: {
     total: number;
@@ -132,24 +129,8 @@ function RecommendationBadge({
   );
 }
 
-function RiskBar({ score }: { score: number }) {
-  let barColor = "bg-emerald-500";
-  if (score >= 80) barColor = "bg-red-500";
-  else if (score >= 60) barColor = "bg-orange-500";
-  else if (score >= 40) barColor = "bg-yellow-500";
 
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="h-1.5 w-16 rounded-full bg-muted overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${barColor}`}
-          style={{ width: `${score}%` }}
-        />
-      </div>
-      <span className="text-xs text-muted-foreground tabular-nums">{score}</span>
-    </div>
-  );
-}
+
 
 function TokenRow({
   token,
@@ -160,14 +141,10 @@ function TokenRow({
   rank?: number;
   onSelect?: (mintAddress: string, symbol: string) => void;
 }) {
-  const isRug = token.rugPullDetected;
-
   return (
     <div
       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
-        isRug
-          ? "bg-red-950/20 border-red-500/20"
-          : token.recommendation === "BUY"
+        token.recommendation === "BUY"
           ? "bg-emerald-950/10 border-emerald-500/15"
           : token.recommendation === "CAUTION"
           ? "bg-yellow-950/10 border-yellow-500/15"
@@ -185,12 +162,6 @@ function TokenRow({
           <span className="font-semibold text-sm text-foreground">
             {token.symbol}
           </span>
-          {isRug && (
-            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] gap-1 px-1.5 py-0">
-              <Skull className="h-2.5 w-2.5" />
-              RUG
-            </Badge>
-          )}
           <span className="text-[10px] text-muted-foreground font-mono">
             {shortMint(token.mintAddress)}
           </span>
@@ -219,9 +190,8 @@ function TokenRow({
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <RiskBar score={token.rugPullRiskScore} />
         <RecommendationBadge recommendation={token.recommendation} />
-        {onSelect && !isRug && (
+        {onSelect && (
           <Button
             size="sm"
             variant="outline"
@@ -503,13 +473,12 @@ function AllTokensTab({
   analysis: TokenAnalysis[];
   onSelect?: (mintAddress: string, symbol: string) => void;
 }) {
-  const [filter, setFilter] = useState<"all" | "buy" | "caution" | "avoid" | "rug">(
+  const [filter, setFilter] = useState<"all" | "buy" | "caution" | "avoid">(
     "all"
   );
 
   const filtered = analysis.filter((t) => {
     if (filter === "all") return true;
-    if (filter === "rug") return t.rugPullDetected;
     return t.recommendation.toLowerCase() === filter;
   });
 
@@ -518,7 +487,6 @@ function AllTokensTab({
     buy: analysis.filter((t) => t.recommendation === "BUY").length,
     caution: analysis.filter((t) => t.recommendation === "CAUTION").length,
     avoid: analysis.filter((t) => t.recommendation === "AVOID").length,
-    rug: analysis.filter((t) => t.rugPullDetected).length,
   };
 
   const filterButtons: {
@@ -541,11 +509,6 @@ function AllTokensTab({
       key: "avoid",
       label: `🚫 Kaçın (${counts.avoid})`,
       color: "text-orange-400",
-    },
-    {
-      key: "rug",
-      label: `💀 Rug (${counts.rug})`,
-      color: "text-red-400",
     },
   ];
 

@@ -264,39 +264,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }, 750);
 
       } else if (event === "auto_sell_ready") {
-        if (data.forceClose) {
-          // Likidite düşüşü — token satılmadan zarar olarak kapat (rug pull)
-          const pos = tradeStore.getById(data.positionId);
-          if (pos && pos.status === "open") {
-            const rugLoss = -(pos.buySolAmount ?? 0);
-
-            const closed = {
-              ...pos,
-              status: "closed" as const,
-              sellTimestamp: Date.now(),
-              sellSolAmount: 0,
-              sellPriceSol: 0,
-              pnlSol: rugLoss,
-              pnlPct: -100,
-              error: data.reason === "liquidity_drop"
-                ? "Likidite %80 Düştü — Rug Pull"
-                : "Force Closed",
-            };
-            tradeStore.upsert(closed);
-            broadcastToClients({ type: "position_update", data: closed });
-            autoTraderEngine.updateRecordAfterSell(
-              pos.mintAddress,
-              "",
-              0,
-              rugLoss,
-              -100
-            );
-            console.log(`🚨 [Auto-Trader] ${pos.symbol} likidite düşüşü nedeniyle -%100 zararla kapatıldı`);
-          }
-        } else {
-          // Otomatik satış yapılacak pozisyon
-          trader.sell(data.positionId).catch((err) => console.error("Auto-sell hatası:", err));
-        }
+        // Otomatik satış yapılacak pozisyon
+        trader.sell(data.positionId).catch((err) => console.error("Auto-sell hatası:", err));
       } else if (event === "auto_sell_at_updated") {
         // Position'a autoSellAt bilgisini ekle ve yayınla
         const { mintAddress, autoSellAt } = data as { mintAddress: string; autoSellAt: number };
@@ -310,6 +279,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
     trader  // Direkt satış için trader referansı
   );
+
+
 
 
   // Otomatik trader enabled ise başlat
