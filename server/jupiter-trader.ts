@@ -7,7 +7,6 @@ import {
 import bs58 from "bs58";
 import { TradeStore } from "./trade-store";
 import { secrets } from "./secrets-loader";
-import { RugpullDetector } from "./rugpull-detector";
 import type { Position, TradeConfig } from "@shared/schema";
 
 const HELIUS_API_KEY = secrets.HELIUS_API_KEY;
@@ -48,7 +47,6 @@ export class JupiterTrader {
   private decimalsCache: Map<string, number> = new Map();
   private inFlight: Set<string> = new Set();
   private balanceCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
-  private rugpullDetector: RugpullDetector = new RugpullDetector();
   // Token başına pool SOL miktarı (Helius monitor'dan güncellenir)
   private poolSolCache: Map<string, number> = new Map();
 
@@ -345,95 +343,6 @@ export class JupiterTrader {
     this.emit("position_update", position);
   }
 
-  /**
-   * Rug check interval — her 4 saniyede 2 kriteri kontrol eder:
-   * 1. Pool liquidity (< 2 SOL → rug pull)
-   * 2. Zararlı pozisyon (%-80 veya daha kötü → rug pull, satış yapılmaz)
-   *
-   * Alım başarılı olsun veya olmasın başlatılır.
-   * Satış başlarsa veya pozisyon kapanırsa interval durur.
-   * Kontrol hatalarında 2 ilave retry yapılır, sonra sayaç sıfırlanır.
-   */
-  private startRugCheckInterval(position: Position) {
-    // Zaten bir interval varsa temizle
-    const existing = this.balanceCheckIntervals.get(position.id);
-    if (existing) {
-      clearInterval(existing);
-      this.balanceCheckIntervals.delete(position.id);
-    }
-
-    const capturedPosition = position;
-    let consecutiveFailures = 0; // Kesin emin olmak için 2 retry
-    const MAX_CONSECUTIVE_FAILURES = 2;
-
-    const rugInterval = setInterval(async () => {
-      // Pozisyon hala izlenebilir durumda mı?
-      const currentPos = this.store.getById(capturedPosition.id);
-      if (!currentPos || !["open", "pending_buy", "failed"].includes(currentPos.status)) {
-        clearInterval(rugInterval);
-        this.balanceCheckIntervals.delete(capturedPosition.id);
-        return;
-      }
-
-      // Satış başladıysa kontrol bırak
-      if (currentPos.status === "pending_sell") {
-        clearInterval(rugInterval);
-        this.balanceCheckIntervals.delete(capturedPosition.id);
-        return;
-      }
-
-      const { symbol, mintAddress } = capturedPosition;
-
-      try {
-        // ── Kriter 1: Pool Liquidity ─────────────────────────────────────────
-        const poolSol = this.poolSolCache.get(mintAddress);
-
-        // ── Kriter 2: Zararlı Pozisyon ───────────────────────────────────────
-        const unrealizedPnlPct = currentPos.unrealizedPnlPct;
-
-        // Tüm kriterleri detectRugpull ile değerlendir
-        const rugAlert = await this.rugpullDetector.detectRugpull({
-          symbol,
-          mintAddress,
-          poolSol,
-          unrealizedPnlPct,
-        });
-
-        if (rugAlert) {
-          // Rug bulundu → interval durdur, token kapat
-          clearInterval(rugInterval);
-          this.balanceCheckIntervals.delete(capturedPosition.id);
-
-          const rugPullPos: Position = {
-            ...currentPos,
-            status: "closed",
-            sellTimestamp: Date.now(),
-            sellSolAmount: 0,
-            sellPriceSol: 0,
-            pnlSol: -(currentPos.buySolAmount ?? 0),
-            pnlPct: -100,
-            error: `Rug Pull Detected: ${rugAlert.detail}`,
-          };
-          this.updateAndEmit(rugPullPos);
-        } else {
-          // Başarılı kontrol → retry sayacı sıfırla
-          consecutiveFailures = 0;
-        }
-      } catch (err) {
-        // Kontrol başarısız → retry sayacı artır
-        consecutiveFailures++;
-        console.warn(`⚠️ [Rug Check] ${capturedPosition.symbol} kontrol başarısız (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`);
-
-        // 2 retry'dan sonra da başarısız olursa sayacı sıfırla, devam et
-        if (consecutiveFailures > MAX_CONSECUTIVE_FAILURES) {
-          consecutiveFailures = 0;
-        }
-      }
-    }, 4000);
-
-    this.balanceCheckIntervals.set(capturedPosition.id, rugInterval);
-  }
-
   async buy(input: { mintAddress: string; name: string; symbol: string; solAmount?: number; isAuto?: boolean }): Promise<Position | null> {
     const { mintAddress, name, symbol, solAmount, isAuto = false } = input;
     if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — alım atlandı"); return null; }
@@ -507,12 +416,6 @@ export class JupiterTrader {
       this.updateAndEmit(position);
       console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
 
-      // Alım sonrası rug check interval — alım başarılı olsun veya olmasın başlatılır
-      // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
-      setTimeout(() => {
-        this.startRugCheckInterval(position);
-      }, 10000);
-
       return position;
 
     } catch (err) {
@@ -520,13 +423,6 @@ export class JupiterTrader {
       position = { ...position, status: "failed", error: message };
       this.updateAndEmit(position);
       console.error(`❌ [Jupiter] ALIM hatası ${symbol}:`, message);
-
-      // Alım başarısız olsa bile rug check interval başlat
-      // (TX gönderilmiş olabilir, token gelmiş olabilir)
-      // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
-      setTimeout(() => {
-        this.startRugCheckInterval(position);
-      }, 10000);
 
       return position;
     } finally {
@@ -611,25 +507,12 @@ export class JupiterTrader {
       this.updateAndEmit(position);
       console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | tx ${sig.slice(0, 16)}...`);
 
-      // Alım sonrası rug check interval — alım başarılı olsun veya olmasın başlatılır
-      // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
-      setTimeout(() => {
-        this.startRugCheckInterval(position);
-      }, 10000);
-
       return position;
     } catch (err) {
       const message = (err as Error).message || String(err);
       position = { ...position, status: "failed", error: message };
       this.updateAndEmit(position);
       console.error(`❌ [PumpSwap] ALIM hatası ${symbol}:`, message);
-
-      // Alım başarısız olsa bile rug check interval başlat
-      // (TX gönderilmiş olabilir, token gelmiş olabilir)
-      // 10 saniye beklenir: token Jupiter'da listelenme şansı bulsun
-      setTimeout(() => {
-        this.startRugCheckInterval(position);
-      }, 10000);
 
       return position;
     } finally {
@@ -1145,12 +1028,6 @@ export class JupiterTrader {
             return this.sellHalf(positionId, _retryCount + 1);
           }
         }
-      }
-
-      // Yarı satış başarılı — kalan token için rug check interval'i yeniden başlat
-      // [DÜZELTİLDİ] startRugCheckInterval sadece 1 parametre alır — fazladan argüman kaldırıldı
-      if (updated! && updated.status === "open" && updated.buyTokenAmount && updated.buyTokenAmount > 0) {
-        this.startRugCheckInterval(updated);
       }
 
       return updated!;
