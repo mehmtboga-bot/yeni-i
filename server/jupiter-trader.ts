@@ -387,7 +387,6 @@ export class JupiterTrader {
 
     try {
       let swapSignature: string | null = null;
-      let swapPricePerToken = 0;
 
       // retries=2 → Deneme 1: Quote al → TX gönder → Bakiye polling
       //              Deneme 2: Önce mevcut bakiye kontrol (önceki TX başardıysa), yoksa yeni TX gönder
@@ -398,13 +397,12 @@ export class JupiterTrader {
           const existing = await this.getTokenBalance(mintAddress);
           if (existing && existing.uiAmount > 0) {
             console.log(`✅ [Jupiter] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
-            return { sig: swapSignature, tokensOut: existing.uiAmount, pricePerToken: swapPricePerToken };
+            // [DÜZELTİLDİ] buyPriceSol gerçek alınan token miktarı ile hesaplanır (tahmin değil)
+            return { sig: swapSignature, tokensOut: existing.uiAmount, pricePerToken: actualSolAmount / existing.uiAmount };
           }
         }
 
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
-        const decimals = await this.fetchDecimals(mintAddress);
-        swapPricePerToken = Number(quote.outAmount) > 0 ? actualSolAmount / (Number(quote.outAmount) / Math.pow(10, decimals)) : 0;
 
         swapSignature = await this.swap(quote, priorityFee);
         // TX ağda yayılması için 750ms bekle
@@ -416,7 +414,8 @@ export class JupiterTrader {
           await new Promise((r) => setTimeout(r, 500));
           const bal = await this.getTokenBalance(mintAddress);
           if (bal && bal.uiAmount > 0) {
-            return { sig: swapSignature!, tokensOut: bal.uiAmount, pricePerToken: swapPricePerToken };
+            // [DÜZELTİLDİ] buyPriceSol gerçek alınan token miktarı ile hesaplanır (tahmin değil)
+            return { sig: swapSignature!, tokensOut: bal.uiAmount, pricePerToken: actualSolAmount / bal.uiAmount };
           }
           console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/20)`);
         }
