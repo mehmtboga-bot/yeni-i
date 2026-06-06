@@ -245,17 +245,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sym = symbol || "?";
         const autoConfig = autoTraderConfigStore.getConfig();
         const solAmount = autoConfig.solAmountPerTrade;
+
+        // Auto-trader config'inden slippage ve priority fee al
+        const autoSlippagePct = autoConfig.slippageBps / 100;
+        const autoPriorityFeeSol = autoConfig.priorityFeeMicroLamports / 1_000_000_000;
+
         console.log(`⏳ [Auto-Trader] ${sym} 750ms bekleniyor... (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
         setTimeout(() => {
           console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
           if (dex === "pumpswap") {
-            trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount, isAuto: true })
+            trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount, slippagePct: autoSlippagePct, priorityFeeSol: autoPriorityFeeSol, isAuto: true })
               .catch((err) => {
                 console.error("Auto-buy (PumpSwap) hatası:", err);
                 autoTraderEngine.markRecordFailed(mintAddress, String(err));
               });
           } else {
-            trader.buy({ mintAddress, name: nm, symbol: sym, solAmount, isAuto: true })
+            trader.buy({ mintAddress, name: nm, symbol: sym, solAmount, slippagePct: autoSlippagePct, priorityFeeSol: autoPriorityFeeSol, isAuto: true })
               .catch((err) => {
                 console.error("Auto-buy hatası:", err);
                 autoTraderEngine.markRecordFailed(mintAddress, String(err));
@@ -332,6 +337,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sym = symbol || "?";
         const solAmount = autoConfig.solAmountPerTrade;
 
+        // Auto-trader config'inden slippage ve priority fee al
+        const fastBuySlippagePct = autoConfig.slippageBps / 100;
+        const fastBuyPriorityFeeSol = autoConfig.priorityFeeMicroLamports / 1_000_000_000;
+
         // Whitelist kontrol et
         if (!whitelistManager.isWhitelisted(sym)) {
           console.log(`⏭️ [Fast-Buy] ${sym} whitelist'te yok, atlanıyor`);
@@ -368,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         setTimeout(() => {
           console.log(`⚡ [Fast-Buy] Direkt alım başlatılıyor: ${sym} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | SOL: ${solAmount}${customHoldDurationMs !== undefined ? ` | Özel süre: ${(customHoldDurationMs / 1000).toFixed(0)}s` : ""}`);
 
-          const buyOpts = { mintAddress, name: nm, symbol: sym, solAmount, customHoldDurationMs, isAuto: true };
+          const buyOpts = { mintAddress, name: nm, symbol: sym, solAmount, slippagePct: fastBuySlippagePct, priorityFeeSol: fastBuyPriorityFeeSol, customHoldDurationMs, isAuto: true };
           if (dex === "pumpswap") {
             trader.buyPumpSwap(buyOpts)
               .then((pos: any) => {
@@ -473,11 +482,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const sym = symbol || "?";
             const config = tradeStore.getConfig();
             const solAmount = config.solAmount;
+
+            // Paneldeki slippage ve priority fee ayarlarını al
+            const slippageBps = config.slippageBps || 5000;  // Varsayılan: %50
+            const priorityFeeMicroLamports = config.priorityFeeManualMicroLamports || 1_000_000;
+
+            // Bps → % dönüşümü (5000 bps = 50%)
+            const slippagePct = slippageBps / 100;
+            // Micro-lamports → SOL dönüşümü (1_000_000_000 µL = 1 SOL)
+            const priorityFeeSol = priorityFeeMicroLamports / 1_000_000_000;
+
             if (dex === "pumpswap") {
-              trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
+              trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount, slippagePct, priorityFeeSol })
                 .catch((err) => console.error("buyPumpSwap hatası:", err));
             } else {
-              trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
+              trader.buy({ mintAddress, name: nm, symbol: sym, solAmount, slippagePct, priorityFeeSol })
                 .catch((err) => console.error("buy_token hatası:", err));
             }
           }
