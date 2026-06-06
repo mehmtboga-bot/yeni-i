@@ -1,14 +1,14 @@
 /**
  * LiquidityMonitor
  *
- * After a token is purchased, waits 5 seconds then polls DexScreener
- * every 5 seconds to check liquidity. If liquidity drops below $2000
+ * After a token is purchased, waits 15 seconds then polls DexScreener
+ * every 5 seconds to check liquidity. If liquidity drops below $300
  * (and the response is valid), triggers the rug pull callback.
  */
 
 const DEXSCREENER_API_BASE = "https://api.dexscreener.com/tokens/v1/solana";
-const RUG_LIQUIDITY_THRESHOLD_USD = 2000;
-const INITIAL_DELAY_MS = 5_000;   // Wait 5s after purchase before first check
+const RUG_LIQUIDITY_THRESHOLD_USD = 300;
+const INITIAL_DELAY_MS = 15_000;  // Wait 15s after purchase before first check
 const POLL_INTERVAL_MS = 5_000;   // Check every 5s
 const API_TIMEOUT_MS   = 5_000;   // Max 5s per API call
 
@@ -46,7 +46,7 @@ export class LiquidityMonitor {
       }, POLL_INTERVAL_MS);
     }, INITIAL_DELAY_MS);
 
-    console.log(`🔍 [LiquidityMonitor] ${this.symbol} (${this.positionId}) izleme başlatıldı — 5s sonra kontrol başlayacak`);
+    console.log(`🔍 [LiquidityMonitor] ${this.symbol} (${this.positionId}) izleme başlatıldı — 15s sonra kontrol başlayacak`);
   }
 
   /** Stop monitoring (call when position is closed). */
