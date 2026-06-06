@@ -3,25 +3,27 @@
  *
  * 2 kritere göre rug pull tespiti yapar:
  *
- * 1. Pool Liquidity Kontrolü — Pool SOL < 2 SOL ise rug pull
- * 2. Zararlı Pozisyon Kontrolü — %-80 veya daha kötü zarardaysa rug pull
+ * 1. Likidite Kontrolü — DexScreener'dan USD likidite < $2000 ise rug pull
+ * 2. Satış Başarısızlığı — 3 kez ardışık satış başarısızlığı ise rug pull
  *
  * Eski RemoveLiquidity log analizi de korunmuştur (geriye dönük uyumluluk).
  */
 
 import type { Position } from "@shared/schema";
 
+// DexScreener API endpoint (Solana token çifti sorgulama)
+const DEXSCREENER_API = "https://api.dexscreener.com/tokens/v1/solana";
 // Pool SOL eşiği — bu değerin altındaysa rug pull
 const POOL_SOL_THRESHOLD = 2;
-// Pozisyon zarar eşiği — bu kadar veya daha fazla zarardaysa rug pull
-const LOSS_THRESHOLD_PCT = 80;
+// Likidite USD eşiği — bu değerin altındaysa rug pull
+const LIQUIDITY_USD_THRESHOLD = 2000;
 
 export interface RugpullAlert {
   id: string;
   tokenMint: string;
   tokenName: string;
   tokenSymbol: string;
-  reason: "pool_liquidity" | "loss_threshold" | "remove_liquidity";
+  reason: "pool_liquidity" | "liquidity_usd" | "loss_threshold" | "remove_liquidity" | "sell_failure";
   detail: string;
   detectedAt: number;
   // Eski alanlar (geriye dönük uyumluluk)
@@ -42,7 +44,7 @@ export class RugpullDetector {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 1. Pool Liquidity Kontrolü
+  // 1. Pool Liquidity Kontrolü (Helius — SOL bazlı, geriye dönük uyumluluk)
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -50,72 +52,42 @@ export class RugpullDetector {
    * Pool SOL < POOL_SOL_THRESHOLD ise true döner (rug pull).
    */
   checkPoolLiquidity(poolSol: number | undefined): boolean {
-    if (poolSol === undefined || poolSol === null) return false; // Bilgi yoksa atla
+    if (poolSol === undefined || poolSol === null) return false;
     return poolSol < POOL_SOL_THRESHOLD;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 2. Zararlı Pozisyon Kontrolü
+  // 2. DexScreener Likidite Kontrolü (USD bazlı, ana rug detection sinyali)
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Pozisyonun mevcut unrealizedPnlPct değerine göre zarar eşiğini kontrol eder.
-   * %-80 veya daha kötüyse true döner (rug pull — satış yapılmayacak).
-   */
-  checkLossThreshold(unrealizedPnlPct: number | undefined): boolean {
-    if (unrealizedPnlPct === undefined || unrealizedPnlPct === null) return false;
-    return unrealizedPnlPct <= -LOSS_THRESHOLD_PCT;
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Rug Pull Tespiti — 2 kriteri birleştirir
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Tüm kriterleri kontrol eder. İlk eşleşen kriterde RugpullAlert döner.
-   * Hiçbiri eşleşmezse null döner.
+   * DexScreener API'den token'ın USD likiditesini çeker.
+   * pairs[0].liquidity.usd < $2000 ise RugpullAlert döner, aksi halde null.
    *
-   * @param symbol          Token sembolü (log için)
-   * @param mintAddress     Token mint adresi
-   * @param poolSol         Pool SOL miktarı (Helius monitor'dan, opsiyonel)
-   * @param unrealizedPnlPct  Mevcut gerçekleşmemiş PnL yüzdesi (opsiyonel)
+   * @param mint  Token mint adresi (Solana)
    */
-  async detectRugpull(opts: {
-    symbol: string;
-    mintAddress: string;
-    poolSol?: number;
-    unrealizedPnlPct?: number;
-  }): Promise<RugpullAlert | null> {
-    const { symbol, mintAddress, poolSol, unrealizedPnlPct } = opts;
+  async checkLiquidityRugpull(mint: string): Promise<RugpullAlert | null> {
+    const url = `${DEXSCREENER_API}/${mint}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`DexScreener API ${res.status}`);
+    const json = await res.json();
 
-    // Kriter 1: Pool liquidity
-    if (this.checkPoolLiquidity(poolSol)) {
+    const liquidityUsd: number | undefined = json?.pairs?.[0]?.liquidity?.usd;
+
+    // Veri yoksa rug pull sayma — token henüz listelenmemiş olabilir
+    if (liquidityUsd === undefined || liquidityUsd === null) return null;
+
+    if (liquidityUsd < LIQUIDITY_USD_THRESHOLD) {
       const alert: RugpullAlert = {
-        id: `rugpull-${mintAddress}-${Date.now()}`,
-        tokenMint: mintAddress,
-        tokenName: symbol,
-        tokenSymbol: symbol,
-        reason: "pool_liquidity",
-        detail: `Pool SOL < ${POOL_SOL_THRESHOLD} (${poolSol?.toFixed(4)} SOL)`,
+        id: `rugpull-${mint}-${Date.now()}`,
+        tokenMint: mint,
+        tokenName: mint,
+        tokenSymbol: mint,
+        reason: "liquidity_usd",
+        detail: `Rug Pull: Liquidity < $2000 (mevcut: ${liquidityUsd.toFixed(2)})`,
         detectedAt: Date.now(),
       };
-      console.error(`🚨 [Rug Pull] ${symbol} — Pool SOL < 2 (${poolSol?.toFixed(4)} SOL), rug pull`);
-      return alert;
-    }
-
-    // Kriter 2: Zararlı pozisyon
-    if (this.checkLossThreshold(unrealizedPnlPct)) {
-      const loss = Math.abs(unrealizedPnlPct!);
-      const alert: RugpullAlert = {
-        id: `rugpull-${mintAddress}-${Date.now()}`,
-        tokenMint: mintAddress,
-        tokenName: symbol,
-        tokenSymbol: symbol,
-        reason: "loss_threshold",
-        detail: `%-${loss.toFixed(1)} zararlı pozisyon`,
-        detectedAt: Date.now(),
-      };
-      console.error(`🚨 [Rug Pull] ${symbol} — %-${loss.toFixed(1)} zararlı, satış yapılmayacak`);
+      console.error(`🚨 [Rug Pull] Likidite < $2000 — ${liquidityUsd.toFixed(2)} USD (mint: ${mint.slice(0, 16)}...)`);
       return alert;
     }
 
