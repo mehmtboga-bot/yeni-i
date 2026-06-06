@@ -94,13 +94,24 @@ export class LiquidityMonitor {
 
       const json = await res.json();
 
-      // Validate response structure
-      if (!json || !Array.isArray(json.pairs)) {
-        console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} geçersiz API yanıtı — atlanıyor`);
+      // Debug: log the raw response structure on the first unexpected shape
+      // Resolve pairs from either a root-level array or the `pairs` property
+      let pairs: any[] | null = null;
+      if (Array.isArray(json)) {
+        // API returned the pairs array directly at the root
+        pairs = json;
+      } else if (json && Array.isArray(json.pairs)) {
+        // API returned { pairs: [...] }
+        pairs = json.pairs;
+      } else {
+        // Unexpected shape — log the actual response so we can diagnose it
+        const preview = JSON.stringify(json)?.slice(0, 300);
+        console.warn(
+          `⚠️ [LiquidityMonitor] ${this.symbol} geçersiz API yanıtı — ` +
+          `beklenen yapı bulunamadı. Gerçek yanıt: ${preview} — atlanıyor`
+        );
         return;
       }
-
-      const pairs: any[] = json.pairs;
 
       if (pairs.length === 0) {
         // No pairs yet — data not available, skip this check
@@ -123,7 +134,7 @@ export class LiquidityMonitor {
         return;
       }
 
-      console.log(`💧 [LiquidityMonitor] ${this.symbol} likidite: $${maxLiquidityUsd.toFixed(0)}`);
+      console.log(`💧 [LiquidityMonitor] ${this.symbol} likidite: $` + `${maxLiquidityUsd.toFixed(0)} (${pairs.length} pair)`);
 
       if (maxLiquidityUsd < RUG_LIQUIDITY_THRESHOLD_USD) {
         console.log(`🚨 [LiquidityMonitor] ${this.symbol} likidite $${maxLiquidityUsd.toFixed(0)} < $${RUG_LIQUIDITY_THRESHOLD_USD} — RUG PULL tespit edildi!`);
