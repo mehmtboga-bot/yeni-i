@@ -516,7 +516,8 @@ export class JupiterTrader {
       }, `PumpSwap Buy ${symbol}`, 2);
 
       // [DÜZELTİLDİ] withRetry'dan dönen tokensReceived kullanılıyor — gereksiz tekrar sorgu kaldırıldı
-      position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived };
+      const buyPriceSol = tokensReceived > 0 ? actualSolAmount / tokensReceived : 0;
+      position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived, buyPriceSol };
       this.updateAndEmit(position);
       console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | tx ${sig.slice(0, 16)}...`);
 
