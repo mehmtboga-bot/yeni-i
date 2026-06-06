@@ -77,14 +77,14 @@ export function AutoTraderPanel({
   };
 
   const resetToDefaults = () => {
-    setSolAmountInput("0.1");
-    setMaxTokensInput("5");
-    setHoldDurationInput("60");
-    setProfitTargetInput("50");
-    setStopLossInput("20");
-    setSlippageInput("5000");
-    setPriorityInput("1000000");
-    setMinLiquidityInput("5000");
+    setSolAmountInput("0.035");
+    setMaxTokensInput("2");
+    setHoldDurationInput("500");
+    setProfitTargetInput("135");
+    setStopLossInput("80");
+    setSlippageInput("25000");
+    setPriorityInput("3000000");
+    setMinLiquidityInput("3000");
   };
 
   return (
