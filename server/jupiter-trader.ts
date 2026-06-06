@@ -363,8 +363,6 @@ export class JupiterTrader {
     }
 
     const capturedPosition = position;
-    let consecutiveFailures = 0; // Kesin emin olmak için 2 retry
-    const MAX_CONSECUTIVE_FAILURES = 2;
 
     const rugInterval = setInterval(async () => {
       // Pozisyon hala izlenebilir durumda mı?
@@ -382,53 +380,7 @@ export class JupiterTrader {
         return;
       }
 
-      const { symbol, mintAddress } = capturedPosition;
-
-      try {
-        // ── Kriter 1: Pool Liquidity ─────────────────────────────────────────
-        const poolSol = this.poolSolCache.get(mintAddress);
-
-        // ── Kriter 2: Zararlı Pozisyon ───────────────────────────────────────
-        const unrealizedPnlPct = currentPos.unrealizedPnlPct;
-
-        // Tüm kriterleri detectRugpull ile değerlendir
-        const rugAlert = await this.rugpullDetector.detectRugpull({
-          symbol,
-          mintAddress,
-          poolSol,
-          unrealizedPnlPct,
-        });
-
-        if (rugAlert) {
-          // Rug bulundu → interval durdur, token kapat
-          clearInterval(rugInterval);
-          this.balanceCheckIntervals.delete(capturedPosition.id);
-
-          const rugPullPos: Position = {
-            ...currentPos,
-            status: "closed",
-            sellTimestamp: Date.now(),
-            sellSolAmount: 0,
-            sellPriceSol: 0,
-            pnlSol: -(currentPos.buySolAmount ?? 0),
-            pnlPct: -100,
-            error: `Rug Pull Detected: ${rugAlert.detail}`,
-          };
-          this.updateAndEmit(rugPullPos);
-        } else {
-          // Başarılı kontrol → retry sayacı sıfırla
-          consecutiveFailures = 0;
-        }
-      } catch (err) {
-        // Kontrol başarısız → retry sayacı artır
-        consecutiveFailures++;
-        console.warn(`⚠️ [Rug Check] ${capturedPosition.symbol} kontrol başarısız (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`);
-
-        // 2 retry'dan sonra da başarısız olursa sayacı sıfırla, devam et
-        if (consecutiveFailures > MAX_CONSECUTIVE_FAILURES) {
-          consecutiveFailures = 0;
-        }
-      }
+      // Rug detection devre dışı — sadece satış başarısızlığı rug olarak işaretlenir
     }, 4000);
 
     this.balanceCheckIntervals.set(capturedPosition.id, rugInterval);
