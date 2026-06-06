@@ -41,10 +41,10 @@ export class AutoTraderEngine {
   private seenTokenSymbols: Set<string> = new Set();
   private recentlyClosedTrades: Array<{ symbol: string; closedAt: number }> = [];
   private readonly MAX_RECENT_TRADES = 7;
+  private liquidityDropInFlight: Set<string> = new Set();
 
   // Satış tetikleme takibi — sell() kendi sonsuz döngüsünü yönetir, engine sadece ilk çağrıyı yapar
   private sellInProgress: Set<string> = new Set(); // mint → sell() zaten tetiklendi mi
-
 
   constructor(
     configStore: AutoTraderConfigStore,
@@ -157,8 +157,14 @@ export class AutoTraderEngine {
 
     const now = Date.now();
 
-    for (const [, record] of this.records.entries()) {
+    for (const [recordId, record] of this.records.entries()) {
       if (record.status !== "active") continue;
+
+      // Likidite düşüş kontrolü (async, arka planda)
+      if (record.initialLiquidityUsd && record.initialLiquidityUsd > 0 && !this.liquidityDropInFlight.has(recordId)) {
+        this.liquidityDropInFlight.add(recordId);
+        this.checkLiquidityDrop(recordId, record).finally(() => this.liquidityDropInFlight.delete(recordId));
+      }
 
       const position = this.tradeStore.getByMint(record.mintAddress);
       if (!position || position.status !== "open") continue;
@@ -201,6 +207,96 @@ export class AutoTraderEngine {
         this.emit("auto_sell_ready", { positionId: position.id });
         this.sellInProgress.delete(record.mintAddress);
       }
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  //  LİKİDİTE DÜŞÜŞ KONTROLÜ (Rug Pull)
+  // ─────────────────────────────────────────────
+
+  private async checkLiquidityDrop(recordId: string, record: AutoTradeRecord): Promise<void> {
+    try {
+      const res = await fetch(
+        `https://api.dexscreener.com/latest/dex/tokens/${record.mintAddress}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const pairs: any[] = data?.pairs ?? [];
+      if (pairs.length === 0) return;
+
+      const bestPair = pairs.reduce((best: any, p: any) => {
+        const liq = p?.liquidity?.usd ?? 0;
+        return liq > (best?.liquidity?.usd ?? 0) ? p : best;
+      }, pairs[0]);
+
+      const currentLiquidityUsd: number = bestPair?.liquidity?.usd ?? 0;
+      if (currentLiquidityUsd <= 0) return;
+
+      const initialLiq = record.initialLiquidityUsd!;
+      let dropPct = ((initialLiq - currentLiquidityUsd) / initialLiq) * 100;
+
+      if (dropPct >= 80) {
+        // Yanlış okuma olabilir — 3 kez daha dene
+        let retryCount = 0;
+        let finalLiquidityUsd = currentLiquidityUsd;
+        while (retryCount < 3 && dropPct >= 80) {
+          await new Promise((r) => setTimeout(r, 500));
+          try {
+            const retryRes = await fetch(
+              `https://api.dexscreener.com/latest/dex/tokens/${record.mintAddress}`,
+              { signal: AbortSignal.timeout(5000) }
+            );
+            if (retryRes.ok) {
+              const retryData = await retryRes.json();
+              const retryPairs: any[] = retryData?.pairs ?? [];
+              if (retryPairs.length > 0) {
+                const retryBestPair = retryPairs.reduce((best: any, p: any) => {
+                  const liq = p?.liquidity?.usd ?? 0;
+                  return liq > (best?.liquidity?.usd ?? 0) ? p : best;
+                }, retryPairs[0]);
+                finalLiquidityUsd = retryBestPair?.liquidity?.usd ?? finalLiquidityUsd;
+                dropPct = ((initialLiq - finalLiquidityUsd) / initialLiq) * 100;
+              }
+            }
+          } catch {
+            // Retry başarısız — mevcut değerle devam et
+          }
+          retryCount++;
+          console.warn(
+            `⚠️ [Auto-Trader] %80 likidite düşüşü doğrulanıyor: ${record.tokenSymbol} | ` +
+            `Deneme ${retryCount}/3 | Şimdi: ${finalLiquidityUsd.toFixed(0)} | Düşüş: %${dropPct.toFixed(0)}`
+          );
+        }
+
+        // 3 deneme sonrası hala %80+ düşüş varsa rug pull olarak kapat
+        if (dropPct >= 80) {
+          const freshRecord = this.records.get(recordId);
+          if (!freshRecord || freshRecord.status !== "active") return;
+
+          console.log(
+            `🚨 [Auto-Trader] Likidite %${dropPct.toFixed(0)} düştü (3 denemede doğrulandı): ${record.tokenSymbol} | ` +
+            `Başlangıç: ${initialLiq.toFixed(0)} → Şimdi: ${finalLiquidityUsd.toFixed(0)} | Rug pull`
+          );
+
+          const position = this.tradeStore.getByMint(record.mintAddress);
+          if (position && position.status === "open") {
+            this.emit("auto_sell_ready", {
+              positionId: position.id,
+              forceClose: true,
+              pnlPct: -100,
+              reason: "liquidity_drop",
+            });
+            freshRecord.status = "sold";
+            freshRecord.pnlPct = -100;
+            this.emit("auto_trade_record_updated", freshRecord);
+            this.sellInProgress.delete(record.mintAddress);
+          }
+        }
+      }
+    } catch {
+      // Sessizce devam et
     }
   }
 
