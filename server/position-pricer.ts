@@ -102,11 +102,28 @@ export class PositionPricer {
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
-      const currentPriceUsd = priceData?.usdPrice ?? priceData?.price ?? (typeof priceData === "number" ? priceData : 0);
-      // Eğer priceData sayı ise doğrudan kullan (bazı API'ler sadece fiyat döndürüyor)
-      
+
+      // Jupiter Price API v3:
+      //   priceData.price    → token fiyatı SOL cinsinden (varsa öncelikli kullan)
+      //   priceData.usdPrice → token fiyatı USD cinsinden (SOL'a çevirmek gerekir)
+      const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 87;
+      const currentPriceSol: number =
+        priceData?.price != null
+          ? priceData.price                          // Zaten SOL cinsinden — doğrudan kullan
+          : priceData?.usdPrice != null
+            ? priceData.usdPrice / solPrice          // USD → SOL çevirimi
+            : typeof priceData === "number"
+              ? priceData                            // Ham sayı (SOL varsayımı)
+              : 0;
+
+      // USD fiyatını UI için koru (currentPriceUsd alanı)
+      const currentPriceUsd =
+        priceData?.usdPrice != null
+          ? priceData.usdPrice
+          : currentPriceSol * solPrice;
+
       // Veri gelmediyse
-      if (!currentPriceUsd || currentPriceUsd <= 0) {
+      if (!currentPriceSol || currentPriceSol <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
         
@@ -118,9 +135,6 @@ export class PositionPricer {
 
       // Başarılı okuma — sayacı sıfırla
       this.failureCount.delete(pos.mintAddress);
-
-      const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 87;
-      const currentPriceSol = currentPriceUsd / solPrice;
 
       // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
       const lastPrice = this.lastValidPrice.get(pos.mintAddress);
