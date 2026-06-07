@@ -797,11 +797,22 @@ export class JupiterTrader {
         return updated;
       }
 
-      // Maksimum retry aşıldı
-      if (_retryCount >= MAX_SELL_RETRIES) {
-        updated = { ...pos, status: "failed", error: `${MAX_SELL_RETRIES} deneme sonrası satış başarısız: ${message}` };
+      // 3 başarısız satış denemesi → rug pull olarak işaretle, döngüyü durdur
+      if (_retryCount >= 2) {
+        const rugReason = "Failed to sell after 3 attempts";
+        updated = {
+          ...pos,
+          status: "closed",
+          sellTimestamp: Date.now(),
+          sellSolAmount: 0,
+          sellPriceSol: 0,
+          pnlSol: -(pos.buySolAmount ?? 0),
+          pnlPct: -100,
+          error: rugReason,
+        };
         this.updateAndEmit(updated);
-        console.error(`❌ [${dexLabel}] SATIŞ ${MAX_SELL_RETRIES} denemede başarısız, "failed": ${pos.symbol}`);
+        console.error(`🚨 [${dexLabel}] SATIŞ 3 denemede başarısız — rug pull olarak kapatıldı: ${pos.symbol} | ${message}`);
+        this.emit("rug_pull_detected", { positionId: pos.id, mintAddress: pos.mintAddress, symbol: pos.symbol, reason: rugReason });
         return updated;
       }
 
@@ -809,7 +820,7 @@ export class JupiterTrader {
       const retryDelay = Math.min(1000 * Math.pow(2, _retryCount), MAX_BACKOFF_MS);
       updated = { ...pos, status: "open", error: message };
       this.updateAndEmit(updated);
-      console.warn(`⚠️ [${dexLabel}] SATIŞ başarısız (${pos.symbol}) [${_retryCount + 1}/${MAX_SELL_RETRIES}]: ${message} — ${retryDelay}ms sonra tekrar...`);
+      console.warn(`⚠️ [${dexLabel}] SATIŞ başarısız (${pos.symbol}) [${_retryCount + 1}/3]: ${message} — ${retryDelay}ms sonra tekrar...`);
       setTimeout(() => this.sell(positionId, _retryCount + 1), retryDelay);
       return updated;
     } finally {
