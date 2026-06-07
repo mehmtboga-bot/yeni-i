@@ -371,8 +371,34 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
       setIsHalfSelling(false);
     }
   }, [p.status, isHalfSelling]);
+
+  // Gerçek zamanlı PnL % hesaplama: her 1.5 saniyede bir currentPriceSol ve buyPriceSol kullanarak
+  // PnL % = (currentPrice - buyPrice) / buyPrice × 100
+  const [localUnrealizedPnlPct, setLocalUnrealizedPnlPct] = useState<number | null>(() => {
+    if (isOpen && p.currentPriceSol && p.buyPriceSol && p.buyPriceSol > 0) {
+      return ((p.currentPriceSol - p.buyPriceSol) / p.buyPriceSol) * 100;
+    }
+    return p.unrealizedPnlPct ?? null;
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const recalculate = () => {
+      if (p.currentPriceSol && p.buyPriceSol && p.buyPriceSol > 0) {
+        setLocalUnrealizedPnlPct(((p.currentPriceSol - p.buyPriceSol) / p.buyPriceSol) * 100);
+      } else if (p.unrealizedPnlPct !== undefined) {
+        setLocalUnrealizedPnlPct(p.unrealizedPnlPct);
+      }
+    };
+
+    recalculate();
+    const interval = setInterval(recalculate, 1500);
+    return () => clearInterval(interval);
+  }, [isOpen, p.currentPriceSol, p.buyPriceSol, p.unrealizedPnlPct]);
+
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
-  const profitPct = isOpen ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
+  const profitPct = isOpen ? (localUnrealizedPnlPct ?? null) : (p.pnlPct ?? null);
   const profitPositive = (profitPct ?? 0) >= 0;
   const nearTarget = takeProfitPct > 0 && isOpen && profitPct !== null && profitPct >= takeProfitPct * 0.8;
 
