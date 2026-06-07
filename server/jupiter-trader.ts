@@ -409,7 +409,7 @@ export class JupiterTrader {
             console.log(`✅ [Jupiter] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
             // Gerçek alınan token miktarından fiyatı yeniden hesapla
             swapPricePerToken = existing.uiAmount > 0 ? actualSolAmount / existing.uiAmount : swapPricePerToken;
-            return { sig: swapSignature, tokensOut: existing.uiAmount, pricePerToken: swapPricePerToken };
+            return { sig: swapSignature, tokensOut: existing.uiAmount, pricePerToken: swapPricePerToken, decimals: existing.decimals };
           }
         }
 
@@ -430,7 +430,7 @@ export class JupiterTrader {
             // [DÜZELTİLDİ] Quote'tan değil, gerçek alınan token miktarından hesapla
             swapPricePerToken = actualSolAmount / bal.uiAmount;
             console.log(`💰 [Jupiter] Token alındı: ${bal.uiAmount.toLocaleString()} ${symbol} | fiyat: ${swapPricePerToken.toFixed(10)} SOL/token | slippage: ${(quote.slippageBps / 100).toFixed(1)}% | tx: ${swapSignature!.slice(0, 16)}...`);
-            return { sig: swapSignature!, tokensOut: bal.uiAmount, pricePerToken: swapPricePerToken };
+            return { sig: swapSignature!, tokensOut: bal.uiAmount, pricePerToken: swapPricePerToken, decimals: bal.decimals };
           }
           console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/20)`);
         }
@@ -439,7 +439,7 @@ export class JupiterTrader {
         throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
       }, `Jupiter Buy ${symbol}`, 2);
 
-      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
+      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig, tokenDecimals: result.decimals };
       this.updateAndEmit(position);
       console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | fiyat: ${result.pricePerToken.toFixed(10)} SOL/token | tx: ${result.sig.slice(0, 16)}...`);
 
@@ -496,14 +496,14 @@ export class JupiterTrader {
 
       // retries=2 → Deneme 1: TX gönder → Bakiye polling
       //              Deneme 2: Önce mevcut bakiye kontrol (önceki TX başardıysa), yoksa yeni TX gönder
-      const { sig, tokensReceived } = await this.withRetry(async () => {
+      const { sig, tokensReceived, tokenDecimals } = await this.withRetry(async () => {
         // [DÜZELTİLDİ] Retry'da çift TX'i önle: önceki deneme TX'i onaylanmış olabilir.
         if (swapSignature !== null) {
           console.warn(`🔄 [PumpSwap] Retry: önceki TX kontrol ediliyor (sig: ${swapSignature.slice(0, 16)}...) — yeni TX göndermeden önce bakiye sorgulanıyor`);
           const existing = await this.getTokenBalance(mintAddress);
           if (existing && existing.uiAmount > 0) {
             console.log(`✅ [PumpSwap] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
-            return { sig: swapSignature, tokensReceived: existing.uiAmount };
+            return { sig: swapSignature, tokensReceived: existing.uiAmount, tokenDecimals: existing.decimals };
           }
         }
 
@@ -513,11 +513,13 @@ export class JupiterTrader {
         // TX gönderildi — her 500ms'de bakiye kontrol (max 20 = 10s)
         // [DÜZELTİLDİ] 8→20: Mainnet'te yeni token hesabı oluşumu + RPC yayılımı 5-15s sürebilir
         let tokensReceived = 0;
+        let tokenDecimals = 6;
         for (let c = 0; c < 20; c++) {
           await new Promise((r) => setTimeout(r, 500));
           const bal = await this.getTokenBalance(mintAddress);
           if (bal && bal.uiAmount > 0) {
             tokensReceived = bal.uiAmount;
+            tokenDecimals = bal.decimals;
             const pricePerToken = actualSolAmount / tokensReceived;
             console.log(`💰 [PumpSwap] Token alındı: ${tokensReceived.toLocaleString()} ${symbol} | fiyat: ${pricePerToken.toFixed(10)} SOL/token | slippage: ${slippagePct}% | tx: ${swapSignature!.slice(0, 16)}...`);
             break;
@@ -530,13 +532,13 @@ export class JupiterTrader {
           throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
         }
 
-        return { sig: swapSignature!, tokensReceived };
+        return { sig: swapSignature!, tokensReceived, tokenDecimals };
       }, `PumpSwap Buy ${symbol}`, 2);
 
       // [DÜZELTİLDİ] withRetry'dan dönen tokensReceived kullanılıyor — gereksiz tekrar sorgu kaldırıldı
       // [DÜZELTİLDİ] buyPriceSol: Quote'tan değil, gerçek alınan token miktarından hesapla
       const buyPriceSol = tokensReceived > 0 ? actualSolAmount / tokensReceived : 0;
-      position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived, buyPriceSol };
+      position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived, buyPriceSol, tokenDecimals };
       this.updateAndEmit(position);
       console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | fiyat: ${buyPriceSol.toFixed(10)} SOL/token | tx: ${sig.slice(0, 16)}...`);
 
