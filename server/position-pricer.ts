@@ -162,7 +162,7 @@ export class PositionPricer {
       const buySolAmount = pos.buySolAmount > 0 ? pos.buySolAmount : tokenAmountUi * buyPriceSol;
       const unrealizedPnlPct = buySolAmount > 0 ? (unrealizedPnlSol / buySolAmount) * 100 : 0;
 
-      const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
+      const updated: Position = { ...pos, currentPriceUsd, currentPriceSol, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
       this.emit("position_update", updated);
 

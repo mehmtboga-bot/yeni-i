@@ -55,6 +55,7 @@ export const positionSchema = z.object({
   pnlSol: z.number().optional(),
   pnlPct: z.number().optional(),
   currentPriceUsd: z.number().optional(),
+  currentPriceSol: z.number().optional(),
   unrealizedPnlSol: z.number().optional(),
   unrealizedPnlPct: z.number().optional(),
   error: z.string().optional(),
