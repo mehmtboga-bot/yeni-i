@@ -51,6 +51,7 @@ export const positionSchema = z.object({
   sellSolAmount: z.number().optional(),
   sellPriceSol: z.number().optional(),
   sellTxSignature: z.string().optional(),
+  tokenDecimals: z.number().optional(),
   pnlSol: z.number().optional(),
   pnlPct: z.number().optional(),
   currentPriceUsd: z.number().optional(),
