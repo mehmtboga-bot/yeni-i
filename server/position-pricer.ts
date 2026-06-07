@@ -158,6 +158,8 @@ export class PositionPricer {
       // The correct formula is simply: ((currentPrice - buyPrice) / buyPrice) × 100
       const unrealizedPnlPct = ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100;
 
+      console.log(`[Pricer Debug] ${pos.symbol}: buyPrice=${buyPriceSol.toFixed(8)}, currentPrice=${currentPriceSol.toFixed(8)}, pnlPct=${unrealizedPnlPct.toFixed(2)}%, pnlSol=${unrealizedPnlSol.toFixed(8)}`);
+
       const updated: Position = { ...pos, currentPriceUsd, currentPriceSol, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
       this.emit("position_update", updated);
