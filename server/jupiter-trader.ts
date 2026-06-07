@@ -413,8 +413,10 @@ export class JupiterTrader {
         }
 
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+        console.log(`🔍 [Jupiter] Quote: outAmount=${quote.outAmount}, priceImpact=${Number(quote.priceImpactPct).toFixed(4)}%, slippage=${quote.slippageBps} bps`);
 
         swapSignature = await this.swap(quote, priorityFee);
+        console.log(`📤 [Jupiter] TX gönderiliyor: sig=${swapSignature.slice(0, 16)}..., amount=${actualSolAmount} SOL, slippage=${quote.slippageBps} bps`);
         // TX ağda yayılması için 750ms bekle
         await new Promise((r) => setTimeout(r, 750));
 
@@ -428,7 +430,7 @@ export class JupiterTrader {
             swapPricePerToken = actualSolAmount / bal.uiAmount;
             return { sig: swapSignature!, tokensOut: bal.uiAmount, pricePerToken: swapPricePerToken };
           }
-          console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/20)`);
+          console.log(`⏳ [Jupiter] Polling (${c + 1}/20): bakiye=0, bekleniyor...`);
         }
 
         // Token gelmedi — retry izin ver
@@ -437,7 +439,7 @@ export class JupiterTrader {
 
       position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
       this.updateAndEmit(position);
-      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | tx ${result.sig.slice(0, 16)}...`);
+      console.log(`✅ [Jupiter] ALIM tamam: token=${result.tokensOut.toFixed(4)}, price=${result.pricePerToken.toFixed(9)} SOL/token | tx ${result.sig.slice(0, 16)}...`);
 
       return position;
 
@@ -503,6 +505,7 @@ export class JupiterTrader {
         }
 
         swapSignature = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: actualSolAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
+        console.log(`📤 [PumpSwap] TX gönderiliyor: sig=${swapSignature.slice(0, 16)}..., amount=${actualSolAmount} SOL, slippage=${slippagePct}%`);
 
         // TX gönderildi — her 500ms'de bakiye kontrol (max 20 = 10s)
         // [DÜZELTİLDİ] 8→20: Mainnet'te yeni token hesabı oluşumu + RPC yayılımı 5-15s sürebilir
@@ -514,7 +517,7 @@ export class JupiterTrader {
             tokensReceived = bal.uiAmount;
             break;
           }
-          console.log(`⏳ [PumpSwap] Token bekleniyor... (${c + 1}/20)`);
+          console.log(`⏳ [PumpSwap] Polling (${c + 1}/20): bakiye=0, bekleniyor...`);
         }
 
         // Token gelmedi — retry izin ver
@@ -530,7 +533,7 @@ export class JupiterTrader {
       const buyPriceSol = tokensReceived > 0 ? actualSolAmount / tokensReceived : 0;
       position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived, buyPriceSol };
       this.updateAndEmit(position);
-      console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | tx ${sig.slice(0, 16)}...`);
+      console.log(`✅ [PumpSwap] ALIM tamam: token=${tokensReceived.toLocaleString()}, price=${buyPriceSol.toFixed(9)} SOL/token | tx ${sig.slice(0, 16)}...`);
 
       return position;
     } catch (err) {
