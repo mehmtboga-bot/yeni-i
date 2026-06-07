@@ -94,7 +94,10 @@ export class LiquidityMonitor {
 
       const json = await res.json();
 
-      // Debug: log the raw response structure on the first unexpected shape
+      // DEBUG: Log raw API response (first 500 chars) to diagnose liquidity issues
+      const rawPreview = JSON.stringify(json)?.slice(0, 500);
+      console.log(`🔎 [LiquidityMonitor] ${this.symbol} ham API yanıtı: ${rawPreview}`);
+
       // Resolve pairs from either a root-level array or the `pairs` property
       let pairs: any[] | null = null;
       if (Array.isArray(json)) {
@@ -113,6 +116,9 @@ export class LiquidityMonitor {
         return;
       }
 
+      // DEBUG: Log pair count
+      console.log(`🔎 [LiquidityMonitor] ${this.symbol} toplam pair sayısı: ${pairs.length}`);
+
       if (pairs.length === 0) {
         // No pairs yet — data not available, skip this check
         console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} henüz pair bulunamadı — atlanıyor`);
@@ -123,6 +129,11 @@ export class LiquidityMonitor {
       let maxLiquidityUsd = -1;
       for (const pair of pairs) {
         const liq = pair?.liquidity?.usd;
+        // DEBUG: Log each pair's liquidity field for diagnosis
+        console.log(
+          `🔎 [LiquidityMonitor] ${this.symbol} pair ${pair?.pairAddress ?? "?"} ` +
+          `liquidity.usd=${JSON.stringify(liq)} (type: ${typeof liq})`
+        );
         if (typeof liq === "number" && liq > maxLiquidityUsd) {
           maxLiquidityUsd = liq;
         }
