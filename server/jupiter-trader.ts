@@ -405,6 +405,8 @@ export class JupiterTrader {
           const existing = await this.getTokenBalance(mintAddress);
           if (existing && existing.uiAmount > 0) {
             console.log(`✅ [Jupiter] Önceki TX onaylandı, yeni TX gönderilmiyor. Bakiye: ${existing.uiAmount}`);
+            // Gerçek alınan token miktarından fiyatı yeniden hesapla
+            swapPricePerToken = existing.uiAmount > 0 ? actualSolAmount / existing.uiAmount : swapPricePerToken;
             return { sig: swapSignature, tokensOut: existing.uiAmount, pricePerToken: swapPricePerToken };
           }
         }
