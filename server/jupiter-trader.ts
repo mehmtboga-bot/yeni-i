@@ -185,7 +185,7 @@ export class JupiterTrader {
 
   private async getQuote(params: {
     inputMint: string; outputMint: string; amount: string; slippageBps: number;
-  }): Promise<QuoteResponse> {
+  }): Promise<QuoteResponse & { sentSlippageBps: number }> {
     const url = new URL(JUP_QUOTE);
     url.searchParams.set("inputMint", params.inputMint);
     url.searchParams.set("outputMint", params.outputMint);
@@ -202,8 +202,11 @@ export class JupiterTrader {
     if (!res.ok) throw new Error(`Jupiter quote ${res.status}: ${bodyText.slice(0, 200)}`);
     const json = JSON.parse(bodyText) as QuoteResponse;
     if (!json?.outAmount || BigInt(json.outAmount) === 0n) throw new Error("Jupiter quote: route bulunamadı");
-    return json;
+    // sentSlippageBps: API'ye gönderilen değer (config'den clamped)
+    // json.slippageBps: Jupiter'ın döndürdüğü değer (optimize edilmiş olabilir)
+    return { ...json, sentSlippageBps: clampedSlippage };
   }
+
 
   private async swap(quote: QuoteResponse, priorityFeeMicroLamports: number, confirmForeground = false): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
@@ -414,10 +417,11 @@ export class JupiterTrader {
         }
 
         const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
-        console.log(`📊 [Jupiter] Quote alındı: ${symbol} | slippage: ${(quote.slippageBps / 100).toFixed(1)}% (${quote.slippageBps} bps) | giriş: ${(Number(quote.inAmount) / 1e9).toFixed(6)} SOL | beklenen çıkış: ${Number(quote.outAmount).toLocaleString()} token | priceImpact: ${Number(quote.priceImpactPct).toFixed(4)}%`);
+        console.log(`📊 [Jupiter] Quote alındı: ${symbol} | gönderilen slippage: ${(quote.sentSlippageBps / 100).toFixed(1)}% (${quote.sentSlippageBps} bps) | Jupiter slippage: ${(quote.slippageBps / 100).toFixed(1)}% (${quote.slippageBps} bps) | giriş: ${(Number(quote.inAmount) / 1e9).toFixed(6)} SOL | beklenen çıkış: ${Number(quote.outAmount).toLocaleString()} token | priceImpact: ${Number(quote.priceImpactPct).toFixed(4)}%`);
 
         swapSignature = await this.swap(quote, priorityFee);
-        console.log(`📤 [Jupiter] TX gönderildi: ${swapSignature} | ${symbol} | ${actualSolAmount} SOL | slippage: ${(quote.slippageBps / 100).toFixed(1)}% | beklenen: ${Number(quote.outAmount).toLocaleString()} token`);
+        console.log(`📤 [Jupiter] TX gönderildi: ${swapSignature} | ${symbol} | ${actualSolAmount} SOL | gönderilen slippage: ${(quote.sentSlippageBps / 100).toFixed(1)}% | Jupiter slippage: ${(quote.slippageBps / 100).toFixed(1)}% | beklenen: ${Number(quote.outAmount).toLocaleString()} token`);
+
         // TX ağda yayılması için 750ms bekle
         await new Promise((r) => setTimeout(r, 750));
 
@@ -429,7 +433,8 @@ export class JupiterTrader {
           if (bal && bal.uiAmount > 0) {
             // [DÜZELTİLDİ] Quote'tan değil, gerçek alınan token miktarından hesapla
             swapPricePerToken = actualSolAmount / bal.uiAmount;
-            console.log(`💰 [Jupiter] Token alındı: ${bal.uiAmount.toLocaleString()} ${symbol} | fiyat: ${swapPricePerToken.toFixed(10)} SOL/token | slippage: ${(quote.slippageBps / 100).toFixed(1)}% | tx: ${swapSignature!.slice(0, 16)}...`);
+            console.log(`💰 [Jupiter] Token alındı: ${bal.uiAmount.toLocaleString()} ${symbol} | fiyat: ${swapPricePerToken.toFixed(10)} SOL/token | gönderilen slippage: ${(quote.sentSlippageBps / 100).toFixed(1)}% | Jupiter slippage: ${(quote.slippageBps / 100).toFixed(1)}% | tx: ${swapSignature!.slice(0, 16)}...`);
+
             return { sig: swapSignature!, tokensOut: bal.uiAmount, pricePerToken: swapPricePerToken };
           }
           console.log(`⏳ [Jupiter] Token bekleniyor... (${c + 1}/20)`);
