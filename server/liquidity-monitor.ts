@@ -119,17 +119,21 @@ export class LiquidityMonitor {
         return;
       }
 
-      // Find the highest liquidity pair
-      let maxLiquidityUsd = -1;
+      // Find the highest liquidity pair.
+      // null  = no liquidity field present in any pair (data missing, retry)
+      // 0     = real zero liquidity (rug pull)
+      let maxLiquidityUsd: number | null = null;
       for (const pair of pairs) {
         const liq = pair?.liquidity?.usd;
-        if (typeof liq === "number" && liq > maxLiquidityUsd) {
-          maxLiquidityUsd = liq;
+        if (typeof liq === "number") {
+          if (maxLiquidityUsd === null || liq > maxLiquidityUsd) {
+            maxLiquidityUsd = liq;
+          }
         }
       }
 
-      if (maxLiquidityUsd < 0) {
-        // Liquidity field missing from all pairs — data invalid, skip
+      if (maxLiquidityUsd === null) {
+        // Liquidity field missing from all pairs — data not yet available, skip
         console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} likidite verisi eksik — atlanıyor`);
         return;
       }
