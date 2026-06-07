@@ -150,9 +150,13 @@ export class PositionPricer {
         console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
         continue;
       }
+      // buyTokenAmount raw units'te saklanmış olabilir (Solana token amounts 6-9 decimals).
+      // tokenDecimals ile normalize ederek UI miktarına çevir.
+      const tokenDecimals = pos.tokenDecimals ?? 6;
+      const normalizedTokenAmount = (pos.buyTokenAmount ?? 0) / Math.pow(10, tokenDecimals);
       const unrealizedPnlSol =
-        (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
-      const buySolAmount = pos.buySolAmount > 0 ? pos.buySolAmount : (pos.buyTokenAmount ?? 0) * buyPriceSol;
+        normalizedTokenAmount * (currentPriceSol - buyPriceSol);
+      const buySolAmount = pos.buySolAmount > 0 ? pos.buySolAmount : normalizedTokenAmount * buyPriceSol;
       const unrealizedPnlPct = buySolAmount > 0 ? (unrealizedPnlSol / buySolAmount) * 100 : 0;
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };

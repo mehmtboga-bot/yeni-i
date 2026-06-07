@@ -439,9 +439,10 @@ export class JupiterTrader {
         throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
       }, `Jupiter Buy ${symbol}`, 2);
 
-      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig };
+      const tokenDecimals = await this.fetchDecimals(mintAddress).catch(() => 6);
+      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig, tokenDecimals };
       this.updateAndEmit(position);
-      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | fiyat: ${result.pricePerToken.toFixed(10)} SOL/token | tx: ${result.sig.slice(0, 16)}...`);
+      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | fiyat: ${result.pricePerToken.toFixed(10)} SOL/token | decimals: ${tokenDecimals} | tx: ${result.sig.slice(0, 16)}...`);
 
       return position;
 
@@ -536,9 +537,10 @@ export class JupiterTrader {
       // [DÜZELTİLDİ] withRetry'dan dönen tokensReceived kullanılıyor — gereksiz tekrar sorgu kaldırıldı
       // [DÜZELTİLDİ] buyPriceSol: Quote'tan değil, gerçek alınan token miktarından hesapla
       const buyPriceSol = tokensReceived > 0 ? actualSolAmount / tokensReceived : 0;
-      position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived, buyPriceSol };
+      const tokenDecimals = await this.fetchDecimals(mintAddress).catch(() => 6);
+      position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived, buyPriceSol, tokenDecimals };
       this.updateAndEmit(position);
-      console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | fiyat: ${buyPriceSol.toFixed(10)} SOL/token | tx: ${sig.slice(0, 16)}...`);
+      console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | fiyat: ${buyPriceSol.toFixed(10)} SOL/token | decimals: ${tokenDecimals} | tx: ${sig.slice(0, 16)}...`);
 
       return position;
     } catch (err) {
