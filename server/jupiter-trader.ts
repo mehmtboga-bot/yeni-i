@@ -657,9 +657,11 @@ export class JupiterTrader {
         }
 
         const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.tokenAmount);
-        const pnlSol = estimatedSolOut - (pos.buySolAmount ?? 0);
-        const pnlPct = (pos.buySolAmount ?? 0) > 0 ? (pnlSol / pos.buySolAmount!) * 100 : 0;
-        const sellPriceSol = result.tokenAmount > 0 ? estimatedSolOut / result.tokenAmount : 0;
+        // sellPriceSol: token başına SOL fiyatı (buyPriceSol ile aynı birim)
+        // pos.buyTokenAmount kullanılır — böylece buyPriceSol ile tutarlı olur
+        const sellPriceSol = (pos.buyTokenAmount ?? 0) > 0 ? estimatedSolOut / (pos.buyTokenAmount ?? 0) : 0;
+        const pnlSol = (sellPriceSol - (pos.buyPriceSol ?? 0)) * (pos.buyTokenAmount ?? 0);
+        const pnlPct = (pos.buyPriceSol ?? 0) > 0 ? ((sellPriceSol - (pos.buyPriceSol ?? 0)) / (pos.buyPriceSol ?? 0)) * 100 : 0;
 
         updated = {
           ...updated,
@@ -682,14 +684,16 @@ export class JupiterTrader {
             if (BigInt(balance.raw) === 0n) throw new Error("Cüzdanda token bakiyesi yok");
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
             const solOut = Number(quote.outAmount) / 1e9;
-            const sellPriceSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
+            // sellPriceSol: token başına SOL fiyatı (buyPriceSol ile aynı birim)
+            // pos.buyTokenAmount kullanılır — balance.uiAmount değil — böylece buyPriceSol ile tutarlı olur
+            const sellPriceSol = (pos.buyTokenAmount ?? 0) > 0 ? solOut / (pos.buyTokenAmount ?? 0) : 0;
             const sig = await this.swap(quote, config.priorityFeeManualMicroLamports, true);
             return { sig, solOut, sellPriceSol, tokenAmount: balance.uiAmount };
           }, `Jupiter Sell ${pos.symbol}`);
 
           jupiterOk = true;
-          const pnlSol = result.solOut - (pos.buySolAmount ?? 0);
-          const pnlPct = (pos.buySolAmount ?? 0) > 0 ? (pnlSol / pos.buySolAmount!) * 100 : 0;
+          const pnlSol = (result.sellPriceSol - (pos.buyPriceSol ?? 0)) * (pos.buyTokenAmount ?? 0);
+          const pnlPct = (pos.buyPriceSol ?? 0) > 0 ? ((result.sellPriceSol - (pos.buyPriceSol ?? 0)) / (pos.buyPriceSol ?? 0)) * 100 : 0;
           updated = {
             ...updated,
             status: "closed",
@@ -736,9 +740,11 @@ export class JupiterTrader {
           }, `PumpSwap Fallback Sell ${pos.symbol}`);
 
           const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.tokenAmount);
-          const pnlSol = estimatedSolOut - (pos.buySolAmount ?? 0);
-          const pnlPct = (pos.buySolAmount ?? 0) > 0 ? (pnlSol / pos.buySolAmount!) * 100 : 0;
-          const sellPriceSol = result.tokenAmount > 0 ? estimatedSolOut / result.tokenAmount : 0;
+          // sellPriceSol: token başına SOL fiyatı (buyPriceSol ile aynı birim)
+          // pos.buyTokenAmount kullanılır — böylece buyPriceSol ile tutarlı olur
+          const sellPriceSol = (pos.buyTokenAmount ?? 0) > 0 ? estimatedSolOut / (pos.buyTokenAmount ?? 0) : 0;
+          const pnlSol = (sellPriceSol - (pos.buyPriceSol ?? 0)) * (pos.buyTokenAmount ?? 0);
+          const pnlPct = (pos.buyPriceSol ?? 0) > 0 ? ((sellPriceSol - (pos.buyPriceSol ?? 0)) / (pos.buyPriceSol ?? 0)) * 100 : 0;
 
           updated = {
             ...updated,
