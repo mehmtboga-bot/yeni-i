@@ -4,6 +4,11 @@
  * After a token is purchased, waits 15 seconds then polls DexScreener
  * every 5 seconds to check liquidity. If liquidity drops below $300
  * (and the response is valid), triggers the rug pull callback.
+ *
+ * Fallback detection: if the API returns invalid or missing data for
+ * MAX_CONSECUTIVE_API_FAILURES consecutive checks (25 seconds), the
+ * position is treated as a rug pull even without a confirmed liquidity
+ * reading — this catches rugs that disappear from the DEX index entirely.
  */
 
 const DEXSCREENER_API_BASE = "https://api.dexscreener.com/tokens/v1/solana";
@@ -11,22 +16,26 @@ const RUG_LIQUIDITY_THRESHOLD_USD = 300;
 const INITIAL_DELAY_MS = 15_000;  // Wait 15s after purchase before first check
 const POLL_INTERVAL_MS = 5_000;   // Check every 5s
 const API_TIMEOUT_MS   = 5_000;   // Max 5s per API call
+// 5 consecutive bad responses × 5s = 25s of unavailable data → treat as rug
+const MAX_CONSECUTIVE_API_FAILURES = 5;
 
 export class LiquidityMonitor {
   private positionId: string;
   private mintAddress: string;
   private symbol: string;
-  private onRugDetected: (positionId: string) => void;
+  private onRugDetected: (positionId: string, reason: string) => void;
 
   private stopped = false;
   private initialTimer: NodeJS.Timeout | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
+  // Counts consecutive checks where API returned invalid/missing data
+  private consecutiveApiFailures = 0;
 
   constructor(
     positionId: string,
     mintAddress: string,
     symbol: string,
-    onRugDetected: (positionId: string) => void,
+    onRugDetected: (positionId: string, reason: string) => void,
   ) {
     this.positionId   = positionId;
     this.mintAddress  = mintAddress;
@@ -89,6 +98,8 @@ export class LiquidityMonitor {
 
       if (!res.ok) {
         console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} API yanıtı: ${res.status} — sonraki döngüde tekrar denenecek`);
+        this.consecutiveApiFailures++;
+        this.checkFallbackRug();
         return;
       }
 
@@ -110,12 +121,16 @@ export class LiquidityMonitor {
           `⚠️ [LiquidityMonitor] ${this.symbol} geçersiz API yanıtı — ` +
           `beklenen yapı bulunamadı. Gerçek yanıt: ${preview} — atlanıyor`
         );
+        this.consecutiveApiFailures++;
+        this.checkFallbackRug();
         return;
       }
 
       if (pairs.length === 0) {
-        // No pairs yet — data not available, skip this check
+        // No pairs yet — data not available, increment failure counter
         console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} henüz pair bulunamadı — atlanıyor`);
+        this.consecutiveApiFailures++;
+        this.checkFallbackRug();
         return;
       }
 
@@ -133,17 +148,22 @@ export class LiquidityMonitor {
       }
 
       if (maxLiquidityUsd === null) {
-        // Liquidity field missing from all pairs — data not yet available, skip
+        // Liquidity field missing from all pairs — increment failure counter
         console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} likidite verisi eksik — atlanıyor`);
+        this.consecutiveApiFailures++;
+        this.checkFallbackRug();
         return;
       }
+
+      // Valid data received — reset the consecutive failure counter
+      this.consecutiveApiFailures = 0;
 
       console.log(`💧 [LiquidityMonitor] ${this.symbol} likidite: $` + `${maxLiquidityUsd.toFixed(0)} (${pairs.length} pair)`);
 
       if (maxLiquidityUsd < RUG_LIQUIDITY_THRESHOLD_USD) {
         console.log(`🚨 [LiquidityMonitor] ${this.symbol} likidite $${maxLiquidityUsd.toFixed(0)} < $${RUG_LIQUIDITY_THRESHOLD_USD} — RUG PULL tespit edildi!`);
         this.stop();
-        this.onRugDetected(this.positionId);
+        this.onRugDetected(this.positionId, `Liquidity dropped below $${RUG_LIQUIDITY_THRESHOLD_USD}`);
       }
     } catch (err: any) {
       if (err?.name === "AbortError") {
@@ -151,7 +171,27 @@ export class LiquidityMonitor {
       } else {
         console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} kontrol hatası: ${err?.message ?? err} — sonraki döngüde tekrar denenecek`);
       }
+      this.consecutiveApiFailures++;
+      this.checkFallbackRug();
       // Don't crash — retry on next poll cycle
+    }
+  }
+
+  /**
+   * Triggers rug pull detection if the API has returned invalid or missing
+   * data for MAX_CONSECUTIVE_API_FAILURES consecutive checks (25 seconds).
+   * This catches tokens that vanish from the DEX index without a liquidity
+   * reading ever being available.
+   */
+  private checkFallbackRug() {
+    if (this.stopped) return;
+    if (this.consecutiveApiFailures >= MAX_CONSECUTIVE_API_FAILURES) {
+      const reason = "API data unavailable for 25s";
+      console.log(
+        `🚨 [LiquidityMonitor] ${this.symbol} — API ${this.consecutiveApiFailures} ardışık kontrolde veri döndürmedi (${reason}) — RUG PULL olarak işaretleniyor`
+      );
+      this.stop();
+      this.onRugDetected(this.positionId, reason);
     }
   }
 }

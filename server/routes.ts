@@ -205,8 +205,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             data.id,
             data.mintAddress,
             data.symbol,
-            (positionId: string) => {
-              // Rug pull detected by liquidity drop — close the position
+            (positionId: string, reason: string) => {
+              // Rug pull detected by liquidity drop or API unavailability — close the position
               const pos = tradeStore.getById(positionId);
               if (pos && (pos.status === "open" || pos.status === "pending_buy" || pos.status === "pending_sell")) {
                 const rugLoss = -(pos.buySolAmount ?? 0);
@@ -218,12 +218,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   sellPriceSol: 0,
                   pnlSol: rugLoss,
                   pnlPct: -100,
-                  error: "Rug Pull",
+                  error: `Rug Pull: ${reason}`,
                 };
                 tradeStore.upsert(closed);
-                autoTraderEngine.markRecordClosed(pos.mintAddress);
+                autoTraderEngine.markRecordRugDetected(pos.mintAddress, reason);
                 broadcastToClients({ type: "position_update", data: closed });
-                console.log(`🚨 [LiquidityMonitor] ${pos.symbol} likidite düşüşü nedeniyle rug pull olarak kapatıldı (-%100)`);
+                console.log(`🚨 [LiquidityMonitor] ${pos.symbol} rug pull olarak kapatıldı (-%100) — ${reason}`);
               }
               liquidityMonitors.delete(positionId);
             },
@@ -252,6 +252,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } else if (event === "trade_config_update") {
       broadcastToClients({ type: "trade_config_update", data });
+    } else if (event === "rug_pull_detected") {
+      // sell() failed 3 times — position already closed as rug pull by the trader
+      const { mintAddress, symbol, reason } = data as { positionId: string; mintAddress: string; symbol: string; reason: string };
+      console.error(`🚨 [routes] Rug pull event alındı: ${symbol} — ${reason}`);
+      autoTraderEngine.markRecordRugDetected(mintAddress, reason);
+      // Stop liquidity monitoring for this position if still running
+      const lm = liquidityMonitors.get(data.positionId);
+      if (lm) {
+        lm.stop();
+        liquidityMonitors.delete(data.positionId);
+      }
+      broadcastToClients({ type: "rug_pull_detected", data });
     }
   });
 

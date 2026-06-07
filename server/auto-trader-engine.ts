@@ -15,7 +15,7 @@ interface AutoTradeRecord {
   buyTimestamp: number;
   shouldSellAt: number;
   buyTxSignature?: string;
-  status: "pending" | "active" | "sold" | "failed" | "closed";
+  status: "pending" | "active" | "sold" | "failed" | "closed" | "rug_detected";
   error?: string;
   buyPriceSol?: number;
   buyTokenAmount?: number;
@@ -303,6 +303,29 @@ export class AutoTraderEngine {
         record.error = error;
         this.emit("auto_trade_record_updated", record);
         console.error(`❌ [Auto-Trader] Hata: ${record.tokenSymbol} | ${error}`);
+        break;
+      }
+    }
+  }
+
+  /**
+   * Called when a rug pull is detected — either by the LiquidityMonitor
+   * (API data unavailable / liquidity drop) or by the sell() method after
+   * 3 consecutive failed sell attempts.  Marks the record as "rug_detected"
+   * so the UI can distinguish it from a generic failure.
+   */
+  markRecordRugDetected(mintAddress: string, reason: string) {
+    for (const [, record] of this.records.entries()) {
+      if (
+        record.mintAddress === mintAddress &&
+        (record.status === "pending" || record.status === "active" || record.status === "sold")
+      ) {
+        record.status = "rug_detected";
+        record.error = reason;
+        record.closedAt = Date.now();
+        this.emit("auto_trade_record_updated", record);
+        this.sellInProgress.delete(mintAddress);
+        console.error(`🚨 [Auto-Trader] Rug pull tespit edildi: ${record.tokenSymbol} | ${reason}`);
         break;
       }
     }
