@@ -73,7 +73,7 @@ export class TradeStore {
     return position;
   }
 
-  private static MAX_CLOSED_HISTORY = 4;
+  private static MAX_CLOSED_HISTORY = 50;
   private pruneClosed() {
     const isClosed = (p: Position) => p.status === "closed" || p.status === "failed";
     const closed = this.data.positions
