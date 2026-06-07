@@ -98,7 +98,7 @@ export class PositionPricer {
     }
 
     const config = this.store.getConfig();
-    const takeProfitPct = config.takeProfitPct ?? 0;
+    const takeProfitPct = config.profitTargetPct ?? 0;
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
