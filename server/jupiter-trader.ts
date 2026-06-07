@@ -92,7 +92,14 @@ export class JupiterTrader {
     const { timeoutMs, ...fetchInit } = init;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    return fetch(input, { ...fetchInit, signal: controller.signal }).finally(() => clearTimeout(timer));
+    return fetch(input, { ...fetchInit, signal: controller.signal })
+      .finally(() => clearTimeout(timer))
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === "AbortError") {
+          throw new Error(`Timeout — istek iptal edildi`);
+        }
+        throw err;
+      });
   }
 
   // --- [DÜZELTİLDİ] Exponential backoff ile retry ---
