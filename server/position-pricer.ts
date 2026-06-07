@@ -152,8 +152,9 @@ export class PositionPricer {
       }
       const unrealizedPnlSol =
         (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
-      const buySolAmount = pos.buySolAmount;
-      const unrealizedPnlPct = buySolAmount > 0 ? (unrealizedPnlSol / buySolAmount) * 100 : 0;
+      // PnL % = (currentPrice - buyPrice) / buyPrice × 100
+      // Yatırılan SOL miktarına değil, token fiyatı değişimine göre hesapla
+      const unrealizedPnlPct = ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100;
 
       const updated: Position = { ...pos, currentPriceUsd, currentPriceSol, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
