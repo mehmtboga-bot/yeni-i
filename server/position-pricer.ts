@@ -152,8 +152,11 @@ export class PositionPricer {
       }
       const unrealizedPnlSol =
         (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
-      const buySolAmount = pos.buySolAmount;
-      const unrealizedPnlPct = buySolAmount > 0 ? (unrealizedPnlSol / buySolAmount) * 100 : 0;
+      // PnL % = price change % relative to buy price (not ROI on SOL spent).
+      // Using buySolAmount as denominator inflates it when fees/slippage cause
+      // buyTokenAmount × buyPriceSol < buySolAmount, producing a far-too-small %.
+      // The correct formula is simply: ((currentPrice - buyPrice) / buyPrice) × 100
+      const unrealizedPnlPct = ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100;
 
       const updated: Position = { ...pos, currentPriceUsd, currentPriceSol, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
