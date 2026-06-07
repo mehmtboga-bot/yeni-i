@@ -92,7 +92,16 @@ export class JupiterTrader {
     const { timeoutMs, ...fetchInit } = init;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    return fetch(input, { ...fetchInit, signal: controller.signal }).finally(() => clearTimeout(timer));
+    return fetch(input, { ...fetchInit, signal: controller.signal })
+      .catch((err: unknown) => {
+        // AbortController.abort() throws a DOMException with name "AbortError".
+        // Re-throw as a plain Error so withRetry can log and retry it correctly.
+        if (err instanceof Error && err.name === "AbortError") {
+          throw new Error(`Timeout (${timeoutMs}ms aşıldı) — istek iptal edildi`);
+        }
+        throw err;
+      })
+      .finally(() => clearTimeout(timer));
   }
 
   // --- [DÜZELTİLDİ] Exponential backoff ile retry ---
@@ -189,7 +198,7 @@ export class JupiterTrader {
     url.searchParams.set("asLegacyTransaction", "false");
     url.searchParams.set("restrictIntermediateTokens", "true");
 
-    const res = await this.fetchWithTimeout(url.toString(), { timeoutMs: 3000 });
+    const res = await this.fetchWithTimeout(url.toString(), { timeoutMs: 5000 });
     const bodyText = await res.text();
     if (!res.ok) throw new Error(`Jupiter quote ${res.status}: ${bodyText.slice(0, 200)}`);
     const json = JSON.parse(bodyText) as QuoteResponse;
@@ -212,7 +221,7 @@ export class JupiterTrader {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(swapBody),
-      timeoutMs: 2500,
+      timeoutMs: 4000,
     });
     if (!swapRes.ok) throw new Error(`Jupiter swap ${swapRes.status}: ${(await swapRes.text()).slice(0, 200)}`);
     const { swapTransaction } = (await swapRes.json()) as { swapTransaction: string };
@@ -294,7 +303,7 @@ export class JupiterTrader {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      timeoutMs: 3000,
+      timeoutMs: 5000,
     });
 
     if (!res.ok) throw new Error(`PumpPortal API ${res.status}: ${(await res.text()).slice(0, 200)}`);
