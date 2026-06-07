@@ -252,6 +252,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } else if (event === "trade_config_update") {
       broadcastToClients({ type: "trade_config_update", data });
+    } else if (event === "rug_pull_detected") {
+      // Satış 3 denemede başarısız — rug pull olarak işaretle
+      const { positionId, mintAddress, symbol, reason } = data as {
+        positionId: string;
+        mintAddress: string;
+        symbol: string;
+        reason: string;
+      };
+      autoTraderEngine.markRecordRugDetected(mintAddress, reason);
+      // Stop liquidity monitoring if still running
+      const lmFailed = liquidityMonitors.get(positionId);
+      if (lmFailed) {
+        lmFailed.stop();
+        liquidityMonitors.delete(positionId);
+      }
+      broadcastToClients({ type: "rug_pull_detected", data: { positionId, mintAddress, symbol, reason } });
+      console.error(`🚨 [Routes] ${symbol} — satış 3 denemede başarısız, rug pull olarak işaretlendi`);
     }
   });
 
