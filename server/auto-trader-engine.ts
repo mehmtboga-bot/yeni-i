@@ -274,7 +274,7 @@ export class AutoTraderEngine {
         this.emit("auto_trade_record_updated", record);
         console.log(`✅ [Auto-Trader] Satış tamamlandı: ${record.tokenSymbol} | PnL: ${pnlSol?.toFixed(4) || "?"} SOL (${pnlPct?.toFixed(1) || "?"}%)`);
         const tokenKey = `${record.tokenSymbol}:${record.tokenName}`.toLowerCase();
-        this.seenTokenSymbols.add(tokenKey);
+        this.seenTokenSymbols.delete(tokenKey);
         this.recentlyClosedTrades.push({ symbol: record.tokenSymbol, closedAt: Date.now() });
         if (this.recentlyClosedTrades.length > this.MAX_RECENT_TRADES) this.recentlyClosedTrades.shift();
         this.sellInProgress.delete(mintAddress);
@@ -290,6 +290,8 @@ export class AutoTraderEngine {
         record.closedAt = Date.now();
         this.emit("auto_trade_record_updated", record);
         console.log(`✅ [Auto-Trader] ${record.tokenSymbol} manuel satıldı, record kapatıldı`);
+        const tokenKey = `${record.tokenSymbol}:${record.tokenName}`.toLowerCase();
+        this.seenTokenSymbols.delete(tokenKey);
         this.sellInProgress.delete(mintAddress);
         break;
       }
@@ -298,11 +300,14 @@ export class AutoTraderEngine {
 
   markRecordFailed(mintAddress: string, error: string) {
     for (const [, record] of this.records.entries()) {
+
       if (record.mintAddress === mintAddress && (record.status === "pending" || record.status === "active")) {
         record.status = "failed";
         record.error = error;
         this.emit("auto_trade_record_updated", record);
         console.error(`❌ [Auto-Trader] Hata: ${record.tokenSymbol} | ${error}`);
+        const tokenKey = `${record.tokenSymbol}:${record.tokenName}`.toLowerCase();
+        this.seenTokenSymbols.delete(tokenKey);
         break;
       }
     }
@@ -317,6 +322,8 @@ export class AutoTraderEngine {
         record.closedAt = Date.now();
         this.emit("auto_trade_record_updated", record);
         console.error(`🚨 [Auto-Trader] Rug pull tespit edildi: ${record.tokenSymbol} | ${reason}`);
+        const tokenKey = `${record.tokenSymbol}:${record.tokenName}`.toLowerCase();
+        this.seenTokenSymbols.delete(tokenKey);
         this.sellInProgress.delete(mintAddress);
         break;
       }
