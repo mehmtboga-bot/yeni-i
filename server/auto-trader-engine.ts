@@ -106,14 +106,6 @@ export class AutoTraderEngine {
     }
     this.seenTokenSymbols.add(tokenKey);
 
-    if (config.skipRecentlyTradedSymbols) {
-      const isRecentlyTraded = this.recentlyClosedTrades.some((t) => t.symbol === symbol);
-      if (isRecentlyTraded) {
-        console.log(`⏭️ [Auto-Trader] ${symbol} son 7 işlemde var, atlanıyor`);
-        return;
-      }
-    }
-
     const openPositions = this.tradeStore.getAll().filter(
       (p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell"
     );
