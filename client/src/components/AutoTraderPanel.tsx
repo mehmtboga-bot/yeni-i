@@ -82,7 +82,7 @@ export function AutoTraderPanel({
     setHoldDurationInput("500");
     setProfitTargetInput("135");
     setStopLossInput("80");
-    setSlippageInput("25000");
+    setSlippageInput("9900");
     setPriorityInput("3000000");
     setMinLiquidityInput("3000");
   };
