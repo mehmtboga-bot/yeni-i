@@ -2,7 +2,8 @@ import { TradeStore } from "./trade-store";
 import { JupiterTrader } from "./jupiter-trader";
 import type { Position } from "@shared/schema";
 
-const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+const JUP_PRICE_API = "https://lite-api.jup.ag/price/v2";
 
 export class PositionPricer {
   private store: TradeStore;
@@ -62,33 +63,34 @@ export class PositionPricer {
     if (openPositions.length === 0) return;
 
     const mints = openPositions.map((p) => p.mintAddress).join(",");
-    
-    // Retry ile API çağrısı yap (3 deneme) — USD bazlı fiyat al
+
+    // SOL bazlı fiyat al — vsToken=SOL_MINT ile doğrudan SOL cinsinden fiyat
     let data: Record<string, { price?: number }> | null = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5000);
-        
-        const res = await fetch(`${JUP_PRICE_API}?ids=${mints}`, {
-          signal: controller.signal,
-        });
+
+        const res = await fetch(
+          `${JUP_PRICE_API}?ids=${mints}&vsToken=${SOL_MINT}`,
+          { signal: controller.signal }
+        );
         clearTimeout(timeout);
-        
+
         if (!res.ok) {
           console.warn(`⚠️ [Pricer] HTTP ${res.status} (deneme ${attempt}/3)`);
           if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
           continue;
         }
-        
+
         const json = await res.json();
-        data = json?.data ?? json; // API { "data": { ... } } veya { ... } döndürebilir
+        data = json?.data ?? json;
         if (!data || Object.keys(data).length === 0) {
           console.warn(`⚠️ [Pricer] Boş API yanıtı (deneme ${attempt}/3)`);
           if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
           continue;
         }
-        
+
         // Başarılı — döngüden çık
         break;
       } catch (err) {
@@ -104,20 +106,15 @@ export class PositionPricer {
       return;
     }
 
-    // DEBUG: API response'unu görmek için
-    console.log("[PRICE API RAW]", JSON.stringify(data, null, 2));
-
     const config = this.store.getConfig();
     const takeProfitPct = config.takeProfitPct ?? 0;
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
 
-      // Jupiter Price API v3 (USD bazlı, vsToken parametresi yok):
-      //   priceData.price → token fiyatı USD cinsinden
-      // USD fiyatı SOL'a çevrilir — PnL hesaplamaları SOL bazlı çalışır.
-
-      const currentPriceUsd: number =
+      // Jupiter Price API v2 (SOL bazlı, vsToken=SOL_MINT):
+      //   priceData.price → token fiyatı SOL cinsinden
+      const currentPriceSol: number =
         priceData?.price != null
           ? priceData.price
           : typeof priceData === "number"
@@ -125,7 +122,7 @@ export class PositionPricer {
             : 0;
 
       // Veri gelmediyse — atla
-      if (!currentPriceUsd || currentPriceUsd <= 0) {
+      if (!currentPriceSol || currentPriceSol <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
 
@@ -138,11 +135,9 @@ export class PositionPricer {
       // Başarılı okuma — sayacı sıfırla
       this.failureCount.delete(pos.mintAddress);
 
-      // USD → SOL çevirimi
-      const currentPriceSol =
-        this.solPriceUsd > 0
-          ? currentPriceUsd / this.solPriceUsd
-          : 0;
+      // SOL → USD çevirimi (gösterim için)
+      const currentPriceUsd =
+        this.solPriceUsd > 0 ? currentPriceSol * this.solPriceUsd : 0;
 
       // buyPriceSol: alım sırasında bir kez doğru set edilir, pricer tarafından değiştirilmez
       const buyPriceSol = pos.buyPriceSol;
