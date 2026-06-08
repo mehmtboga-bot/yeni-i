@@ -372,7 +372,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     }
   }, [p.status, isHalfSelling]);
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
-  const profitPct = (isOpen || p.status === "pending_sell") ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
+  const profitPct = isOpen ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
   const profitPositive = (profitPct ?? 0) >= 0;
   const nearTarget = takeProfitPct > 0 && isOpen && profitPct !== null && profitPct >= takeProfitPct * 0.8;
 
