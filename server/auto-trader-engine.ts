@@ -17,7 +17,7 @@ interface AutoTradeRecord {
   buyTxSignature?: string;
   status: "pending" | "active" | "sold" | "failed" | "closed" | "rug_detected";
   error?: string;
-  buyPriceSol?: number;
+  buyPriceUsd?: number;
   buyTokenAmount?: number;
   sellPriceSol?: number;
   pnlSol?: number;
@@ -211,14 +211,14 @@ export class AutoTraderEngine {
   updateRecordAfterBuy(
     mintAddress: string,
     buyTxSignature: string,
-    buyPriceSol?: number,
+    buyPriceUsd?: number,
     buyTokenAmount?: number
   ) {
     for (const [, record] of this.records.entries()) {
       if (record.mintAddress === mintAddress && record.status === "pending") {
         record.status = "active";
         record.buyTxSignature = buyTxSignature;
-        record.buyPriceSol = buyPriceSol;
+        record.buyPriceUsd = buyPriceUsd;
         record.buyTokenAmount = buyTokenAmount;
 
         const config = this.configStore.getConfig();

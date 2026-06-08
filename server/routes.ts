@@ -195,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         autoTraderEngine.updateRecordAfterBuy(
           data.mintAddress,
           data.buyTxSignature,
-          data.buyPriceSol,
+          data.buyPriceUsd,
           data.buyTokenAmount
         );
 
