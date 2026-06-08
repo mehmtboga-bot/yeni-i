@@ -119,37 +119,13 @@ export class PositionPricer {
             ? priceData
             : 0;
 
-      // Veri gelmediyse — JupiterTrader.estimateSolValue() ile fallback dene
+      // Veri gelmediyse — atla
       if (!currentPriceSol || currentPriceSol <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
 
         if (fails === this.maxFailuresBeforeAlert) {
-          console.warn(`⚠️ [Pricer] ${pos.symbol} fiyatı alınamıyor (${fails}x) — estimateSolValue fallback deneniyor`);
-        }
-
-        // JupiterTrader varsa ve token miktarı biliniyorsa gerçek fiyatı tahmin et
-        if (this.jupiterTrader && (pos.buyTokenAmount ?? 0) > 0) {
-          try {
-            const tokenAmount = pos.buyTokenAmount!;
-            const solValue = await this.jupiterTrader.estimateSolValue(pos.mintAddress, tokenAmount);
-            if (solValue > 0) {
-              const estimatedPriceSol = solValue / tokenAmount;
-              const buyPriceSol = pos.buyPriceSol;
-              if (!buyPriceSol || buyPriceSol <= 0) continue;
-
-              const unrealizedPnlSol = tokenAmount * (estimatedPriceSol - buyPriceSol);
-              const unrealizedPnlPct = ((estimatedPriceSol - buyPriceSol) / buyPriceSol) * 100;
-              const currentPriceUsd = this.solPriceUsd > 0 ? estimatedPriceSol * this.solPriceUsd : undefined;
-
-              const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
-              this.store.upsert(updated);
-              this.emit("position_update", updated);
-              console.log(`📊 [Pricer] ${pos.symbol} fallback fiyat: ${estimatedPriceSol.toFixed(10)} SOL/token | PnL: ${unrealizedPnlPct.toFixed(2)}%`);
-            }
-          } catch {
-            // Fallback da başarısız — sessizce geç
-          }
+          console.warn(`⚠️ [Pricer] ${pos.symbol} fiyatı alınamıyor (${fails}x)`);
         }
         continue;
       }
@@ -179,19 +155,8 @@ export class PositionPricer {
       // USD görüntüleme için dönüşüm (solPriceUsd mevcut değilse undefined)
       const currentPriceUsd = this.solPriceUsd > 0 ? currentPriceSol * this.solPriceUsd : undefined;
 
-      // PnL % — USD cinsinden hesapla (kart USD gösterdiği için tutarlı olsun)
-      // buyPriceUsd yoksa SOL fiyatından türet; o da yoksa 0
-      const buyPriceUsd =
-        pos.buyPriceUsd != null && pos.buyPriceUsd > 0
-          ? pos.buyPriceUsd
-          : pos.buyPriceSol != null && pos.buyPriceSol > 0 && this.solPriceUsd > 0
-            ? pos.buyPriceSol * this.solPriceUsd
-            : 0;
-
-      const unrealizedPnlPct =
-        buyPriceUsd > 0 && currentPriceUsd != null
-          ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100
-          : ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100; // fallback: SOL
+      // PnL % — SOL bazlı hesapla (basit ve güvenilir)
+      const unrealizedPnlPct = ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100;
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
