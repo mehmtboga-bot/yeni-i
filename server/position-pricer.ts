@@ -103,14 +103,8 @@ export class PositionPricer {
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
 
-      // Jupiter Price API v3 — tek dönüşüm yolu:
-      //   priceData.price    → token fiyatı SOL cinsinden (doğrudan kullan)
-      //   priceData.usdPrice → token fiyatı USD cinsinden (bir kez SOL'a çevir)
       const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 87;
-      const currentPriceUsd =
-        priceData?.usdPrice ??
-        priceData?.price ??
-        0;
+      const currentPriceUsd = priceData?.usdPrice ?? 0;
       const priceInSol = currentPriceUsd / solPrice;
 
       // Veri gelmediyse
@@ -143,10 +137,10 @@ export class PositionPricer {
       }
 
       // P&L hesaplamaları — tümü aynı priceInSol değerini kullanır
-      const buyPriceUsd = buyPriceSol * solPrice;
       const unrealizedPnlSol =
         (pos.buyTokenAmount ?? 0) * (priceInSol - buyPriceSol);
 
+      const buyPriceUsd = pos.buyPriceUsd ?? (pos.buyPriceSol * solPrice);
       const unrealizedPnlPct =
         buyPriceUsd > 0
           ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100
