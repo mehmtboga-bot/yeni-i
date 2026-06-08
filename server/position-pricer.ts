@@ -116,12 +116,6 @@ export class PositionPricer {
               ? priceData                            // Ham sayı (SOL varsayımı)
               : 0;
 
-      // USD fiyatını UI için koru (currentPriceUsd alanı)
-      const currentPriceUsd =
-        priceData?.usdPrice != null
-          ? priceData.usdPrice
-          : currentPriceSol * solPrice;
-
       // Veri gelmediyse
       if (!currentPriceSol || currentPriceSol <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
@@ -150,20 +144,26 @@ export class PositionPricer {
         console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
         continue;
       }
+
+      // Tek kaynak: ham API verisinden SOL cinsinden fiyat türet
+      // usdPrice varsa ve SOL fiyatı biliniyorsa USD→SOL çevirimi yap,
+      // aksi hâlde doğrudan SOL fiyatını kullan.
       const priceInSol =
-  currentPriceUsd && this.solPriceUsd > 0
-    ? currentPriceUsd / this.solPriceUsd
-    : currentPriceSol;
+        priceData?.usdPrice != null && this.solPriceUsd > 0
+          ? priceData.usdPrice / this.solPriceUsd
+          : currentPriceSol;
 
-const buyPriceInSol = buyPriceSol;
+      // UI için USD fiyatı: priceInSol'dan türetilir (tek kaynak)
+      const currentPriceUsd = priceInSol * solPrice;
 
-const unrealizedPnlSol =
-  (pos.buyTokenAmount ?? 0) * (priceInSol - buyPriceInSol);
+      // P&L hesaplamaları — tümü aynı priceInSol değerini kullanır
+      const unrealizedPnlSol =
+        (pos.buyTokenAmount ?? 0) * (priceInSol - buyPriceSol);
 
-const unrealizedPnlPct =
-  buyPriceInSol > 0
-    ? ((priceInSol - buyPriceInSol) / buyPriceInSol) * 100
-    : 0;
+      const unrealizedPnlPct =
+        buyPriceSol > 0
+          ? ((priceInSol - buyPriceSol) / buyPriceSol) * 100
+          : 0;
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
