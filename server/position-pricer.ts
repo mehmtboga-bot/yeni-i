@@ -115,15 +115,18 @@ export class PositionPricer {
             ? priceData
             : 0;
 
-      // Veri gelmediyse
-      if (!currentPriceSol || currentPriceSol <= 0) {
+      // Veri gelmediyse — fallback olarak buyPriceSol kullan (kar yüzdesi 0 gösterilsin)
+      let resolvedPriceSol = currentPriceSol;
+      if (!resolvedPriceSol || resolvedPriceSol <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
         
         if (fails === this.maxFailuresBeforeAlert) {
           console.warn(`⚠️ [Pricer] ${pos.symbol} fiyatı alınamıyor (${fails}x)`);
         }
-        continue;
+
+        if (!pos.buyPriceSol || pos.buyPriceSol <= 0) continue;
+        resolvedPriceSol = pos.buyPriceSol;
       }
 
       // Başarılı okuma — sayacı sıfırla
@@ -131,11 +134,11 @@ export class PositionPricer {
 
       // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
       const lastPrice = this.lastValidPrice.get(pos.mintAddress);
-      if (lastPrice && lastPrice > 0 && currentPriceSol > lastPrice * 10) {
-        console.warn(`⚠️ [Pricer] Spike: ${pos.symbol} ${lastPrice.toFixed(10)} → ${currentPriceSol.toFixed(10)} SOL`);
+      if (lastPrice && lastPrice > 0 && resolvedPriceSol > lastPrice * 10) {
+        console.warn(`⚠️ [Pricer] Spike: ${pos.symbol} ${lastPrice.toFixed(10)} → ${resolvedPriceSol.toFixed(10)} SOL`);
         continue;
       }
-      this.lastValidPrice.set(pos.mintAddress, currentPriceSol);
+      this.lastValidPrice.set(pos.mintAddress, resolvedPriceSol);
 
       // buyPriceSol: alım sırasında bir kez doğru set edilir, pricer tarafından değiştirilmez
       const buyPriceSol = pos.buyPriceSol;
@@ -146,10 +149,10 @@ export class PositionPricer {
 
       // PnL SOL = token miktarı × (şimdiki SOL fiyatı - alım SOL fiyatı)
       const unrealizedPnlSol =
-        (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
+        (pos.buyTokenAmount ?? 0) * (resolvedPriceSol - buyPriceSol);
 
       // USD görüntüleme için dönüşüm (solPriceUsd mevcut değilse undefined)
-      const currentPriceUsd = this.solPriceUsd > 0 ? currentPriceSol * this.solPriceUsd : undefined;
+      const currentPriceUsd = this.solPriceUsd > 0 ? resolvedPriceSol * this.solPriceUsd : undefined;
 
       // PnL % — USD cinsinden hesapla (kart USD gösterdiği için tutarlı olsun)
       // buyPriceUsd yoksa SOL fiyatından türet; o da yoksa 0
@@ -163,7 +166,7 @@ export class PositionPricer {
       const unrealizedPnlPct =
         buyPriceUsd > 0 && currentPriceUsd != null
           ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100
-          : ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100; // fallback: SOL
+          : ((resolvedPriceSol - buyPriceSol) / buyPriceSol) * 100; // fallback: SOL
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
