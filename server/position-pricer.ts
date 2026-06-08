@@ -150,10 +150,20 @@ export class PositionPricer {
         console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
         continue;
       }
-      const unrealizedPnlSol =
-        (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
-      const unrealizedPnlPct =
-        buyPriceSol > 0 ? ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100 : 0;
+      const priceInSol =
+  currentPriceUsd && this.solPriceUsd > 0
+    ? currentPriceUsd / this.solPriceUsd
+    : currentPriceSol;
+
+const buyPriceInSol = buyPriceSol;
+
+const unrealizedPnlSol =
+  (pos.buyTokenAmount ?? 0) * (priceInSol - buyPriceInSol);
+
+const unrealizedPnlPct =
+  buyPriceInSol > 0
+    ? ((priceInSol - buyPriceInSol) / buyPriceInSol) * 100
+    : 0;
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
