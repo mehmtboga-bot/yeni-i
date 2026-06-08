@@ -167,7 +167,7 @@ export class JupiterTrader {
 
   // Jupiter Price API üzerinden token'ın SOL karşılığını tahmin eder
   // PumpSwap satışlarında gerçek fiyat bilinmediğinde PnL tahmini için kullanılır
-  async estimateSolValue(mint: string, tokenAmount: number): Promise<number> {
+  private async estimateSolValue(mint: string, tokenAmount: number): Promise<number> {
     if (tokenAmount <= 0) return 0;
     try {
       const url = new URL(JUP_PRICE);
