@@ -1,4 +1,5 @@
 import { TradeStore } from "./trade-store";
+import { JupiterTrader } from "./jupiter-trader";
 import type { Position } from "@shared/schema";
 
 const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
@@ -6,6 +7,7 @@ const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export class PositionPricer {
   private store: TradeStore;
+  private jupiterTrader: JupiterTrader | null = null;
   private solPriceUsd: number = 0;
   private emit: (event: string, data: any) => void;
   private onAutoSell: ((positionId: string) => void) | null = null;
@@ -26,11 +28,13 @@ export class PositionPricer {
     solPriceUsd: number,
     emit: (event: string, data: any) => void,
     onAutoSell?: (positionId: string) => void,
+    jupiterTrader?: JupiterTrader,
   ) {
     this.store = store;
     this.solPriceUsd = solPriceUsd;
     this.emit = emit;
     this.onAutoSell = onAutoSell ?? null;
+    this.jupiterTrader = jupiterTrader ?? null;
   }
 
   setSolPrice(price: number) { this.solPriceUsd = price; }
@@ -115,13 +119,37 @@ export class PositionPricer {
             ? priceData
             : 0;
 
-      // Veri gelmediyse
+      // Veri gelmediyse — JupiterTrader.estimateSolValue() ile fallback dene
       if (!currentPriceSol || currentPriceSol <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
-        
+
         if (fails === this.maxFailuresBeforeAlert) {
-          console.warn(`⚠️ [Pricer] ${pos.symbol} fiyatı alınamıyor (${fails}x)`);
+          console.warn(`⚠️ [Pricer] ${pos.symbol} fiyatı alınamıyor (${fails}x) — estimateSolValue fallback deneniyor`);
+        }
+
+        // JupiterTrader varsa ve token miktarı biliniyorsa gerçek fiyatı tahmin et
+        if (this.jupiterTrader && (pos.buyTokenAmount ?? 0) > 0) {
+          try {
+            const tokenAmount = pos.buyTokenAmount!;
+            const solValue = await this.jupiterTrader.estimateSolValue(pos.mintAddress, tokenAmount);
+            if (solValue > 0) {
+              const estimatedPriceSol = solValue / tokenAmount;
+              const buyPriceSol = pos.buyPriceSol;
+              if (!buyPriceSol || buyPriceSol <= 0) continue;
+
+              const unrealizedPnlSol = tokenAmount * (estimatedPriceSol - buyPriceSol);
+              const unrealizedPnlPct = ((estimatedPriceSol - buyPriceSol) / buyPriceSol) * 100;
+              const currentPriceUsd = this.solPriceUsd > 0 ? estimatedPriceSol * this.solPriceUsd : undefined;
+
+              const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
+              this.store.upsert(updated);
+              this.emit("position_update", updated);
+              console.log(`📊 [Pricer] ${pos.symbol} fallback fiyat: ${estimatedPriceSol.toFixed(10)} SOL/token | PnL: ${unrealizedPnlPct.toFixed(2)}%`);
+            }
+          } catch {
+            // Fallback da başarısız — sessizce geç
+          }
         }
         continue;
       }
