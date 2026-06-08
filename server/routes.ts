@@ -449,7 +449,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     (positionId: string) => {
       trader.sell(positionId).catch((err) => console.error("auto-sell hatası:", err));
     },
-    trader,
   );
   pricer.start();
 
