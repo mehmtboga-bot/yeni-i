@@ -3,7 +3,6 @@ import { JupiterTrader } from "./jupiter-trader";
 import type { Position } from "@shared/schema";
 
 const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
-const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export class PositionPricer {
   private store: TradeStore;
@@ -16,9 +15,7 @@ export class PositionPricer {
 
   // Yanlış fiyat spike'larını filtrele: art arda kaç kez hedef aşıldı
   private aboveThresholdCount: Map<string, number> = new Map();
-  // Son bilinen geçerli fiyat (spike tespiti için)
-  private lastValidPrice: Map<string, number> = new Map();
-  
+
   // Retry mekanizması: mint başına kaç kez başarısız olduğunu takip et
   private failureCount: Map<string, number> = new Map();
   private maxFailuresBeforeAlert = 5;
@@ -56,19 +53,24 @@ export class PositionPricer {
 
   private async updatePrices() {
     const positions = this.store.getAll();
-    const openPositions = positions.filter((p) => p.status === "open");
+    const openPositions = positions.filter(
+      (p) =>
+        p.status === "open" &&
+        p.buyTokenAmount &&
+        p.buyPriceSol
+    );
     if (openPositions.length === 0) return;
 
     const mints = openPositions.map((p) => p.mintAddress).join(",");
     
-    // Retry ile API çağrısı yap (3 deneme) — SOL bazlı fiyat al (vsToken=SOL)
+    // Retry ile API çağrısı yap (3 deneme) — USD bazlı fiyat al
     let data: Record<string, { price?: number }> | null = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5000);
         
-        const res = await fetch(`${JUP_PRICE_API}?ids=${mints}&vsToken=${SOL_MINT}`, {
+        const res = await fetch(`${JUP_PRICE_API}?ids=${mints}`, {
           signal: controller.signal,
         });
         clearTimeout(timeout);
@@ -102,17 +104,20 @@ export class PositionPricer {
       return;
     }
 
+    // DEBUG: API response'unu görmek için
+    console.log("[PRICE API RAW]", JSON.stringify(data, null, 2));
+
     const config = this.store.getConfig();
     const takeProfitPct = config.takeProfitPct ?? 0;
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
 
-      // Jupiter Price API v3 (vsToken=SOL):
-      //   priceData.price → token fiyatı SOL cinsinden
-      // SOL bazlı fiyat kullanılır — USD çevirimi sadece görüntüleme için yapılır.
+      // Jupiter Price API v3 (USD bazlı, vsToken parametresi yok):
+      //   priceData.price → token fiyatı USD cinsinden
+      // USD fiyatı SOL'a çevrilir — PnL hesaplamaları SOL bazlı çalışır.
 
-      const currentPriceSol: number =
+      const currentPriceUsd: number =
         priceData?.price != null
           ? priceData.price
           : typeof priceData === "number"
@@ -120,7 +125,7 @@ export class PositionPricer {
             : 0;
 
       // Veri gelmediyse — atla
-      if (!currentPriceSol || currentPriceSol <= 0) {
+      if (!currentPriceUsd || currentPriceUsd <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
 
@@ -133,13 +138,11 @@ export class PositionPricer {
       // Başarılı okuma — sayacı sıfırla
       this.failureCount.delete(pos.mintAddress);
 
-      // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
-      const lastPrice = this.lastValidPrice.get(pos.mintAddress);
-      if (lastPrice && lastPrice > 0 && currentPriceSol > lastPrice * 10) {
-        console.warn(`⚠️ [Pricer] Spike: ${pos.symbol} ${lastPrice.toFixed(10)} → ${currentPriceSol.toFixed(10)} SOL`);
-        continue;
-      }
-      this.lastValidPrice.set(pos.mintAddress, currentPriceSol);
+      // USD → SOL çevirimi
+      const currentPriceSol =
+        this.solPriceUsd > 0
+          ? currentPriceUsd / this.solPriceUsd
+          : 0;
 
       // buyPriceSol: alım sırasında bir kez doğru set edilir, pricer tarafından değiştirilmez
       const buyPriceSol = pos.buyPriceSol;
@@ -151,9 +154,6 @@ export class PositionPricer {
       // PnL SOL = token miktarı × (şimdiki SOL fiyatı - alım SOL fiyatı)
       const unrealizedPnlSol =
         (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
-
-      // USD görüntüleme için dönüşüm (solPriceUsd mevcut değilse undefined)
-      const currentPriceUsd = this.solPriceUsd > 0 ? currentPriceSol * this.solPriceUsd : undefined;
 
       // PnL % — SOL bazlı hesapla (basit ve güvenilir)
       const unrealizedPnlPct = ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100;
