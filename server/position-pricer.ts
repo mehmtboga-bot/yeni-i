@@ -37,8 +37,8 @@ export class PositionPricer {
 
   start() {
     if (this.updateInterval) return;
-    console.log("🎯 [Pricer] Başlatıldı (1.5s aralık)");
-    this.updateInterval = setInterval(() => this.updatePrices(), 1500);
+    console.log("🎯 [Pricer] Başlatıldı (3s aralık)");
+    this.updateInterval = setInterval(() => this.updatePrices(), 3000);
     this.updatePrices();
   }
 
@@ -71,7 +71,11 @@ export class PositionPricer {
         
         if (!res.ok) {
           console.warn(`⚠️ [Pricer] HTTP ${res.status} (deneme ${attempt}/3)`);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+          if (res.status === 429) {
+            console.warn(`⚠️ [Pricer] Rate limit (429) — retry iptal edildi`);
+            break;
+          }
+          if (attempt < 3) await new Promise(r => setTimeout(r, Math.min(500 * Math.pow(2, attempt), 5000)));
           continue;
         }
         
@@ -79,7 +83,7 @@ export class PositionPricer {
         data = json?.data ?? json; // API { "data": { ... } } veya { ... } döndürebilir
         if (!data || Object.keys(data).length === 0) {
           console.warn(`⚠️ [Pricer] Boş API yanıtı (deneme ${attempt}/3)`);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+          if (attempt < 3) await new Promise(r => setTimeout(r, Math.min(500 * Math.pow(2, attempt), 5000)));
           continue;
         }
         
@@ -88,7 +92,7 @@ export class PositionPricer {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(`⚠️ [Pricer] Hata: ${msg} (deneme ${attempt}/3)`);
-        if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+        if (attempt < 3) await new Promise(r => setTimeout(r, Math.min(500 * Math.pow(2, attempt), 5000)));
       }
     }
 
