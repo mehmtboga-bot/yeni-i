@@ -183,24 +183,6 @@ export class JupiterTrader {
     }
   }
 
-  // Jupiter Price API üzerinden SOL/USD fiyatını çeker (alım anında buyPriceUsd hesabı için)
-  private async fetchSolPriceUsd(): Promise<number> {
-    try {
-      const url = new URL(JUP_PRICE);
-      url.searchParams.set("ids", SOL_MINT);
-      const res = await this.fetchWithTimeout(url.toString(), { timeoutMs: 3000 });
-      if (!res.ok) return 0;
-      const json = await res.json();
-      const price: number =
-        json?.data?.[SOL_MINT]?.usdPrice ??
-        json?.data?.[SOL_MINT]?.price ??
-        0;
-      return price;
-    } catch {
-      return 0;
-    }
-  }
-
   private async getQuote(params: {
     inputMint: string; outputMint: string; amount: string; slippageBps: number;
   }): Promise<QuoteResponse> {
@@ -457,13 +439,12 @@ export class JupiterTrader {
         throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
       }, `Jupiter Buy ${symbol}`, 2);
 
-      // buyPriceUsd: alım anındaki USD fiyatı = (harcanan SOL × SOL/USD fiyatı) / alınan token miktarı
-      // Tutarlı PnL hesabı için tüm fiyatlar USD bazlı tutulur
-      const solPriceUsd = await this.fetchSolPriceUsd();
-      const buyPriceUsd = result.tokensOut > 0 ? (actualSolAmount * solPriceUsd) / result.tokensOut : 0;
-      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceUsd, buyTxSignature: result.sig, tokenDecimals: result.decimals };
+      // buyPriceSol: gerçek alım fiyatı = harcanan SOL / alınan token miktarı
+      // Jupiter API fiyatı (pricePerToken) değil, swap'tan hesaplanan gerçek fiyat kullanılır
+      const buyPriceSol = result.tokensOut > 0 ? actualSolAmount / result.tokensOut : 0;
+      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol, buyTxSignature: result.sig, tokenDecimals: result.decimals };
       this.updateAndEmit(position);
-      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | fiyat: ${buyPriceUsd.toFixed(10)}/token | SOL: ${solPriceUsd.toFixed(2)} | tx: ${result.sig.slice(0, 16)}...`);
+      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | fiyat: ${buyPriceSol.toFixed(10)} SOL/token | tx: ${result.sig.slice(0, 16)}...`);
 
       return position;
 
@@ -557,13 +538,12 @@ export class JupiterTrader {
         return { sig: swapSignature!, tokensReceived, tokenDecimals };
       }, `PumpSwap Buy ${symbol}`, 2);
 
-      // buyPriceUsd: alım anındaki USD fiyatı = (harcanan SOL × SOL/USD fiyatı) / alınan token miktarı
-      // Tutarlı PnL hesabı için tüm fiyatlar USD bazlı tutulur
-      const solPriceUsd = await this.fetchSolPriceUsd();
-      const buyPriceUsd = tokensReceived > 0 ? (actualSolAmount * solPriceUsd) / tokensReceived : 0;
-      position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived, buyPriceUsd, tokenDecimals };
+      // [DÜZELTİLDİ] withRetry'dan dönen tokensReceived kullanılıyor — gereksiz tekrar sorgu kaldırıldı
+      // [DÜZELTİLDİ] buyPriceSol: Quote'tan değil, gerçek alınan token miktarından hesapla
+      const buyPriceSol = tokensReceived > 0 ? actualSolAmount / tokensReceived : 0;
+      position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived, buyPriceSol, tokenDecimals };
       this.updateAndEmit(position);
-      console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | fiyat: ${buyPriceUsd.toFixed(10)}/token | SOL: ${solPriceUsd.toFixed(2)} | tx: ${sig.slice(0, 16)}...`);
+      console.log(`✅ [PumpSwap] ALIM tamam: ${symbol} | ${tokensReceived.toLocaleString()} token | fiyat: ${buyPriceSol.toFixed(10)} SOL/token | tx: ${sig.slice(0, 16)}...`);
 
       return position;
     } catch (err) {

@@ -106,7 +106,8 @@ export class PositionPricer {
       // Jupiter Price API v3:
       //   priceData.price    → token fiyatı USD cinsinden (v3 API her zaman USD döndürür)
       //   priceData.usdPrice → token fiyatı USD cinsinden (price ile aynı)
-      // Tüm hesaplamalar USD bazlı — SOL çevirimi yapılmaz.
+      // SOL fiyatına çevirmek için solPriceUsd kullanılır.
+      const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 87;
 
       // USD fiyatını belirle: price veya usdPrice alanından al
       const usdPriceRaw: number =
@@ -118,11 +119,14 @@ export class PositionPricer {
               ? priceData
               : 0;
 
-      // Doğrudan USD fiyatı kullan
+      // USD → SOL çevirimi (buyPriceSol SOL cinsinden olduğu için currentPriceSol da SOL olmalı)
+      const currentPriceSol: number = usdPriceRaw > 0 ? usdPriceRaw / solPrice : 0;
+
+      // USD fiyatını UI için koru (currentPriceUsd alanı)
       const currentPriceUsd = usdPriceRaw;
 
       // Veri gelmediyse
-      if (!currentPriceUsd || currentPriceUsd <= 0) {
+      if (!currentPriceSol || currentPriceSol <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
         
@@ -137,25 +141,27 @@ export class PositionPricer {
 
       // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
       const lastPrice = this.lastValidPrice.get(pos.mintAddress);
-      if (lastPrice && lastPrice > 0 && currentPriceUsd > lastPrice * 10) {
-        console.warn(`⚠️ [Pricer] Spike: ${pos.symbol} ${lastPrice.toFixed(8)} → ${currentPriceUsd.toFixed(8)}`);
+      if (lastPrice && lastPrice > 0 && currentPriceSol > lastPrice * 10) {
+        console.warn(`⚠️ [Pricer] Spike: ${pos.symbol} ${lastPrice.toFixed(8)} → ${currentPriceSol.toFixed(8)} SOL`);
         continue;
       }
-      this.lastValidPrice.set(pos.mintAddress, currentPriceUsd);
+      this.lastValidPrice.set(pos.mintAddress, currentPriceSol);
 
-      // buyPriceUsd: alım sırasında bir kez doğru set edilir, pricer tarafından değiştirilmez
-      const buyPriceUsd = pos.buyPriceUsd;
-      if (!buyPriceUsd || buyPriceUsd <= 0) {
-        console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceUsd tanımlı değil, atlanıyor`);
+      // buyPriceSol: alım sırasında bir kez doğru set edilir, pricer tarafından değiştirilmez
+      const buyPriceSol = pos.buyPriceSol;
+      if (!buyPriceSol || buyPriceSol <= 0) {
+        console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
         continue;
       }
-      // PnL USD = token miktarı × (şimdiki USD fiyatı - alım USD fiyatı)
-      const unrealizedPnlUsd =
-        (pos.buyTokenAmount ?? 0) * (currentPriceUsd - buyPriceUsd);
-      // PnL % = fiyat değişimi % (alım fiyatına göre) — aynı birimde karşılaştırma
-      const unrealizedPnlPct = ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100;
+      const unrealizedPnlSol =
+        (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
+      // PnL % = price change % relative to buy price (not ROI on SOL spent).
+      // Using buySolAmount as denominator inflates it when fees/slippage cause
+      // buyTokenAmount × buyPriceSol < buySolAmount, producing a far-too-small %.
+      // The correct formula is simply: ((currentPrice - buyPrice) / buyPrice) × 100
+      const unrealizedPnlPct = ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100;
 
-      const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlUsd, unrealizedPnlPct };
+      const updated: Position = { ...pos, currentPriceUsd, currentPriceSol, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
       this.emit("position_update", updated);
 

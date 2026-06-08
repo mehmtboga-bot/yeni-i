@@ -45,7 +45,7 @@ export const positionSchema = z.object({
   buyTimestamp: z.number(),
   buySolAmount: z.number(),
   buyTokenAmount: z.number().optional(),
-  buyPriceUsd: z.number().optional(),
+  buyPriceSol: z.number().optional(),
   buyTxSignature: z.string().optional(),
   sellTimestamp: z.number().optional(),
   sellSolAmount: z.number().optional(),
@@ -55,7 +55,8 @@ export const positionSchema = z.object({
   pnlSol: z.number().optional(),
   pnlPct: z.number().optional(),
   currentPriceUsd: z.number().optional(),
-  unrealizedPnlUsd: z.number().optional(),
+  currentPriceSol: z.number().optional(),
+  unrealizedPnlSol: z.number().optional(),
   unrealizedPnlPct: z.number().optional(),
   error: z.string().optional(),
   autoSellAt: z.number().optional(),  // Auto-trader satış zamanı (timestamp)
