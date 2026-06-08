@@ -147,11 +147,23 @@ export class PositionPricer {
       // PnL SOL = token miktarı × (şimdiki SOL fiyatı - alım SOL fiyatı)
       const unrealizedPnlSol =
         (pos.buyTokenAmount ?? 0) * (currentPriceSol - buyPriceSol);
-      // PnL % = fiyat değişimi % (alım fiyatına göre) — aynı birimde karşılaştırma
-      const unrealizedPnlPct = ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100;
 
-      // USD görüntüleme için dönüşüm (solPriceUsd mevcut değilse 0)
+      // USD görüntüleme için dönüşüm (solPriceUsd mevcut değilse undefined)
       const currentPriceUsd = this.solPriceUsd > 0 ? currentPriceSol * this.solPriceUsd : undefined;
+
+      // PnL % — USD cinsinden hesapla (kart USD gösterdiği için tutarlı olsun)
+      // buyPriceUsd yoksa SOL fiyatından türet; o da yoksa 0
+      const buyPriceUsd =
+        pos.buyPriceUsd != null && pos.buyPriceUsd > 0
+          ? pos.buyPriceUsd
+          : pos.buyPriceSol != null && pos.buyPriceSol > 0 && this.solPriceUsd > 0
+            ? pos.buyPriceSol * this.solPriceUsd
+            : 0;
+
+      const unrealizedPnlPct =
+        buyPriceUsd > 0 && currentPriceUsd != null
+          ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100
+          : ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100; // fallback: SOL
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
