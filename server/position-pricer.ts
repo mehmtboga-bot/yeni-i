@@ -103,21 +103,19 @@ export class PositionPricer {
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
 
-      // Jupiter Price API v3:
-      //   priceData.price    → token fiyatı SOL cinsinden (varsa öncelikli kullan)
-      //   priceData.usdPrice → token fiyatı USD cinsinden (SOL'a çevirmek gerekir)
+      // Jupiter Price API v3 — tek dönüşüm yolu:
+      //   priceData.price    → token fiyatı SOL cinsinden (doğrudan kullan)
+      //   priceData.usdPrice → token fiyatı USD cinsinden (bir kez SOL'a çevir)
       const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 87;
-      const currentPriceSol: number =
+      const priceInSol: number =
         priceData?.price != null
           ? priceData.price                          // Zaten SOL cinsinden — doğrudan kullan
           : priceData?.usdPrice != null
-            ? priceData.usdPrice / solPrice          // USD → SOL çevirimi
-            : typeof priceData === "number"
-              ? priceData                            // Ham sayı (SOL varsayımı)
-              : 0;
+            ? priceData.usdPrice / solPrice          // USD → SOL çevirimi (yalnızca bir kez)
+            : 0;                                     // Veri yok
 
       // Veri gelmediyse
-      if (!currentPriceSol || currentPriceSol <= 0) {
+      if (!priceInSol || priceInSol <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
         
@@ -132,11 +130,11 @@ export class PositionPricer {
 
       // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
       const lastPrice = this.lastValidPrice.get(pos.mintAddress);
-      if (lastPrice && lastPrice > 0 && currentPriceSol > lastPrice * 10) {
-        console.warn(`⚠️ [Pricer] Spike: ${pos.symbol} ${lastPrice.toFixed(8)} → ${currentPriceSol.toFixed(8)} SOL`);
+      if (lastPrice && lastPrice > 0 && priceInSol > lastPrice * 10) {
+        console.warn(`⚠️ [Pricer] Spike: ${pos.symbol} ${lastPrice.toFixed(8)} → ${priceInSol.toFixed(8)} SOL`);
         continue;
       }
-      this.lastValidPrice.set(pos.mintAddress, currentPriceSol);
+      this.lastValidPrice.set(pos.mintAddress, priceInSol);
 
       // buyPriceSol: alım sırasında bir kez doğru set edilir, pricer tarafından değiştirilmez
       const buyPriceSol = pos.buyPriceSol;
@@ -144,14 +142,6 @@ export class PositionPricer {
         console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
         continue;
       }
-
-      // Tek kaynak: ham API verisinden SOL cinsinden fiyat türet
-      // usdPrice varsa ve SOL fiyatı biliniyorsa USD→SOL çevirimi yap,
-      // aksi hâlde doğrudan SOL fiyatını kullan.
-      const priceInSol =
-        priceData?.usdPrice != null && this.solPriceUsd > 0
-          ? priceData.usdPrice / this.solPriceUsd
-          : currentPriceSol;
 
       // UI için USD fiyatı: priceInSol'dan türetilir (tek kaynak)
       const currentPriceUsd = priceInSol * solPrice;
