@@ -184,20 +184,30 @@ export class JupiterTrader {
   }
 
   // Jupiter Price API üzerinden SOL/USD fiyatını çeker (alım anında buyPriceUsd hesabı için)
+  // API başarısız olursa fallback değer (87) kullanılır — buyPriceUsd'nin 0 kalmasını önler
   private async fetchSolPriceUsd(): Promise<number> {
+    const FALLBACK_SOL_PRICE_USD = 87;
     try {
       const url = new URL(JUP_PRICE);
       url.searchParams.set("ids", SOL_MINT);
       const res = await this.fetchWithTimeout(url.toString(), { timeoutMs: 3000 });
-      if (!res.ok) return 0;
+      if (!res.ok) {
+        console.warn(`⚠️ [fetchSolPriceUsd] API yanıt vermedi (HTTP ${res.status}) — fallback: ${FALLBACK_SOL_PRICE_USD}`);
+        return FALLBACK_SOL_PRICE_USD;
+      }
       const json = await res.json();
       const price: number =
         json?.data?.[SOL_MINT]?.usdPrice ??
         json?.data?.[SOL_MINT]?.price ??
         0;
+      if (price <= 0) {
+        console.warn(`⚠️ [fetchSolPriceUsd] API'den geçersiz fiyat alındı (${price}) — fallback: ${FALLBACK_SOL_PRICE_USD}`);
+        return FALLBACK_SOL_PRICE_USD;
+      }
       return price;
-    } catch {
-      return 0;
+    } catch (err) {
+      console.warn(`⚠️ [fetchSolPriceUsd] İstek başarısız: ${(err as Error).message} — fallback: ${FALLBACK_SOL_PRICE_USD}`);
+      return FALLBACK_SOL_PRICE_USD;
     }
   }
 
@@ -459,7 +469,10 @@ export class JupiterTrader {
 
       // buyPriceUsd: alım anındaki USD fiyatı = (harcanan SOL × SOL/USD fiyatı) / alınan token miktarı
       // Tutarlı PnL hesabı için tüm fiyatlar USD bazlı tutulur
-      const solPriceUsd = await this.fetchSolPriceUsd();
+      const solPriceUsdRaw = await this.fetchSolPriceUsd();
+      const solPriceUsd = solPriceUsdRaw > 0 ? solPriceUsdRaw : 87;
+      if (solPriceUsdRaw <= 0) console.warn(`⚠️ [Jupiter] SOL fiyatı alınamadı, fallback kullanılıyor: ${solPriceUsd}`);
+      else console.log(`💲 [Jupiter] SOL fiyatı: ${solPriceUsd.toFixed(2)}`);
       const buyPriceUsd = result.tokensOut > 0 ? (actualSolAmount * solPriceUsd) / result.tokensOut : 0;
       position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceUsd, buyTxSignature: result.sig, tokenDecimals: result.decimals };
       this.updateAndEmit(position);
@@ -559,7 +572,10 @@ export class JupiterTrader {
 
       // buyPriceUsd: alım anındaki USD fiyatı = (harcanan SOL × SOL/USD fiyatı) / alınan token miktarı
       // Tutarlı PnL hesabı için tüm fiyatlar USD bazlı tutulur
-      const solPriceUsd = await this.fetchSolPriceUsd();
+      const solPriceUsdRaw = await this.fetchSolPriceUsd();
+      const solPriceUsd = solPriceUsdRaw > 0 ? solPriceUsdRaw : 87;
+      if (solPriceUsdRaw <= 0) console.warn(`⚠️ [PumpSwap] SOL fiyatı alınamadı, fallback kullanılıyor: ${solPriceUsd}`);
+      else console.log(`💲 [PumpSwap] SOL fiyatı: ${solPriceUsd.toFixed(2)}`);
       const buyPriceUsd = tokensReceived > 0 ? (actualSolAmount * solPriceUsd) / tokensReceived : 0;
       position = { ...position, status: "open", buyTxSignature: sig, buyTokenAmount: tokensReceived, buyPriceUsd, tokenDecimals };
       this.updateAndEmit(position);
