@@ -155,6 +155,17 @@ export class PositionPricer {
           ? ((priceInSol - buyPriceSol) / buyPriceSol) * 100
           : 0;
 
+      // Debug: Log all P&L calculation inputs and outputs
+      console.log(`📊 [Pricer Debug] ${pos.symbol}:`);
+      console.log(`  Raw priceData: ${JSON.stringify(priceData)}`);
+      console.log(`  priceInSol: ${priceInSol.toFixed(10)} SOL`);
+      console.log(`  buyPriceSol: ${buyPriceSol.toFixed(10)} SOL`);
+      console.log(`  buyTokenAmount: ${pos.buyTokenAmount}`);
+      console.log(`  Price diff: ${(priceInSol - buyPriceSol).toFixed(10)} SOL`);
+      console.log(`  unrealizedPnlSol: ${unrealizedPnlSol.toFixed(6)} SOL`);
+      console.log(`  unrealizedPnlPct calculation: ((${priceInSol.toFixed(10)} - ${buyPriceSol.toFixed(10)}) / ${buyPriceSol.toFixed(10)}) * 100 = ${unrealizedPnlPct.toFixed(2)}%`);
+      console.log(`  currentPriceUsd: ${currentPriceUsd.toFixed(10)} USD`);
+
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
       this.emit("position_update", updated);
