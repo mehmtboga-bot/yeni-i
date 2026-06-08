@@ -104,23 +104,26 @@ export class PositionPricer {
       const priceData = data[pos.mintAddress];
 
       // Jupiter Price API v3:
-      //   priceData.price    → token fiyatı SOL cinsinden (varsa öncelikli kullan)
-      //   priceData.usdPrice → token fiyatı USD cinsinden (SOL'a çevirmek gerekir)
+      //   priceData.price    → token fiyatı USD cinsinden (v3 API her zaman USD döndürür)
+      //   priceData.usdPrice → token fiyatı USD cinsinden (price ile aynı)
+      // SOL fiyatına çevirmek için solPriceUsd kullanılır.
       const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 87;
-      const currentPriceSol: number =
-        priceData?.price != null
-          ? priceData.price                          // Zaten SOL cinsinden — doğrudan kullan
-          : priceData?.usdPrice != null
-            ? priceData.usdPrice / solPrice          // USD → SOL çevirimi
-            : typeof priceData === "number"
-              ? priceData                            // Ham sayı (SOL varsayımı)
-              : 0;
 
-      // USD fiyatını UI için koru (currentPriceUsd alanı)
-      const currentPriceUsd =
+      // USD fiyatını belirle: price veya usdPrice alanından al
+      const usdPriceRaw: number =
         priceData?.usdPrice != null
           ? priceData.usdPrice
-          : currentPriceSol * solPrice;
+          : priceData?.price != null
+            ? priceData.price
+            : typeof priceData === "number"
+              ? priceData
+              : 0;
+
+      // USD → SOL çevirimi (buyPriceSol SOL cinsinden olduğu için currentPriceSol da SOL olmalı)
+      const currentPriceSol: number = usdPriceRaw > 0 ? usdPriceRaw / solPrice : 0;
+
+      // USD fiyatını UI için koru (currentPriceUsd alanı)
+      const currentPriceUsd = usdPriceRaw;
 
       // Veri gelmediyse
       if (!currentPriceSol || currentPriceSol <= 0) {

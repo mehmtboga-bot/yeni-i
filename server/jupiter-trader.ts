@@ -439,9 +439,12 @@ export class JupiterTrader {
         throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
       }, `Jupiter Buy ${symbol}`, 2);
 
-      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol: result.pricePerToken, buyTxSignature: result.sig, tokenDecimals: result.decimals };
+      // buyPriceSol: gerçek alım fiyatı = harcanan SOL / alınan token miktarı
+      // Jupiter API fiyatı (pricePerToken) değil, swap'tan hesaplanan gerçek fiyat kullanılır
+      const buyPriceSol = result.tokensOut > 0 ? actualSolAmount / result.tokensOut : 0;
+      position = { ...position, status: "open", buyTokenAmount: result.tokensOut, buyPriceSol, buyTxSignature: result.sig, tokenDecimals: result.decimals };
       this.updateAndEmit(position);
-      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | fiyat: ${result.pricePerToken.toFixed(10)} SOL/token | tx: ${result.sig.slice(0, 16)}...`);
+      console.log(`✅ [Jupiter] ALIM tamam: ${symbol} | ${result.tokensOut.toFixed(4)} token | fiyat: ${buyPriceSol.toFixed(10)} SOL/token | tx: ${result.sig.slice(0, 16)}...`);
 
       return position;
 
