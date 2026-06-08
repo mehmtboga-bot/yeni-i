@@ -10,7 +10,17 @@ const DEFAULT_CONFIG: TradeConfig = {
   slippageBps: 10000, // 100% kayma (fiyat ne olursa olsun al/sat)
   priorityFeeManualMicroLamports: 700_000,     // Manuel alım: 0.0007 SOL (~1-2s)
   priorityFeeAutoMicroLamports: 1_000_000,     // Otomatik alım: 0.001 SOL (<1s)
-  takeProfitPct: 0,
+  takeProfitPct: 0,                            // @deprecated — profitTargetPct kullan
+  // ── Otomatik trader ayarları ──
+  enabled: false,
+  solAmountPerTrade: 0.1,
+  maxTokensHeld: 5,
+  holdDurationMs: 60000,
+  profitTargetPct: 50,
+  stopLossPct: 20,
+  minLiquidityUsd: 5000,
+  skipRecentlyTradedSymbols: true,
+  priorityFeeMicroLamports: 1_000_000,
 };
 
 interface StoreData {

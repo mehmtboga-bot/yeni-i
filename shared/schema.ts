@@ -71,7 +71,17 @@ export const tradeConfigSchema = z.object({
   slippageBps: z.number().min(50).max(1_000_000),
   priorityFeeManualMicroLamports: z.number().min(0).max(100_000_000), // Manuel alım
   priorityFeeAutoMicroLamports: z.number().min(0).max(100_000_000),   // Otomatik alım
-  takeProfitPct: z.number().min(0).max(10000).optional().default(0),
+  takeProfitPct: z.number().min(0).max(10000).optional().default(0),  // @deprecated — profitTargetPct kullan
+  // ── Otomatik trader ayarları (tek config sistemi) ──
+  enabled: z.boolean().optional().default(false),
+  solAmountPerTrade: z.number().min(0.0001).optional().default(0.1),
+  maxTokensHeld: z.number().min(1).optional().default(5),
+  holdDurationMs: z.number().min(1000).optional().default(60000),
+  profitTargetPct: z.number().min(0).optional().default(50),
+  stopLossPct: z.number().min(0).optional().default(20),
+  minLiquidityUsd: z.number().min(0).optional().default(5000),
+  skipRecentlyTradedSymbols: z.boolean().optional().default(true),
+  priorityFeeMicroLamports: z.number().min(0).max(100_000_000).optional().default(1_000_000),
 });
 
 export type TradeConfig = z.infer<typeof tradeConfigSchema>;

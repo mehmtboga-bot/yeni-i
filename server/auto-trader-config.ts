@@ -1,7 +1,10 @@
 /**
- * Auto-Trader Konfigürasyon Yöneticisi
+ * @deprecated Bu modül artık kullanılmıyor.
  * 
- * Otomatik trading ayarlarını tutar ve kalıcı olarak kaydeder
+ * Tüm auto-trader ayarları TradeStore.config üzerinden yönetilmektedir.
+ * Bkz: server/trade-store.ts ve shared/schema.ts (TradeConfig interface)
+ * 
+ * Bu dosya geriye dönük uyumluluk için korunmaktadır.
  */
 
 import fs from "fs";

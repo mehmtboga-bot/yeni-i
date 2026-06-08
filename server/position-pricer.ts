@@ -99,7 +99,10 @@ export class PositionPricer {
     }
 
     const config = this.store.getConfig();
-    const takeProfitPct = config.takeProfitPct ?? 0;
+    // profitTargetPct (birleşik config) öncelikli; geriye dönük uyumluluk için takeProfitPct fallback
+    const takeProfitPct = (config.profitTargetPct ?? 0) > 0
+      ? (config.profitTargetPct ?? 0)
+      : (config.takeProfitPct ?? 0);
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];

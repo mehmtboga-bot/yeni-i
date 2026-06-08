@@ -29,8 +29,19 @@ type Tab = "console" | "dashboard" | "trade" | "files";
 const DEFAULT_CONFIG: TradeConfig = {
   solAmount: 0.01,
   slippageBps: 5000,
-  priorityFeeMicroLamports: 200_000,
+  priorityFeeManualMicroLamports: 700_000,
+  priorityFeeAutoMicroLamports: 1_000_000,
   takeProfitPct: 0,
+  // Otomatik trader ayarları
+  enabled: false,
+  solAmountPerTrade: 0.1,
+  maxTokensHeld: 5,
+  holdDurationMs: 60000,
+  profitTargetPct: 50,
+  stopLossPct: 20,
+  minLiquidityUsd: 5000,
+  skipRecentlyTradedSymbols: true,
+  priorityFeeMicroLamports: 1_000_000,
 };
 
 const DEFAULT_AUTO_TRADER_CONFIG: AutoTraderConfig = {
