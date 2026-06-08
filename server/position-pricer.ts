@@ -109,8 +109,7 @@ export class PositionPricer {
       const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 87;
       const currentPriceUsd =
         priceData?.usdPrice ??
-        priceData?.price ??
-        0;
+        (priceData?.price ? priceData.price * solPrice : 0);
       const priceInSol = currentPriceUsd / solPrice;
 
       // Veri gelmediyse
