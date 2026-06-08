@@ -107,12 +107,11 @@ export class PositionPricer {
       //   priceData.price    → token fiyatı SOL cinsinden (doğrudan kullan)
       //   priceData.usdPrice → token fiyatı USD cinsinden (bir kez SOL'a çevir)
       const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 87;
-      const priceInSol: number =
-        priceData?.price != null
-          ? priceData.price                          // Zaten SOL cinsinden — doğrudan kullan
-          : priceData?.usdPrice != null
-            ? priceData.usdPrice / solPrice          // USD → SOL çevirimi (yalnızca bir kez)
-            : 0;                                     // Veri yok
+      const currentPriceUsd =
+        priceData?.usdPrice ??
+        priceData?.price ??
+        0;
+      const priceInSol = currentPriceUsd / solPrice;
 
       // Veri gelmediyse
       if (!priceInSol || priceInSol <= 0) {
@@ -143,16 +142,14 @@ export class PositionPricer {
         continue;
       }
 
-      // UI için USD fiyatı: priceInSol'dan türetilir (tek kaynak)
-      const currentPriceUsd = priceInSol * solPrice;
-
       // P&L hesaplamaları — tümü aynı priceInSol değerini kullanır
+      const buyPriceUsd = buyPriceSol * solPrice;
       const unrealizedPnlSol =
         (pos.buyTokenAmount ?? 0) * (priceInSol - buyPriceSol);
 
       const unrealizedPnlPct =
-        buyPriceSol > 0
-          ? ((priceInSol - buyPriceSol) / buyPriceSol) * 100
+        buyPriceUsd > 0
+          ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100
           : 0;
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
