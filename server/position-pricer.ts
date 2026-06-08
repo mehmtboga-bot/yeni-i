@@ -108,26 +108,31 @@ export class PositionPricer {
       //   priceData.price → token fiyatı SOL cinsinden
       // SOL bazlı fiyat kullanılır — USD çevirimi sadece görüntüleme için yapılır.
 
-      const currentPriceSol: number =
+      let currentPriceSol: number =
         priceData?.price != null
           ? priceData.price
           : typeof priceData === "number"
             ? priceData
             : 0;
 
-      // Veri gelmediyse
+      // Veri gelmediyse — buyPriceSol'a fallback yap (unrealizedPnlPct = 0 olur)
       if (!currentPriceSol || currentPriceSol <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
-        
-        if (fails === this.maxFailuresBeforeAlert) {
-          console.warn(`⚠️ [Pricer] ${pos.symbol} fiyatı alınamıyor (${fails}x)`);
-        }
-        continue;
-      }
 
-      // Başarılı okuma — sayacı sıfırla
-      this.failureCount.delete(pos.mintAddress);
+        if (fails === this.maxFailuresBeforeAlert) {
+          console.warn(`⚠️ [Pricer] ${pos.symbol} fiyatı alınamıyor (${fails}x), buyPriceSol fallback`);
+        }
+
+        // buyPriceSol yoksa pozisyonu güncelleyemeyiz, atla
+        if (!pos.buyPriceSol || pos.buyPriceSol <= 0) continue;
+
+        // Fallback: alım fiyatını kullan → kart gösterilir, pnl = 0
+        currentPriceSol = pos.buyPriceSol;
+      } else {
+        // Başarılı okuma — sayacı sıfırla
+        this.failureCount.delete(pos.mintAddress);
+      }
 
       // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
       const lastPrice = this.lastValidPrice.get(pos.mintAddress);
