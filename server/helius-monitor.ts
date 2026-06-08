@@ -194,10 +194,10 @@ export class HeliusMonitor {
     try {
       const res  = await fetch(`https://lite-api.jup.ag/price/v3?ids=${SOL_MINT}`);
       const data = await res.json();
-      const price = data?.[SOL_MINT]?.usdPrice;
+      const price = data?.[SOL_MINT]?.price ?? data?.[SOL_MINT]?.usdPrice;
       if (typeof price === "number" && price > 0) {
         this.solPriceUsd = price;
-        console.log(`💵 SOL/USD (Jupiter): $${price.toFixed(2)}`);
+        console.log(`💵 SOL/USD (Jupiter): ${price.toFixed(2)}`);
         return;
       }
     } catch (err) {
