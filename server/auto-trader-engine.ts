@@ -39,8 +39,7 @@ export class AutoTraderEngine {
   private sellCheckInterval: NodeJS.Timeout | null = null;
   private processedLPs: Set<string> = new Set();
   private seenTokenSymbols: Set<string> = new Set();
-  private recentlyClosedTrades: Array<{ symbol: string; closedAt: number }> = [];
-  private readonly MAX_RECENT_TRADES = 7;
+  private recentlyClosedTrades: Array<{ symbol: string; name: string; closedAt: number }> = [];
 
   // Satış tetikleme takibi — sell() kendi sonsuz döngüsünü yönetir, engine sadece ilk çağrıyı yapar
   private sellInProgress: Set<string> = new Set(); // mint → sell() zaten tetiklendi mi
@@ -106,12 +105,10 @@ export class AutoTraderEngine {
     }
     this.seenTokenSymbols.add(tokenKey);
 
-    if (config.skipRecentlyTradedSymbols) {
-      const isRecentlyTraded = this.recentlyClosedTrades.some((t) => t.symbol === symbol);
-      if (isRecentlyTraded) {
-        console.log(`⏭️ [Auto-Trader] ${symbol} son 7 işlemde var, atlanıyor`);
-        return;
-      }
+    const isRecentlyTraded = this.recentlyClosedTrades.some((t) => t.symbol === symbol);
+    if (isRecentlyTraded) {
+      console.log(`⏭️ [Auto-Trader] ${symbol} son 13 dakikada satıldı, atlanıyor`);
+      return;
     }
 
     const openPositions = this.tradeStore.getAll().filter(
@@ -275,8 +272,8 @@ export class AutoTraderEngine {
         console.log(`✅ [Auto-Trader] Satış tamamlandı: ${record.tokenSymbol} | PnL: ${pnlSol?.toFixed(4) || "?"} SOL (${pnlPct?.toFixed(1) || "?"}%)`);
         const tokenKey = `${record.tokenSymbol}:${record.tokenName}`.toLowerCase();
         this.seenTokenSymbols.add(tokenKey);
-        this.recentlyClosedTrades.push({ symbol: record.tokenSymbol, closedAt: Date.now() });
-        if (this.recentlyClosedTrades.length > this.MAX_RECENT_TRADES) this.recentlyClosedTrades.shift();
+        this.recentlyClosedTrades.push({ symbol: record.tokenSymbol, name: record.tokenName, closedAt: Date.now() });
+        // No sliding window - cleanup happens in cleanupOldTrades() every 13 minutes
         this.sellInProgress.delete(mintAddress);
         break;
       }

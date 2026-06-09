@@ -317,22 +317,6 @@ export function AutoTraderPanel({
           </div>
         </div>
 
-        {/* Son 7 İşlemde Tekrar Almaz */}
-        <div className="flex items-center justify-between py-2 border-t border-border/50">
-          <div className="space-y-0.5">
-            <label className="text-sm font-medium">🔁 Son 7 İşlemde Tekrar Almaz</label>
-            <p className="text-xs text-muted-foreground">
-              Son 7 kapalı işlemde aynı symbol varsa yeni alım yapılmaz
-            </p>
-          </div>
-          <Switch
-            checked={config.skipRecentlyTradedSymbols ?? true}
-            onCheckedChange={(checked) => onConfigUpdate({ skipRecentlyTradedSymbols: checked })}
-            disabled={isRunning}
-            data-testid="switch-skip-recently-traded"
-          />
-        </div>
-
         {/* Butonlar */}
         <div className="flex gap-2 pt-2">
           <Button
