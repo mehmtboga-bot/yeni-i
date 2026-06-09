@@ -38,7 +38,6 @@ export class AutoTraderEngine {
   private isRunning = false;
   private sellCheckInterval: NodeJS.Timeout | null = null;
   private processedLPs: Set<string> = new Set();
-  private seenTokenSymbols: Set<string> = new Set();
   private recentlyClosedTrades: Array<{ symbol: string; closedAt: number }> = [];
   private readonly MAX_RECENT_TRADES = 7;
 
@@ -98,13 +97,6 @@ export class AutoTraderEngine {
       console.log(`🚫 [Auto-Trader] Düşük likidite — ${symbol} atlanıyor | Likidite: ${liquidityUsd?.toFixed(0) ?? "?"} | Eşik: ${config.minLiquidityUsd}`);
       return;
     }
-
-    const tokenKey = `${symbol}:${name}`.toLowerCase();
-    if (this.seenTokenSymbols.has(tokenKey)) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} (${name}) daha önce görüldü, atlanıyor`);
-      return;
-    }
-    this.seenTokenSymbols.add(tokenKey);
 
     if (config.skipRecentlyTradedSymbols) {
       const isRecentlyTraded = this.recentlyClosedTrades.some((t) => t.symbol === symbol);
@@ -273,8 +265,6 @@ export class AutoTraderEngine {
         record.pnlPct = pnlPct;
         this.emit("auto_trade_record_updated", record);
         console.log(`✅ [Auto-Trader] Satış tamamlandı: ${record.tokenSymbol} | PnL: ${pnlSol?.toFixed(4) || "?"} SOL (${pnlPct?.toFixed(1) || "?"}%)`);
-        const tokenKey = `${record.tokenSymbol}:${record.tokenName}`.toLowerCase();
-        this.seenTokenSymbols.add(tokenKey);
         this.recentlyClosedTrades.push({ symbol: record.tokenSymbol, closedAt: Date.now() });
         if (this.recentlyClosedTrades.length > this.MAX_RECENT_TRADES) this.recentlyClosedTrades.shift();
         this.sellInProgress.delete(mintAddress);
