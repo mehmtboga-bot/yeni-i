@@ -38,9 +38,7 @@ export class AutoTraderEngine {
   private isRunning = false;
   private sellCheckInterval: NodeJS.Timeout | null = null;
   private processedLPs: Set<string> = new Set();
-  private seenTokenSymbols: Set<string> = new Set();
-  private recentlyClosedTrades: Array<{ symbol: string; closedAt: number }> = [];
-  private readonly MAX_RECENT_TRADES = 7;
+  private recentlySeenTokens: Array<{ symbol: string; name: string; firstSeenAt: number }> = [];
 
   // Satış tetikleme takibi — sell() kendi sonsuz döngüsünü yönetir, engine sadece ilk çağrıyı yapar
   private sellInProgress: Set<string> = new Set(); // mint → sell() zaten tetiklendi mi
@@ -99,20 +97,16 @@ export class AutoTraderEngine {
       return;
     }
 
-    const tokenKey = `${symbol}:${name}`.toLowerCase();
-    if (this.seenTokenSymbols.has(tokenKey)) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} (${name}) daha önce görüldü, atlanıyor`);
+    // Check if token was seen in last 13 minutes
+    const isRecentlySeen = this.recentlySeenTokens.some((t) => t.symbol === symbol);
+    if (isRecentlySeen) {
+      console.log(`⏭️ [Auto-Trader] ${symbol} son 13 dakikada görüldü, atlanıyor`);
       return;
     }
-    this.seenTokenSymbols.add(tokenKey);
 
-    if (config.skipRecentlyTradedSymbols) {
-      const isRecentlyTraded = this.recentlyClosedTrades.some((t) => t.symbol === symbol);
-      if (isRecentlyTraded) {
-        console.log(`⏭️ [Auto-Trader] ${symbol} son 7 işlemde var, atlanıyor`);
-        return;
-      }
-    }
+    // Token not in recent list, add it now
+    this.recentlySeenTokens.push({ symbol, name, firstSeenAt: Date.now() });
+    console.log(`✅ [Auto-Trader] ${symbol} ilk kez görüldü, 13 dk timer başladı`);
 
     const openPositions = this.tradeStore.getAll().filter(
       (p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell"
@@ -150,6 +144,21 @@ export class AutoTraderEngine {
 
   private startSellChecker() {
     this.sellCheckInterval = setInterval(() => this.checkAndSell(), 100);
+    setInterval(() => this.cleanupOldTokens(), 60 * 1000);
+  }
+
+  private cleanupOldTokens() {
+    const now = Date.now();
+    const CLEANUP_AGE_MS = 13 * 60 * 1000;
+
+    this.recentlySeenTokens = this.recentlySeenTokens.filter((token) => {
+      const age = now - token.firstSeenAt;
+      if (age > CLEANUP_AGE_MS) {
+        console.log(`🧹 [Auto-Trader] ${token.symbol} 13 dk geçti, listeden silindi`);
+        return false;
+      }
+      return true;
+    });
   }
 
   private checkAndSell() {
@@ -273,10 +282,6 @@ export class AutoTraderEngine {
         record.pnlPct = pnlPct;
         this.emit("auto_trade_record_updated", record);
         console.log(`✅ [Auto-Trader] Satış tamamlandı: ${record.tokenSymbol} | PnL: ${pnlSol?.toFixed(4) || "?"} SOL (${pnlPct?.toFixed(1) || "?"}%)`);
-        const tokenKey = `${record.tokenSymbol}:${record.tokenName}`.toLowerCase();
-        this.seenTokenSymbols.add(tokenKey);
-        this.recentlyClosedTrades.push({ symbol: record.tokenSymbol, closedAt: Date.now() });
-        if (this.recentlyClosedTrades.length > this.MAX_RECENT_TRADES) this.recentlyClosedTrades.shift();
         this.sellInProgress.delete(mintAddress);
         break;
       }
