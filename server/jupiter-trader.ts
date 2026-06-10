@@ -288,14 +288,33 @@ export class JupiterTrader {
   }): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
 
+    // [DÜZELTİLDİ] PumpPortal API parametre dönüşümleri:
+    // - amount: token satışında float UI amount → integer lamports (decimals ile çarp)
+    //           SOL alımında float SOL olarak bırakılır (denominatedInSol: true)
+    // - slippage: yüzde (%) → basis points (100 ile çarp)
+    // - priorityFee: SOL → micro-lamports (1_000_000 ile çarp)
+    let apiAmount: number;
+    if (opts.denominatedInSol) {
+      // Alım: SOL cinsinden, float olarak gönder (API SOL kabul eder)
+      apiAmount = opts.amount;
+    } else {
+      // Satış: token miktarı → lamports
+      const decimals = await this.fetchDecimals(opts.mint);
+      apiAmount = Math.floor(opts.amount * Math.pow(10, decimals));
+    }
+    const slippageBps = Math.floor(opts.slippagePct * 100);
+    const priorityFeeMicroLamports = Math.floor(opts.priorityFeeSol * 1_000_000);
+
+    console.log(`📤 [PumpSwap] ${opts.action} | mint: ${opts.mint.slice(0, 8)}... | amount: ${apiAmount}${opts.denominatedInSol ? " SOL" : " lamports"} | slippage: ${slippageBps} bps | fee: ${priorityFeeMicroLamports} µL`);
+
     const body = {
       publicKey: this.keypair.publicKey.toBase58(),
       action: opts.action,
       mint: opts.mint,
       denominatedInSol: opts.denominatedInSol,
-      amount: opts.amount,
-      slippage: opts.slippagePct,
-      priorityFee: opts.priorityFeeSol,
+      amount: apiAmount,
+      slippage: slippageBps,
+      priorityFee: priorityFeeMicroLamports,
       pool: "pumpswap",
     };
 
@@ -319,7 +338,11 @@ export class JupiterTrader {
       timeoutMs: 3000,
     });
 
-    if (!res.ok) throw new Error(`PumpPortal API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`❌ [PumpPortal] ${res.status}: ${errText.slice(0, 200)}`);
+      throw new Error(`PumpPortal API ${res.status}: ${errText.slice(0, 200)}`);
+    }
 
     // [DÜZELTİLDİ] PumpPortal response validation:
     // Başarılı yanıt binary TX verisi olmalı (JSON hata mesajı değil).
