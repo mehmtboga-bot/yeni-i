@@ -233,7 +233,15 @@ export class JupiterTrader {
     const latest = await this.connection.getLatestBlockhash("processed");
 
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
-    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    let signature: string;
+    try {
+      signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+      console.log(`✅ [Jupiter] TX ağa gönderildi: ${signature} | boyut: ${tx.serialize().length} byte`);
+    } catch (err) {
+      const errorMsg = (err as Error).message || String(err);
+      console.error(`❌ [Jupiter] TX GÖNDERME HATASI: ${errorMsg} | TX boyutu: ${tx.serialize().length} byte | RPC: ${RPC_URL.split('?')[0]}`);
+      throw new Error(`Jupiter TX gönderme başarısız: ${errorMsg}`);
+    }
 
     if (confirmForeground) {
       // Satış TX'leri için FOREGROUND confirm — onaylanmadan devam etme
@@ -335,7 +343,15 @@ export class JupiterTrader {
     const latest = await this.connection.getLatestBlockhash("processed");
 
     // TX ağa gönderilir — bu noktadan sonra withRetry YENİ TX GÖNDERMEMELİ
-    const signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+    let signature: string;
+    try {
+      signature = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 1 });
+      console.log(`✅ [PumpSwap] TX ağa gönderildi: ${signature} | boyut: ${tx.serialize().length} byte`);
+    } catch (err) {
+      const errorMsg = (err as Error).message || String(err);
+      console.error(`❌ [PumpSwap] TX GÖNDERME HATASI: ${errorMsg} | TX boyutu: ${tx.serialize().length} byte | RPC: ${RPC_URL.split('?')[0]}`);
+      throw new Error(`PumpSwap TX gönderme başarısız: ${errorMsg}`);
+    }
 
     if (opts.confirmForeground) {
       // Satış TX'leri için FOREGROUND confirm — onaylanmadan devam etme
