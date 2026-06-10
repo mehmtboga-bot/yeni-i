@@ -212,6 +212,7 @@ export class JupiterTrader {
       userPublicKey: this.keypair.publicKey.toBase58(),
       wrapAndUnwrapSol: true,
       dynamicComputeUnitLimit: true,
+      skipUserAccountsRpcCalls: false,
       prioritizationFeeLamports: {
         priorityLevelWithMaxLamports: { maxLamports: Math.max(priorityFeeMicroLamports, 1), priorityLevel: "veryHigh" },
       },
