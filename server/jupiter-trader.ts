@@ -411,8 +411,8 @@ export class JupiterTrader {
     this.updateAndEmit(position);
     console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "otomatik" : "manuel"}, fee: ${priorityFee})`);
 
-    // 650ms bekle — LP indexer'ın yayılması için
-    await new Promise((r) => setTimeout(r, 650));
+    // 3000ms bekle — Token Jupiter'da listelenene kadar bekle
+    await new Promise((r) => setTimeout(r, 3000));
 
     try {
       let swapSignature: string | null = null;
@@ -501,8 +501,8 @@ export class JupiterTrader {
     this.updateAndEmit(position);
     console.log(`🛒 [PumpSwap] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "otomatik" : "manuel"}) | slippage: ${Math.floor(config.slippageBps / 100)}%`);
 
-    // 650ms bekle — LP indexer'ın yayılması için
-    await new Promise((r) => setTimeout(r, 650));
+    // 3000ms bekle — Token Jupiter'da listelenene kadar bekle
+    await new Promise((r) => setTimeout(r, 3000));
 
     const slippagePct = Math.floor(config.slippageBps / 100);
     // Manuel/otomatik alım için ayrı priority fee kullan
