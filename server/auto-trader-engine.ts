@@ -2,8 +2,6 @@
  * Otomatik Trading Motoru
  */
 
-import type { AutoTraderConfig } from "./auto-trader-config";
-import type { AutoTraderConfigStore } from "./auto-trader-config";
 import type { TradeStore } from "./trade-store";
 import type { Position } from "@shared/schema";
 
@@ -29,7 +27,6 @@ interface AutoTradeRecord {
 type EventEmitter = (event: string, data: any) => void;
 
 export class AutoTraderEngine {
-  private configStore: AutoTraderConfigStore;
   private tradeStore: TradeStore;
   private emit: EventEmitter;
   private trader: any;
@@ -45,12 +42,10 @@ export class AutoTraderEngine {
 
 
   constructor(
-    configStore: AutoTraderConfigStore,
     tradeStore: TradeStore,
     emit: EventEmitter,
     trader?: any
   ) {
-    this.configStore = configStore;
     this.tradeStore = tradeStore;
     this.emit = emit;
     this.trader = trader;
@@ -80,7 +75,7 @@ export class AutoTraderEngine {
    * LP tespit edildiğinde çağrılır
    */
   async onLPDetected(lpData: any) {
-    const config = this.configStore.getConfig();
+    const config = this.tradeStore.getConfig();
     if (!config.enabled) return;
 
     const { mintAddress, name, symbol } = lpData;
@@ -175,11 +170,11 @@ export class AutoTraderEngine {
       // sell() zaten tetiklendi mi? — tekrar tetikleme (sell() kendi döngüsünü yönetir)
       if (this.sellInProgress.has(record.mintAddress)) continue;
 
-      const config = this.configStore.getConfig();
+      const config = this.tradeStore.getConfig();
 
       // ─── Kar hedefi kontrolü ───
       const shouldSellForProfit =
-        config.profitTargetPct > 0 && (position.unrealizedPnlPct ?? 0) >= config.profitTargetPct;
+        (config.profitTargetPct ?? 0) > 0 && (position.unrealizedPnlPct ?? 0) >= (config.profitTargetPct ?? 0);
 
       // ─── Süre doldu mu? ───
       const shouldSellForTime = now >= record.shouldSellAt;
@@ -187,7 +182,7 @@ export class AutoTraderEngine {
       if (!shouldSellForProfit && !shouldSellForTime) continue;
 
       const reason = shouldSellForProfit
-        ? `Kar hedefi: +${(position.unrealizedPnlPct ?? 0).toFixed(1)}% (Hedef: ${config.profitTargetPct}%)`
+        ? `Kar hedefi: +${(position.unrealizedPnlPct ?? 0).toFixed(1)}% (Hedef: ${config.profitTargetPct ?? 0}%)`
         : `Tutma süresi doldu (${((now - record.buyTimestamp) / 1000).toFixed(0)}s)`;
 
       console.log(`💰 [Auto-Trader] Satış tetiklendi: ${record.tokenSymbol} — ${reason}`);
@@ -230,9 +225,9 @@ export class AutoTraderEngine {
         record.buyPriceSol = buyPriceSol;
         record.buyTokenAmount = buyTokenAmount;
 
-        const config = this.configStore.getConfig();
+        const config = this.tradeStore.getConfig();
         const position = this.tradeStore.getByMint(mintAddress);
-        const holdMs = position?.customHoldDurationMs ?? config.holdDurationMs;
+        const holdMs = position?.customHoldDurationMs ?? (config.holdDurationMs ?? 60000);
         record.shouldSellAt = Date.now() + holdMs;
 
         this.emit("auto_trade_record_updated", record);

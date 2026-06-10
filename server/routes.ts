@@ -5,7 +5,6 @@ import { HeliusMonitor } from "./helius-monitor";
 import { JupiterTrader } from "./jupiter-trader";
 import { TradeStore } from "./trade-store";
 import { PositionPricer } from "./position-pricer";
-import { AutoTraderConfigStore } from "./auto-trader-config";
 import { AutoTraderEngine } from "./auto-trader-engine";
 import { saveSecrets } from "./secrets-loader";
 import { WhitelistManager } from "./whitelist-manager";
@@ -279,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           positions: tradeStore.getAll(),
           config: tradeStore.getConfig(),
-          autoTraderConfig: autoTraderConfigStore.getConfig(),
+          autoTraderConfig: tradeStore.getConfig(),
           autoTraderRunning: autoTraderEngine.getIsRunning(),
           traderPublicKey: trader.getPublicKey(),
           traderReady: trader.isReady(),
@@ -291,9 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // -------------------------------
 
   // ---- Auto Trader Kurulum ----
-  const autoTraderConfigStore = new AutoTraderConfigStore();
   const autoTraderEngine = new AutoTraderEngine(
-    autoTraderConfigStore,
     tradeStore,
     (event: string, data: any) => {
       if (event === "auto_trade_record_updated") {
@@ -303,8 +300,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { mintAddress, name, symbol, dex } = data;
         const nm = name || "Bilinmiyor";
         const sym = symbol || "?";
-        const autoConfig = autoTraderConfigStore.getConfig();
-        const solAmount = autoConfig.solAmountPerTrade;
+        const autoConfig = tradeStore.getConfig();
+        const solAmount = autoConfig.solAmountPerTrade ?? 0.1;
         console.log(`⏳ [Auto-Trader] ${sym} 750ms bekleniyor... (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
         setTimeout(() => {
           console.log(`🤖 [Auto-Trader] Alım başlatılıyor: ${sym} (${mintAddress}) | DEX: ${dex || "jupiter"} | SOL: ${solAmount}`);
@@ -342,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Otomatik trader enabled ise başlat
-  if (autoTraderConfigStore.getConfig().enabled) {
+  if (tradeStore.getConfig().enabled) {
     autoTraderEngine.start();
   }
   // ----------------------------
@@ -354,7 +351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastToClients({ type: "lp_detected", data });
 
       // Otomatik trader enabled ise direkt alım yap (hızlı)
-      const autoConfig = autoTraderConfigStore.getConfig();
+      const autoConfig = tradeStore.getConfig();
       if (autoConfig.enabled) {
         const { mintAddress, name, symbol, dex, tvlUsd } = data;
         const nm = name || "Bilinmiyor";
@@ -469,7 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       JSON.stringify({
         type: "auto_trader_config_snapshot",
         data: {
-          config: autoTraderConfigStore.getConfig(),
+          config: tradeStore.getConfig(),
           records: autoTraderEngine.getRecords(),
         },
       })
@@ -524,15 +521,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }).catch((err) => console.error("sell_token hatası:", err));
           }
         } else if (message.type === "trade_config_update") {
-          const { solAmount, slippageBps, priorityFeeManualMicroLamports, priorityFeeAutoMicroLamports, takeProfitPct } = message.data || {};
-          const partial: Record<string, number> = {};
+          const { solAmount, slippageBps, priorityFeeManualMicroLamports, priorityFeeAutoMicroLamports, takeProfitPct, profitTargetPct } = message.data || {};
+          const partial: Record<string, any> = {};
           if (typeof solAmount === "number" && solAmount > 0) partial.solAmount = solAmount;
           if (typeof slippageBps === "number" && slippageBps >= 50) partial.slippageBps = slippageBps;
           if (typeof priorityFeeManualMicroLamports === "number" && priorityFeeManualMicroLamports >= 0) partial.priorityFeeManualMicroLamports = priorityFeeManualMicroLamports;
           if (typeof priorityFeeAutoMicroLamports === "number" && priorityFeeAutoMicroLamports >= 0) partial.priorityFeeAutoMicroLamports = priorityFeeAutoMicroLamports;
           if (typeof takeProfitPct === "number" && takeProfitPct >= 0) partial.takeProfitPct = takeProfitPct;
+          if (typeof profitTargetPct === "number" && profitTargetPct >= 0) partial.profitTargetPct = profitTargetPct;
           if (Object.keys(partial).length) {
-            const updatedConfig = tradeStore.updateConfig(partial as any);
+            const updatedConfig = tradeStore.updateConfig(partial);
             broadcastToClients({
               type: "trade_config_update",
               data: { config: updatedConfig },
@@ -560,7 +558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             partial.enabled = enabled;
           }
           
-          const updatedConfig = autoTraderConfigStore.updateConfig(partial);
+          const updatedConfig = tradeStore.updateConfig(partial);
           broadcastToClients({
             type: "auto_trader_config_updated",
             data: { config: updatedConfig },
@@ -569,7 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Otomatik trader'i aç/kapat
           const { enabled } = message.data || {};
           if (typeof enabled === "boolean") {
-            autoTraderConfigStore.updateConfig({ enabled });
+            tradeStore.updateConfig({ enabled });
             if (enabled) {
               autoTraderEngine.start();
             } else {
@@ -577,7 +575,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             broadcastToClients({
               type: "auto_trader_config_updated",
-              data: { config: autoTraderConfigStore.getConfig() },
+              data: { config: tradeStore.getConfig() },
             });
             broadcastToClients({
               type: "auto_trader_state",
@@ -623,7 +621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               data: {
                 positions: tradeStore.getAll(),
                 config: tradeStore.getConfig(),
-                autoTraderConfig: autoTraderConfigStore.getConfig(),
+                autoTraderConfig: tradeStore.getConfig(),
                 autoTraderRunning: autoTraderEngine.getIsRunning(),
                 traderPublicKey: trader.getPublicKey(),
                 traderReady: trader.isReady(),
@@ -652,7 +650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             JSON.stringify({
               type: "auto_trader_config_snapshot",
               data: {
-                config: autoTraderConfigStore.getConfig(),
+                config: tradeStore.getConfig(),
                 records: autoTraderEngine.getRecords(),
               },
             })
