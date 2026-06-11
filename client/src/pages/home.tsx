@@ -32,9 +32,6 @@ const DEFAULT_CONFIG: TradeConfig = {
   priorityFeeManualMicroLamports: 700_000,
   priorityFeeAutoMicroLamports: 1_000_000,
   takeProfitPct: 0,
-  halfSellTarget1: 0,
-  halfSellTarget2: 0,
-  halfSellTarget3: 0,
 };
 
 const DEFAULT_AUTO_TRADER_CONFIG: AutoTraderConfig = {
@@ -47,6 +44,9 @@ const DEFAULT_AUTO_TRADER_CONFIG: AutoTraderConfig = {
   slippageBps: 5000,
   priorityFeeMicroLamports: 1000000,
   minLiquidityUsd: 5000,
+  halfSellTarget1: 0,
+  halfSellTarget2: 0,
+  halfSellTarget3: 0,
 };
 
 type StoredEvent = { id: number; type: string; data: any; timestamp: number };
@@ -730,7 +730,6 @@ export default function Home() {
           </DialogHeader>
           <AutoTraderPanel
             config={autoTraderConfig}
-            tradeConfig={tradeConfig}
             isRunning={autoTraderRunning}
             onConfigUpdate={handleAutoTraderConfigUpdate}
             onToggle={handleAutoTraderToggle}

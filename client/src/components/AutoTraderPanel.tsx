@@ -5,11 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { AutoTraderConfig, TradeConfig } from "@shared/schema";
+import type { AutoTraderConfig } from "@shared/schema";
 
 interface AutoTraderPanelProps {
   config: AutoTraderConfig;
-  tradeConfig?: TradeConfig;
   isRunning: boolean;
   onConfigUpdate: (cfg: Partial<AutoTraderConfig>) => void;
   onToggle: (enabled: boolean) => void;
@@ -17,7 +16,6 @@ interface AutoTraderPanelProps {
 
 export function AutoTraderPanel({
   config,
-  tradeConfig,
   isRunning,
   onConfigUpdate,
   onToggle,
@@ -30,6 +28,9 @@ export function AutoTraderPanel({
   const [slippageInput, setSlippageInput] = useState(String(config.slippageBps));
   const [priorityInput, setPriorityInput] = useState(String(config.priorityFeeMicroLamports));
   const [minLiquidityInput, setMinLiquidityInput] = useState(String(config.minLiquidityUsd ?? 5000));
+  const [halfSellTarget1Input, setHalfSellTarget1Input] = useState(String(config.halfSellTarget1 ?? 0));
+  const [halfSellTarget2Input, setHalfSellTarget2Input] = useState(String(config.halfSellTarget2 ?? 0));
+  const [halfSellTarget3Input, setHalfSellTarget3Input] = useState(String(config.halfSellTarget3 ?? 0));
 
   // Sunucudan gelen config değiştiğinde (positions_snapshot veya auto_trader_config_update)
   // input state'lerini güncelle — böylece sayfa yenilemesinde veya yeniden bağlanmada
@@ -43,6 +44,9 @@ export function AutoTraderPanel({
     setSlippageInput(String(config.slippageBps));
     setPriorityInput(String(config.priorityFeeMicroLamports));
     setMinLiquidityInput(String(config.minLiquidityUsd ?? 5000));
+    setHalfSellTarget1Input(String(config.halfSellTarget1 ?? 0));
+    setHalfSellTarget2Input(String(config.halfSellTarget2 ?? 0));
+    setHalfSellTarget3Input(String(config.halfSellTarget3 ?? 0));
   }, [config]);
 
   const saveConfig = () => {
@@ -71,6 +75,15 @@ export function AutoTraderPanel({
 
     const minLiquidity = parseFloat(minLiquidityInput);
     if (!Number.isNaN(minLiquidity) && minLiquidity >= 0) partial.minLiquidityUsd = minLiquidity;
+
+    const hs1 = parseFloat(halfSellTarget1Input);
+    if (!Number.isNaN(hs1) && hs1 >= 0) partial.halfSellTarget1 = hs1;
+
+    const hs2 = parseFloat(halfSellTarget2Input);
+    if (!Number.isNaN(hs2) && hs2 >= 0) partial.halfSellTarget2 = hs2;
+
+    const hs3 = parseFloat(halfSellTarget3Input);
+    if (!Number.isNaN(hs3) && hs3 >= 0) partial.halfSellTarget3 = hs3;
 
     if (Object.keys(partial).length > 0) {
       onConfigUpdate(partial);
@@ -192,7 +205,7 @@ export function AutoTraderPanel({
             </p>
           </div>
 
-          {/* Satır 2: Tutma Süresi & Kar Hedefi */}
+          {/* Satır 2: Tutma Süresi */}
           <div className="space-y-2">
             <Label htmlFor="auto-hold-duration" className="text-sm font-medium">
               ⏱️ Tutma Süresi (saniye)
@@ -210,26 +223,6 @@ export function AutoTraderPanel({
             />
             <p className="text-xs text-muted-foreground">
               {parseInt(holdDurationInput) < 60 ? `${parseInt(holdDurationInput)}s` : `${(parseInt(holdDurationInput) / 60).toFixed(1)}m`} tutunca otomatik sat
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="auto-profit-target" className="text-sm font-medium">
-              📈 Kar Hedefi (%)
-            </Label>
-            <Input
-              id="auto-profit-target"
-              type="number"
-              step="5"
-              min="0"
-              value={profitTargetInput}
-              onChange={(e) => setProfitTargetInput(e.target.value)}
-              disabled={isRunning}
-              data-testid="input-auto-profit-target"
-              className="font-mono"
-            />
-            <p className="text-xs text-muted-foreground">
-              Alış fiyatından bu yüzde fiyat yükselince otomatik sat
             </p>
           </div>
 
@@ -318,54 +311,95 @@ export function AutoTraderPanel({
           </div>
         </div>
 
-        {/* Kar Hedefleri Özeti */}
-        {tradeConfig && (
-          <div className="pt-2 border-t border-border/50 space-y-2">
-            <p className="text-sm font-medium">🎯 Kar Hedefleri (Trade Ayarları)</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <div className="bg-muted/40 rounded-md px-3 py-2 space-y-0.5">
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <Target className="h-3 w-3 text-emerald-400" />
-                  Normal Satış
-                </p>
-                <p className={`text-sm font-mono font-semibold ${(tradeConfig.takeProfitPct ?? 0) > 0 ? "text-emerald-400" : "text-muted-foreground"}`}>
-                  {(tradeConfig.takeProfitPct ?? 0) > 0 ? `+%${tradeConfig.takeProfitPct}` : "Devre Dışı"}
-                </p>
-                <p className="text-[10px] text-muted-foreground">Tümünü sat</p>
-              </div>
-              <div className="bg-muted/40 rounded-md px-3 py-2 space-y-0.5">
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <Scissors className="h-3 w-3 text-amber-400" />
-                  Yarı Satış 1
-                </p>
-                <p className={`text-sm font-mono font-semibold ${(tradeConfig.halfSellTarget1 ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
-                  {(tradeConfig.halfSellTarget1 ?? 0) > 0 ? `+%${tradeConfig.halfSellTarget1}` : "Devre Dışı"}
-                </p>
-                <p className="text-[10px] text-muted-foreground">Yarısını sat</p>
-              </div>
-              <div className="bg-muted/40 rounded-md px-3 py-2 space-y-0.5">
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <Scissors className="h-3 w-3 text-amber-400" />
-                  Yarı Satış 2
-                </p>
-                <p className={`text-sm font-mono font-semibold ${(tradeConfig.halfSellTarget2 ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
-                  {(tradeConfig.halfSellTarget2 ?? 0) > 0 ? `+%${tradeConfig.halfSellTarget2}` : "Devre Dışı"}
-                </p>
-                <p className="text-[10px] text-muted-foreground">Yarısını sat</p>
-              </div>
-              <div className="bg-muted/40 rounded-md px-3 py-2 space-y-0.5">
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <Scissors className="h-3 w-3 text-amber-400" />
-                  Yarı Satış 3
-                </p>
-                <p className={`text-sm font-mono font-semibold ${(tradeConfig.halfSellTarget3 ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
-                  {(tradeConfig.halfSellTarget3 ?? 0) > 0 ? `+%${tradeConfig.halfSellTarget3}` : "Devre Dışı"}
-                </p>
-                <p className="text-[10px] text-muted-foreground">Yarısını sat</p>
-              </div>
+        {/* Kar Hedefleri */}
+        <div className="pt-2 border-t border-border/50 space-y-3">
+          <p className="text-sm font-medium flex items-center gap-2">
+            <Target className="h-4 w-4 text-emerald-400" />
+            🎯 Kar Hedefleri
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="auto-take-profit" className="text-xs font-medium flex items-center gap-1">
+                <Target className="h-3 w-3 text-emerald-400" />
+                Normal Satış (%)
+              </Label>
+              <Input
+                id="auto-take-profit"
+                type="number"
+                step="5"
+                min="0"
+                value={profitTargetInput}
+                onChange={(e) => setProfitTargetInput(e.target.value)}
+                disabled={isRunning}
+                data-testid="input-auto-profit-target"
+                className={`font-mono ${parseFloat(profitTargetInput) > 0 ? "border-emerald-500/50 text-emerald-400" : ""}`}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {parseFloat(profitTargetInput) > 0 ? `+%${profitTargetInput}'de tümünü sat` : "0 = devre dışı"}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="auto-half-sell-1" className="text-xs font-medium flex items-center gap-1">
+                <Scissors className="h-3 w-3 text-amber-400" />
+                Yarı Satış 1 (%)
+              </Label>
+              <Input
+                id="auto-half-sell-1"
+                type="number"
+                step="5"
+                min="0"
+                value={halfSellTarget1Input}
+                onChange={(e) => setHalfSellTarget1Input(e.target.value)}
+                disabled={isRunning}
+                data-testid="input-auto-half-sell-1"
+                className={`font-mono ${parseFloat(halfSellTarget1Input) > 0 ? "border-amber-500/50 text-amber-400" : ""}`}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {parseFloat(halfSellTarget1Input) > 0 ? `+%${halfSellTarget1Input}'de yarısını sat` : "0 = devre dışı"}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="auto-half-sell-2" className="text-xs font-medium flex items-center gap-1">
+                <Scissors className="h-3 w-3 text-amber-400" />
+                Yarı Satış 2 (%)
+              </Label>
+              <Input
+                id="auto-half-sell-2"
+                type="number"
+                step="5"
+                min="0"
+                value={halfSellTarget2Input}
+                onChange={(e) => setHalfSellTarget2Input(e.target.value)}
+                disabled={isRunning}
+                data-testid="input-auto-half-sell-2"
+                className={`font-mono ${parseFloat(halfSellTarget2Input) > 0 ? "border-amber-500/50 text-amber-400" : ""}`}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {parseFloat(halfSellTarget2Input) > 0 ? `+%${halfSellTarget2Input}'de yarısını sat` : "0 = devre dışı"}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="auto-half-sell-3" className="text-xs font-medium flex items-center gap-1">
+                <Scissors className="h-3 w-3 text-amber-400" />
+                Yarı Satış 3 (%)
+              </Label>
+              <Input
+                id="auto-half-sell-3"
+                type="number"
+                step="5"
+                min="0"
+                value={halfSellTarget3Input}
+                onChange={(e) => setHalfSellTarget3Input(e.target.value)}
+                disabled={isRunning}
+                data-testid="input-auto-half-sell-3"
+                className={`font-mono ${parseFloat(halfSellTarget3Input) > 0 ? "border-amber-500/50 text-amber-400" : ""}`}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {parseFloat(halfSellTarget3Input) > 0 ? `+%${halfSellTarget3Input}'de yarısını sat` : "0 = devre dışı"}
+              </p>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Butonlar */}
         <div className="flex gap-2 pt-2">
