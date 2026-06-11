@@ -69,6 +69,7 @@ export const tradeConfigSchema = z.object({
   priorityFeeManualMicroLamports: z.number().min(0).max(100_000_000), // Manuel alım
   priorityFeeAutoMicroLamports: z.number().min(0).max(100_000_000),   // Otomatik alım
   takeProfitPct: z.number().min(0).max(10000).optional().default(0),
+  halfSellGainPct: z.number().default(100).describe("Half-sell trigger gain percentage (e.g., 100 = sell half at 100% gain)"),
 });
 
 export type TradeConfig = z.infer<typeof tradeConfigSchema>;

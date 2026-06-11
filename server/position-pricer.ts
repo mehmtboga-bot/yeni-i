@@ -8,6 +8,7 @@ export class PositionPricer {
   private solPriceUsd: number = 0;
   private emit: (event: string, data: any) => void;
   private onAutoSell: ((positionId: string) => void) | null = null;
+  private onHalfSell: ((positionId: string) => void) | null = null;
   private updateInterval: ReturnType<typeof setInterval> | null = null;
   private autoSellInFlight: Set<string> = new Set();
 
@@ -25,11 +26,13 @@ export class PositionPricer {
     solPriceUsd: number,
     emit: (event: string, data: any) => void,
     onAutoSell?: (positionId: string) => void,
+    onHalfSell?: (positionId: string) => void,
   ) {
     this.store = store;
     this.solPriceUsd = solPriceUsd;
     this.emit = emit;
     this.onAutoSell = onAutoSell ?? null;
+    this.onHalfSell = onHalfSell ?? null;
   }
 
   setSolPrice(price: number) { this.solPriceUsd = price; }
@@ -99,6 +102,7 @@ export class PositionPricer {
 
     const config = this.store.getConfig();
     const takeProfitPct = config.takeProfitPct ?? 0;
+    const halfSellGainPct = config.halfSellGainPct ?? 100;
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
@@ -147,6 +151,15 @@ export class PositionPricer {
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
       this.emit("position_update", updated);
+
+      // Yarı satış: halfSellGainPct eşiğine ulaşıldığında ve take-profit henüz tetiklenmemişse
+      if (unrealizedPnlPct >= halfSellGainPct && takeProfitPct > 0 && unrealizedPnlPct < takeProfitPct) {
+        if (!this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
+          this.autoSellInFlight.add(pos.id);
+          console.log(`✂️ [Pricer] Yarı satış tetiklendi: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (eşik: ${halfSellGainPct}%)`);
+          this.onHalfSell(pos.id);
+        }
+      }
 
       // Take-profit: yanlış tetiklenmeyi önlemek için art arda 2 okuma gerekli
       if (takeProfitPct > 0 && unrealizedPnlPct >= takeProfitPct) {
