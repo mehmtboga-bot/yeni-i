@@ -29,8 +29,12 @@ type Tab = "console" | "dashboard" | "trade" | "files";
 const DEFAULT_CONFIG: TradeConfig = {
   solAmount: 0.01,
   slippageBps: 5000,
-  priorityFeeMicroLamports: 200_000,
+  priorityFeeManualMicroLamports: 700_000,
+  priorityFeeAutoMicroLamports: 1_000_000,
   takeProfitPct: 0,
+  halfSellTarget1: 0,
+  halfSellTarget2: 0,
+  halfSellTarget3: 0,
 };
 
 const DEFAULT_AUTO_TRADER_CONFIG: AutoTraderConfig = {
@@ -726,6 +730,7 @@ export default function Home() {
           </DialogHeader>
           <AutoTraderPanel
             config={autoTraderConfig}
+            tradeConfig={tradeConfig}
             isRunning={autoTraderRunning}
             onConfigUpdate={handleAutoTraderConfigUpdate}
             onToggle={handleAutoTraderToggle}
