@@ -449,6 +449,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     (positionId: string) => {
       trader.sell(positionId).catch((err) => console.error("auto-sell hatası:", err));
     },
+    (positionId: string) => {
+      trader.sellHalf(positionId).catch((err) => console.error("half-sell hatası:", err));
+    },
   );
   pricer.start();
 
@@ -524,13 +527,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }).catch((err) => console.error("sell_token hatası:", err));
           }
         } else if (message.type === "trade_config_update") {
-          const { solAmount, slippageBps, priorityFeeManualMicroLamports, priorityFeeAutoMicroLamports, takeProfitPct } = message.data || {};
+          const { solAmount, slippageBps, priorityFeeManualMicroLamports, priorityFeeAutoMicroLamports, takeProfitPct, halfSellTarget1, halfSellTarget2, halfSellTarget3 } = message.data || {};
           const partial: Record<string, number> = {};
           if (typeof solAmount === "number" && solAmount > 0) partial.solAmount = solAmount;
           if (typeof slippageBps === "number" && slippageBps >= 50) partial.slippageBps = slippageBps;
           if (typeof priorityFeeManualMicroLamports === "number" && priorityFeeManualMicroLamports >= 0) partial.priorityFeeManualMicroLamports = priorityFeeManualMicroLamports;
           if (typeof priorityFeeAutoMicroLamports === "number" && priorityFeeAutoMicroLamports >= 0) partial.priorityFeeAutoMicroLamports = priorityFeeAutoMicroLamports;
           if (typeof takeProfitPct === "number" && takeProfitPct >= 0) partial.takeProfitPct = takeProfitPct;
+          if (typeof halfSellTarget1 === "number" && halfSellTarget1 >= 0) partial.halfSellTarget1 = halfSellTarget1;
+          if (typeof halfSellTarget2 === "number" && halfSellTarget2 >= 0) partial.halfSellTarget2 = halfSellTarget2;
+          if (typeof halfSellTarget3 === "number" && halfSellTarget3 >= 0) partial.halfSellTarget3 = halfSellTarget3;
           if (Object.keys(partial).length) {
             const updatedConfig = tradeStore.updateConfig(partial as any);
             broadcastToClients({

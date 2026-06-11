@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
-import { Settings, Play, Square, AlertCircle, TrendingUp } from "lucide-react";
+import { Settings, Play, Square, AlertCircle, TrendingUp, Scissors, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import type { AutoTraderConfig } from "@shared/schema";
+import type { AutoTraderConfig, TradeConfig } from "@shared/schema";
 
 interface AutoTraderPanelProps {
   config: AutoTraderConfig;
+  tradeConfig?: TradeConfig;
   isRunning: boolean;
   onConfigUpdate: (cfg: Partial<AutoTraderConfig>) => void;
   onToggle: (enabled: boolean) => void;
@@ -17,6 +17,7 @@ interface AutoTraderPanelProps {
 
 export function AutoTraderPanel({
   config,
+  tradeConfig,
   isRunning,
   onConfigUpdate,
   onToggle,
@@ -317,21 +318,54 @@ export function AutoTraderPanel({
           </div>
         </div>
 
-        {/* Son 7 İşlemde Tekrar Almaz */}
-        <div className="flex items-center justify-between py-2 border-t border-border/50">
-          <div className="space-y-0.5">
-            <label className="text-sm font-medium">🔁 Son 7 İşlemde Tekrar Almaz</label>
-            <p className="text-xs text-muted-foreground">
-              Son 7 kapalı işlemde aynı symbol varsa yeni alım yapılmaz
-            </p>
+        {/* Kar Hedefleri Özeti */}
+        {tradeConfig && (
+          <div className="pt-2 border-t border-border/50 space-y-2">
+            <p className="text-sm font-medium">🎯 Kar Hedefleri (Trade Ayarları)</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="bg-muted/40 rounded-md px-3 py-2 space-y-0.5">
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Target className="h-3 w-3 text-emerald-400" />
+                  Normal Satış
+                </p>
+                <p className={`text-sm font-mono font-semibold ${(tradeConfig.takeProfitPct ?? 0) > 0 ? "text-emerald-400" : "text-muted-foreground"}`}>
+                  {(tradeConfig.takeProfitPct ?? 0) > 0 ? `+%${tradeConfig.takeProfitPct}` : "Devre Dışı"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Tümünü sat</p>
+              </div>
+              <div className="bg-muted/40 rounded-md px-3 py-2 space-y-0.5">
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Scissors className="h-3 w-3 text-amber-400" />
+                  Yarı Satış 1
+                </p>
+                <p className={`text-sm font-mono font-semibold ${(tradeConfig.halfSellTarget1 ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+                  {(tradeConfig.halfSellTarget1 ?? 0) > 0 ? `+%${tradeConfig.halfSellTarget1}` : "Devre Dışı"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Yarısını sat</p>
+              </div>
+              <div className="bg-muted/40 rounded-md px-3 py-2 space-y-0.5">
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Scissors className="h-3 w-3 text-amber-400" />
+                  Yarı Satış 2
+                </p>
+                <p className={`text-sm font-mono font-semibold ${(tradeConfig.halfSellTarget2 ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+                  {(tradeConfig.halfSellTarget2 ?? 0) > 0 ? `+%${tradeConfig.halfSellTarget2}` : "Devre Dışı"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Yarısını sat</p>
+              </div>
+              <div className="bg-muted/40 rounded-md px-3 py-2 space-y-0.5">
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Scissors className="h-3 w-3 text-amber-400" />
+                  Yarı Satış 3
+                </p>
+                <p className={`text-sm font-mono font-semibold ${(tradeConfig.halfSellTarget3 ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+                  {(tradeConfig.halfSellTarget3 ?? 0) > 0 ? `+%${tradeConfig.halfSellTarget3}` : "Devre Dışı"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Yarısını sat</p>
+              </div>
+            </div>
           </div>
-          <Switch
-            checked={config.skipRecentlyTradedSymbols ?? true}
-            onCheckedChange={(checked) => onConfigUpdate({ skipRecentlyTradedSymbols: checked })}
-            disabled={isRunning}
-            data-testid="switch-skip-recently-traded"
-          />
-        </div>
+        )}
 
         {/* Butonlar */}
         <div className="flex gap-2 pt-2">

@@ -68,7 +68,10 @@ export const tradeConfigSchema = z.object({
   slippageBps: z.number().min(50).max(1_000_000),
   priorityFeeManualMicroLamports: z.number().min(0).max(100_000_000), // Manuel alım
   priorityFeeAutoMicroLamports: z.number().min(0).max(100_000_000),   // Otomatik alım
-  takeProfitPct: z.number().min(0).max(10000).optional().default(0),
+  takeProfitPct: z.number().min(0).max(10000).optional().default(0).describe("Normal take-profit: sell entire position"),
+  halfSellTarget1: z.number().default(0).describe("Half-sell target 1 (e.g., 50 = sell half at +50%)"),
+  halfSellTarget2: z.number().default(0).describe("Half-sell target 2"),
+  halfSellTarget3: z.number().default(0).describe("Half-sell target 3"),
 });
 
 export type TradeConfig = z.infer<typeof tradeConfigSchema>;

@@ -11,6 +11,9 @@ const DEFAULT_CONFIG: TradeConfig = {
   priorityFeeManualMicroLamports: 700_000,     // Manuel alım: 0.0007 SOL (~1-2s)
   priorityFeeAutoMicroLamports: 1_000_000,     // Otomatik alım: 0.001 SOL (<1s)
   takeProfitPct: 0,
+  halfSellTarget1: 0,
+  halfSellTarget2: 0,
+  halfSellTarget3: 0,
 };
 
 interface StoreData {
