@@ -452,6 +452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     (positionId: string) => {
       trader.sellHalf(positionId).catch((err) => console.error("half-sell hatası:", err));
     },
+    autoTraderConfigStore,
   );
   pricer.start();
 
@@ -527,16 +528,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }).catch((err) => console.error("sell_token hatası:", err));
           }
         } else if (message.type === "trade_config_update") {
-          const { solAmount, slippageBps, priorityFeeManualMicroLamports, priorityFeeAutoMicroLamports, takeProfitPct, halfSellTarget1, halfSellTarget2, halfSellTarget3 } = message.data || {};
+          const { solAmount, slippageBps, priorityFeeManualMicroLamports, priorityFeeAutoMicroLamports, takeProfitPct } = message.data || {};
           const partial: Record<string, number> = {};
           if (typeof solAmount === "number" && solAmount > 0) partial.solAmount = solAmount;
           if (typeof slippageBps === "number" && slippageBps >= 50) partial.slippageBps = slippageBps;
           if (typeof priorityFeeManualMicroLamports === "number" && priorityFeeManualMicroLamports >= 0) partial.priorityFeeManualMicroLamports = priorityFeeManualMicroLamports;
           if (typeof priorityFeeAutoMicroLamports === "number" && priorityFeeAutoMicroLamports >= 0) partial.priorityFeeAutoMicroLamports = priorityFeeAutoMicroLamports;
           if (typeof takeProfitPct === "number" && takeProfitPct >= 0) partial.takeProfitPct = takeProfitPct;
-          if (typeof halfSellTarget1 === "number" && halfSellTarget1 >= 0) partial.halfSellTarget1 = halfSellTarget1;
-          if (typeof halfSellTarget2 === "number" && halfSellTarget2 >= 0) partial.halfSellTarget2 = halfSellTarget2;
-          if (typeof halfSellTarget3 === "number" && halfSellTarget3 >= 0) partial.halfSellTarget3 = halfSellTarget3;
           if (Object.keys(partial).length) {
             const updatedConfig = tradeStore.updateConfig(partial as any);
             broadcastToClients({
@@ -547,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         } else if (message.type === "auto_trader_config_update") {
           // Otomatik trader konfigürasyonu güncelle
-          const { solAmountPerTrade, maxTokensHeld, holdDurationMs, profitTargetPct, stopLossPct, slippageBps, priorityFeeMicroLamports, minLiquidityUsd, enabled } = message.data || {};
+          const { solAmountPerTrade, maxTokensHeld, holdDurationMs, profitTargetPct, stopLossPct, slippageBps, priorityFeeMicroLamports, minLiquidityUsd, enabled, halfSellTarget1, halfSellTarget2, halfSellTarget3 } = message.data || {};
           const partial: Record<string, any> = {};
           if (typeof solAmountPerTrade === "number" && solAmountPerTrade > 0) partial.solAmountPerTrade = solAmountPerTrade;
           if (typeof maxTokensHeld === "number" && maxTokensHeld > 0) partial.maxTokensHeld = maxTokensHeld;
@@ -557,6 +555,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (typeof slippageBps === "number" && slippageBps >= 50) partial.slippageBps = slippageBps;
           if (typeof priorityFeeMicroLamports === "number" && priorityFeeMicroLamports >= 0) partial.priorityFeeMicroLamports = priorityFeeMicroLamports;
           if (typeof minLiquidityUsd === "number" && minLiquidityUsd >= 0) partial.minLiquidityUsd = minLiquidityUsd;
+          if (typeof halfSellTarget1 === "number" && halfSellTarget1 >= 0) partial.halfSellTarget1 = halfSellTarget1;
+          if (typeof halfSellTarget2 === "number" && halfSellTarget2 >= 0) partial.halfSellTarget2 = halfSellTarget2;
+          if (typeof halfSellTarget3 === "number" && halfSellTarget3 >= 0) partial.halfSellTarget3 = halfSellTarget3;
           if (typeof enabled === "boolean") {
             if (enabled) {
               autoTraderEngine.start();

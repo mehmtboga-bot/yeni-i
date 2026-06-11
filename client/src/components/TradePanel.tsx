@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer, Scissors } from "lucide-react";
+import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -84,9 +84,6 @@ export function TradePanel({
     return saved ?? String(config.priorityFeeManualMicroLamports);
   });
   const [takeProfitInput, setTakeProfitInput] = useState(String(config.takeProfitPct ?? 0));
-  const [halfSellTarget1Input, setHalfSellTarget1Input] = useState(String(config.halfSellTarget1 ?? 0));
-  const [halfSellTarget2Input, setHalfSellTarget2Input] = useState(String(config.halfSellTarget2 ?? 0));
-  const [halfSellTarget3Input, setHalfSellTarget3Input] = useState(String(config.halfSellTarget3 ?? 0));
 
   const copyAddress = async (address: string, id: string) => {
     await navigator.clipboard.writeText(address);
@@ -128,9 +125,6 @@ export function TradePanel({
     const slip = parseInt(slippageInput, 10);
     const prioManual = parseInt(priorityManualInput, 10);
     const tp = parseFloat(takeProfitInput);
-    const hs1 = parseFloat(halfSellTarget1Input);
-    const hs2 = parseFloat(halfSellTarget2Input);
-    const hs3 = parseFloat(halfSellTarget3Input);
     const partial: Partial<TradeConfig> = {};
     if (!Number.isNaN(sol) && sol > 0) partial.solAmount = sol;
     if (!Number.isNaN(slip) && slip >= 50) partial.slippageBps = slip;
@@ -139,9 +133,6 @@ export function TradePanel({
       localStorage.setItem("priorityFeeManualMicroLamports", String(prioManual));
     }
     if (!Number.isNaN(tp) && tp >= 0) partial.takeProfitPct = tp;
-    if (!Number.isNaN(hs1) && hs1 >= 0) partial.halfSellTarget1 = hs1;
-    if (!Number.isNaN(hs2) && hs2 >= 0) partial.halfSellTarget2 = hs2;
-    if (!Number.isNaN(hs3) && hs3 >= 0) partial.halfSellTarget3 = hs3;
     if (Object.keys(partial).length) onUpdateConfig(partial);
   };
 
@@ -229,44 +220,6 @@ export function TradePanel({
                 className={parseFloat(takeProfitInput) > 0 ? "border-emerald-500/50 text-emerald-400" : ""} />
               <p className="text-[10px] text-muted-foreground">
                 {parseFloat(takeProfitInput) > 0 ? `+%${takeProfitInput}'de otomatik sat` : "0 = devre dışı"}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="half-sell-1" className="text-xs flex items-center gap-1">
-                <Scissors className="h-3 w-3 text-amber-400" />
-                Yarı Satış 1 (%)
-              </Label>
-              <Input id="half-sell-1" type="number" step="5" min="0" value={halfSellTarget1Input}
-                onChange={(e) => setHalfSellTarget1Input(e.target.value)} data-testid="input-half-sell-1"
-                className={parseFloat(halfSellTarget1Input) > 0 ? "border-amber-500/50 text-amber-400" : ""} />
-              <p className="text-[10px] text-muted-foreground">
-                {parseFloat(halfSellTarget1Input) > 0 ? `+%${halfSellTarget1Input}'de yarısını sat` : "0 = devre dışı"}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="half-sell-2" className="text-xs flex items-center gap-1">
-                <Scissors className="h-3 w-3 text-amber-400" />
-                Yarı Satış 2 (%)
-              </Label>
-              <Input id="half-sell-2" type="number" step="5" min="0" value={halfSellTarget2Input}
-                onChange={(e) => setHalfSellTarget2Input(e.target.value)} data-testid="input-half-sell-2"
-                className={parseFloat(halfSellTarget2Input) > 0 ? "border-amber-500/50 text-amber-400" : ""} />
-              <p className="text-[10px] text-muted-foreground">
-                {parseFloat(halfSellTarget2Input) > 0 ? `+%${halfSellTarget2Input}'de yarısını sat` : "0 = devre dışı"}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="half-sell-3" className="text-xs flex items-center gap-1">
-                <Scissors className="h-3 w-3 text-amber-400" />
-                Yarı Satış 3 (%)
-              </Label>
-              <Input id="half-sell-3" type="number" step="5" min="0" value={halfSellTarget3Input}
-                onChange={(e) => setHalfSellTarget3Input(e.target.value)} data-testid="input-half-sell-3"
-                className={parseFloat(halfSellTarget3Input) > 0 ? "border-amber-500/50 text-amber-400" : ""} />
-              <p className="text-[10px] text-muted-foreground">
-                {parseFloat(halfSellTarget3Input) > 0 ? `+%${halfSellTarget3Input}'de yarısını sat` : "0 = devre dışı"}
               </p>
             </div>
           </div>

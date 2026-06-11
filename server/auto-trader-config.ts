@@ -18,6 +18,9 @@ export interface AutoTraderConfig {
   priorityFeeMicroLamports: number; // Priority fee
   minLiquidityUsd: number;          // Minimum likidite eşiği (USD)
   skipRecentlyTradedSymbols: boolean; // Son 7 işlemde aynı symbol varsa atla
+  halfSellTarget1: number;          // Yarı satış hedef 1 (%)
+  halfSellTarget2: number;          // Yarı satış hedef 2 (%)
+  halfSellTarget3: number;          // Yarı satış hedef 3 (%)
 }
 
 const DEFAULT_CONFIG: AutoTraderConfig = {
@@ -31,6 +34,9 @@ const DEFAULT_CONFIG: AutoTraderConfig = {
   priorityFeeMicroLamports: 1_000_000,
   minLiquidityUsd: 5000,           // Minimum $5,000 likidite
   skipRecentlyTradedSymbols: true, // Son 7 işlemde aynı symbol varsa atla
+  halfSellTarget1: 0,
+  halfSellTarget2: 0,
+  halfSellTarget3: 0,
 };
 
 const DATA_DIR = path.join(process.cwd(), "data");

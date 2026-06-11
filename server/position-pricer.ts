@@ -1,10 +1,12 @@
 import { TradeStore } from "./trade-store";
+import { AutoTraderConfigStore } from "./auto-trader-config";
 import type { Position } from "@shared/schema";
 
 const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
 
 export class PositionPricer {
   private store: TradeStore;
+  private autoTraderConfigStore: AutoTraderConfigStore | null = null;
   private solPriceUsd: number = 0;
   private emit: (event: string, data: any) => void;
   private onAutoSell: ((positionId: string) => void) | null = null;
@@ -32,12 +34,14 @@ export class PositionPricer {
     emit: (event: string, data: any) => void,
     onAutoSell?: (positionId: string) => void,
     onHalfSell?: (positionId: string) => void,
+    autoTraderConfigStore?: AutoTraderConfigStore,
   ) {
     this.store = store;
     this.solPriceUsd = solPriceUsd;
     this.emit = emit;
     this.onAutoSell = onAutoSell ?? null;
     this.onHalfSell = onHalfSell ?? null;
+    this.autoTraderConfigStore = autoTraderConfigStore ?? null;
   }
 
   setSolPrice(price: number) { this.solPriceUsd = price; }
@@ -107,6 +111,7 @@ export class PositionPricer {
 
     const config = this.store.getConfig();
     const takeProfitPct = config.takeProfitPct ?? 0;
+    const autoConfig = this.autoTraderConfigStore?.getConfig();
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
@@ -182,44 +187,44 @@ export class PositionPricer {
       }
 
       // Yarı satış hedef 1
-      if ((config.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct >= (config.halfSellTarget1 ?? 0) && (takeProfitPct === 0 || unrealizedPnlPct < takeProfitPct)) {
+      if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget1 ?? 0) && (takeProfitPct === 0 || unrealizedPnlPct < takeProfitPct)) {
         const count = (this.halfSellTarget1Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget1Count.set(pos.id, count);
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
           this.autoSellInFlight.add(pos.id);
           this.halfSellTarget1Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 1: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${config.halfSellTarget1}%)`);
+          console.log(`✂️ [Pricer] Yarı satış 1: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget1}%)`);
           this.onHalfSell(pos.id);
         }
-      } else if ((config.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct < (config.halfSellTarget1 ?? 0)) {
+      } else if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget1 ?? 0)) {
         this.halfSellTarget1Count.delete(pos.id);
       }
 
       // Yarı satış hedef 2
-      if ((config.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct >= (config.halfSellTarget2 ?? 0) && (takeProfitPct === 0 || unrealizedPnlPct < takeProfitPct)) {
+      if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget2 ?? 0) && (takeProfitPct === 0 || unrealizedPnlPct < takeProfitPct)) {
         const count = (this.halfSellTarget2Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget2Count.set(pos.id, count);
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
           this.autoSellInFlight.add(pos.id);
           this.halfSellTarget2Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${config.halfSellTarget2}%)`);
+          console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget2}%)`);
           this.onHalfSell(pos.id);
         }
-      } else if ((config.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct < (config.halfSellTarget2 ?? 0)) {
+      } else if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget2 ?? 0)) {
         this.halfSellTarget2Count.delete(pos.id);
       }
 
       // Yarı satış hedef 3
-      if ((config.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct >= (config.halfSellTarget3 ?? 0) && (takeProfitPct === 0 || unrealizedPnlPct < takeProfitPct)) {
+      if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget3 ?? 0) && (takeProfitPct === 0 || unrealizedPnlPct < takeProfitPct)) {
         const count = (this.halfSellTarget3Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget3Count.set(pos.id, count);
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
           this.autoSellInFlight.add(pos.id);
           this.halfSellTarget3Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 3: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${config.halfSellTarget3}%)`);
+          console.log(`✂️ [Pricer] Yarı satış 3: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget3}%)`);
           this.onHalfSell(pos.id);
         }
-      } else if ((config.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct < (config.halfSellTarget3 ?? 0)) {
+      } else if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget3 ?? 0)) {
         this.halfSellTarget3Count.delete(pos.id);
       }
     }
