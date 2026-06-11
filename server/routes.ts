@@ -446,8 +446,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     (event: string, data: any) => {
       if (event === "position_update") broadcastToClients({ type: "position_update", data });
     },
-    (positionId: string) => {
-      trader.sell(positionId).catch((err) => console.error("auto-sell hatası:", err));
+    (positionId: string, isHalfSell?: boolean) => {
+      if (isHalfSell) {
+        trader.sellHalf(positionId).catch((err) => console.error("auto-half-sell hatası:", err));
+      } else {
+        trader.sell(positionId).catch((err) => console.error("auto-sell hatası:", err));
+      }
     },
   );
   pricer.start();
