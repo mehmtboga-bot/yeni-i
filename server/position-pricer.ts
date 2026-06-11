@@ -7,12 +7,14 @@ export class PositionPricer {
   private store: TradeStore;
   private solPriceUsd: number = 0;
   private emit: (event: string, data: any) => void;
-  private onAutoSell: ((positionId: string) => void) | null = null;
+  private onAutoSell: ((positionId: string, isHalfSell?: boolean) => void) | null = null;
   private updateInterval: ReturnType<typeof setInterval> | null = null;
   private autoSellInFlight: Set<string> = new Set();
 
   // Yanlış fiyat spike'larını filtrele: art arda kaç kez hedef aşıldı
   private aboveThresholdCount: Map<string, number> = new Map();
+  // %100 kazanç yarı satış: art arda kaç kez eşik aşıldı
+  private halfSellCount: Map<string, number> = new Map();
   // Son bilinen geçerli fiyat (spike tespiti için)
   private lastValidPrice: Map<string, number> = new Map();
   
@@ -24,7 +26,7 @@ export class PositionPricer {
     store: TradeStore,
     solPriceUsd: number,
     emit: (event: string, data: any) => void,
-    onAutoSell?: (positionId: string) => void,
+    onAutoSell?: (positionId: string, isHalfSell?: boolean) => void,
   ) {
     this.store = store;
     this.solPriceUsd = solPriceUsd;
@@ -171,6 +173,41 @@ export class PositionPricer {
             this.autoSellInFlight.delete(pos.id);
           }
         }
+
+        // %100 Kazanç Yarı Satış: take-profit hedefine ulaşılmadıysa ve süre dolmadıysa
+        // Yanlış tetiklenmeyi önlemek için art arda 2 okuma gerekli
+        if (
+          unrealizedPnlPct >= 100 &&
+          takeProfitPct > 0 &&
+          unrealizedPnlPct < takeProfitPct &&
+          !this.autoSellInFlight.has(pos.id)
+        ) {
+          // Süre doldu mu kontrol et — autoSellAt varsa kullan, yoksa pozisyon hala açık demektir
+          const autoSellAt = pos.autoSellAt ?? Infinity;
+          const timeNotExpired = Date.now() < autoSellAt;
+
+          if (timeNotExpired) {
+            const halfCount = (this.halfSellCount.get(pos.id) ?? 0) + 1;
+            this.halfSellCount.set(pos.id, halfCount);
+
+            if (halfCount >= 2 && this.onAutoSell) {
+              this.autoSellInFlight.add(pos.id);
+              this.halfSellCount.delete(pos.id);
+              console.log(`🎯 [Pricer] %100 Kazanç: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% — Yarısı satılıyor`);
+              this.onAutoSell(pos.id, true); // true = yarı satış
+            }
+          } else {
+            // Süre doldu — yarı satış sayacını sıfırla
+            if (this.halfSellCount.has(pos.id)) {
+              this.halfSellCount.delete(pos.id);
+            }
+          }
+        } else if (unrealizedPnlPct < 100) {
+          // %100 altına düştü — yarı satış sayacını sıfırla
+          if (this.halfSellCount.has(pos.id)) {
+            this.halfSellCount.delete(pos.id);
+          }
+        }
       }
     }
 
@@ -179,6 +216,12 @@ export class PositionPricer {
       const p = this.store.getById(id);
       if (!p || p.status === "closed") {
         this.autoSellInFlight.delete(id);
+      }
+    }
+    for (const id of this.halfSellCount.keys()) {
+      const p = this.store.getById(id);
+      if (!p || p.status === "closed") {
+        this.halfSellCount.delete(id);
       }
     }
   }
