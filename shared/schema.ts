@@ -59,6 +59,12 @@ export const positionSchema = z.object({
   error: z.string().optional(),
   autoSellAt: z.number().optional(),  // Auto-trader satış zamanı (timestamp)
   customHoldDurationMs: z.number().optional(),  // Token başına özel tutma süresi (ms)
+  lastHalfSellTimestamp: z.number().optional(),     // Yarı satış zamanı (timestamp)
+  lastHalfSellSolAmount: z.number().optional(),     // Yarı satıştan elde edilen SOL
+  lastHalfSellPriceSol: z.number().optional(),      // Yarı satış fiyatı (SOL/token)
+  lastHalfSellTxSignature: z.string().optional(),   // Yarı satış TX imzası
+  lastHalfSellPnlSol: z.number().optional(),        // Yarı satış PnL (SOL)
+  lastHalfSellPnlPct: z.number().optional(),        // Yarı satış PnL (%)
 });
 
 export type Position = z.infer<typeof positionSchema>;
