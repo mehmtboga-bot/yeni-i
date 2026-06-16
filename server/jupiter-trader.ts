@@ -288,14 +288,25 @@ export class JupiterTrader {
   }): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
 
+    // Amount dönüşümü: alımda SOL float, satışta token miktarı → lamports
+    let apiAmount: number;
+    if (opts.denominatedInSol) {
+      // Alım: SOL cinsinden, float olarak gönder
+      apiAmount = opts.amount;
+    } else {
+      // Satış: token miktarı → lamports (token'ın decimal sayısına göre)
+      const decimals = await this.fetchDecimals(opts.mint);
+      apiAmount = Math.floor(opts.amount * Math.pow(10, decimals));
+    }
+
     const body = {
       publicKey: this.keypair.publicKey.toBase58(),
       action: opts.action,
       mint: opts.mint,
       denominatedInSol: opts.denominatedInSol,
-      amount: opts.amount,
-      slippage: opts.slippagePct,
-      priorityFee: opts.priorityFeeSol,
+      amount: apiAmount,           // ✅ Alımda SOL float, satışta lamports
+      slippage: opts.slippagePct,  // ✅ % olarak (50 = %50)
+      priorityFee: opts.priorityFeeSol, // ✅ SOL olarak (0.0007 = 0.0007 SOL)
       pool: "pumpswap",
     };
 
