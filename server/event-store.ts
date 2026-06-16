@@ -61,7 +61,10 @@ export class EventStore {
 
   // afterId'den büyük eventleri sırayla döndür
   getAfter(afterId = 0, limit = 1000) {
-    return this.store.events.filter((e) => e.id > afterId).slice(0, limit);
+    const fourMinutesAgo = Date.now() - 4 * 60 * 1000; // 240000ms
+    return this.store.events
+      .filter((e) => e.id > afterId && e.timestamp >= fourMinutesAgo)
+      .slice(0, limit);
   }
 
   // Son N eventı döndür
