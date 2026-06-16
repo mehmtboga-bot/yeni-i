@@ -413,7 +413,7 @@ export class JupiterTrader {
     console.log(`🛒 [Jupiter] ALIM: ${symbol} — ${actualSolAmount} SOL (${isAuto ? "otomatik" : "manuel"}, fee: ${priorityFee})`);
 
     // 650ms bekle — LP indexer'ın yayılması için
-    await new Promise((r) => setTimeout(r, 650));
+    await new Promise((r) => setTimeout(r, 1650));
 
     try {
       let swapSignature: string | null = null;
