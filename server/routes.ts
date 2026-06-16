@@ -479,7 +479,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })
     );
 
-
+    // Tüm persisted event'leri gönder (eski işlemler için)
+    try {
+      const allEvents = eventStore.getAfter(0);
+      if (allEvents.length > 0) {
+        _origLog(`📨 Client'e ${allEvents.length} eski event gönderiliyor...`);
+        allEvents.forEach((event) => {
+          ws.send(JSON.stringify(event));
+        });
+      }
+    } catch (err) {
+      _origError("❌ Eski event'ler gönderilirken hata:", err);
+    }
 
     ws.on("message", async (data: Buffer) => {
       try {
