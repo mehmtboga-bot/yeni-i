@@ -282,20 +282,36 @@ export class JupiterTrader {
     mint: string;
     amount: number;
     denominatedInSol: boolean;
-    slippagePct: number;
-    priorityFeeSol: number;
+    slippagePct: number;  // % olarak (5 = %5)
+    priorityFeeSol: number;  // SOL olarak (0.001 = 0.001 SOL)
     confirmForeground?: boolean;
   }): Promise<string> {
     if (!this.keypair || !this.connection) throw new Error("Cüzdan/RPC hazır değil");
+
+    // [DÜZELTİLDİ] PumpPortal API parametreleri:
+    // - slippagePct: % olarak gönder (5 = %5, API bunu yüzde olarak okuyor)
+    // - priorityFeeSol: SOL olarak gönder (0.001 = 0.001 SOL)
+    // - amount: denominatedInSol=true ise SOL (float), false ise token miktarı → lamports
+    let apiAmount: number;
+    if (opts.denominatedInSol) {
+      // Alım: SOL cinsinden, float olarak gönder
+      apiAmount = opts.amount;
+    } else {
+      // Satış: token uiAmount → lamports (token'ın decimal'ine göre)
+      const decimals = await this.fetchDecimals(opts.mint);
+      apiAmount = Math.floor(opts.amount * Math.pow(10, decimals));
+    }
+
+    console.log(`📤 [PumpSwap] ${opts.action} | mint: ${opts.mint.slice(0, 8)}... | amount: ${apiAmount}${opts.denominatedInSol ? " SOL" : " lamports"} | slippage: ${opts.slippagePct}% | fee: ${opts.priorityFeeSol} SOL`);
 
     const body = {
       publicKey: this.keypair.publicKey.toBase58(),
       action: opts.action,
       mint: opts.mint,
       denominatedInSol: opts.denominatedInSol,
-      amount: opts.amount,
-      slippage: opts.slippagePct,
-      priorityFee: opts.priorityFeeSol,
+      amount: apiAmount,
+      slippage: opts.slippagePct,      // ✅ % olarak (5 = %5)
+      priorityFee: opts.priorityFeeSol, // ✅ SOL olarak (0.001 = 0.001 SOL)
       pool: "pumpswap",
     };
 
@@ -319,7 +335,11 @@ export class JupiterTrader {
       timeoutMs: 3000,
     });
 
-    if (!res.ok) throw new Error(`PumpPortal API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`❌ [PumpPortal] ${res.status}: ${errText.slice(0, 200)}`);
+      throw new Error(`PumpPortal API ${res.status}: ${errText.slice(0, 200)}`);
+    }
 
     // [DÜZELTİLDİ] PumpPortal response validation:
     // Başarılı yanıt binary TX verisi olmalı (JSON hata mesajı değil).
