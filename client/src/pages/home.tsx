@@ -117,23 +117,27 @@ function formatTime(ts: number) {
     .join(":");
 }
 
+// DÜZELTME 1: Yüklerken süresi dolmuş tokenları filtrele
 function loadMintedTokens(): MintedToken[] {
   try {
     const raw = localStorage.getItem("mintedTokens");
     if (!raw) return [];
+    const now = Date.now();
     const tokens = JSON.parse(raw) as MintedToken[];
-    return tokens.slice(0, MAX_MINTED_TOKENS);
+    return tokens.filter((t) => t.expiresAt > now).slice(0, MAX_MINTED_TOKENS);
   } catch {
     return [];
   }
 }
 
+// DÜZELTME 1: Yüklerken süresi dolmuş LP loglarını filtrele
 function loadLpLogs(): LPDetection[] {
   try {
     const raw = localStorage.getItem("lpLogs");
     if (!raw) return [];
+    const now = Date.now();
     const logs = JSON.parse(raw) as LPDetection[];
-    return logs.slice(0, MAX_LP_LOGS);
+    return logs.filter((l) => l.expiresAt > now).slice(0, MAX_LP_LOGS);
   } catch {
     return [];
   }
@@ -330,7 +334,13 @@ export default function Home() {
           return next;
         });
       } else if (msg.type === "positions_snapshot") {
-        setPositions(msg.data.positions);
+        // DÜZELTME 3: Sunucu boş positions gönderiyorsa localStorage'daki veriyi koru
+        const incoming = msg.data.positions as Position[];
+        setPositions((prev) => {
+          const next = incoming.length > 0 ? incoming : prev;
+          try { localStorage.setItem("positions", JSON.stringify(next)); } catch {}
+          return next;
+        });
         setTradeConfig(msg.data.config);
         setAutoTraderConfig(msg.data.autoTraderConfig || DEFAULT_AUTO_TRADER_CONFIG);
         setAutoTraderRunning(msg.data.autoTraderRunning || false);
@@ -339,7 +349,6 @@ export default function Home() {
         if (typeof msg.data.solPriceUsd === "number" && msg.data.solPriceUsd > 0) {
           setSolPriceUsd(msg.data.solPriceUsd);
         }
-        try { localStorage.setItem("positions", JSON.stringify(msg.data.positions)); } catch {}
         try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data.config)); } catch {}
         try { localStorage.setItem("autoTraderConfig", JSON.stringify(msg.data.autoTraderConfig || DEFAULT_AUTO_TRADER_CONFIG)); } catch {}
       } else if (msg.type === "position_update") {
@@ -355,8 +364,6 @@ export default function Home() {
         setTradeConfig(msg.data);
         try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data)); } catch {}
       } else if (msg.type === "auto_trader_config_update" || msg.type === "auto_trader_config_updated") {
-        // Sunucu "auto_trader_config_updated" (geçmiş zaman) gönderir;
-        // her iki varyantı da destekle.
         const cfgData = msg.data?.config ?? msg.data;
         setAutoTraderConfig(cfgData);
         try { localStorage.setItem("autoTraderConfig", JSON.stringify(cfgData)); } catch {}
@@ -365,25 +372,33 @@ export default function Home() {
       } else if (msg.type === "token_comparison_snapshot") {
         setTokenComparison(msg.data);
       } else if (msg.type === "recent_mints_snapshot") {
-        // Sayfa yenilenirken gelen son 100 logdaki mint_detected eventlerini ekle
-        // SADECE henüz süresi dolmamış (aktif) tokenları göster
         const mints = msg.data.mints || [];
         if (mints.length > 0) {
           const now = Date.now();
           setMintedTokens((prev) => {
-            // Gelen mintlerden sadece henüz aktif olanları filtrele (expiresAt > şu an)
             const activeMints = mints.filter((mint: any) => mint.expiresAt > now);
-            
             if (activeMints.length === 0) {
-              // Aktif token yoksa mevcut tokenları koru
               return prev;
             }
-            
-            // Aktif mintleri öncekilerle birleştir, duplikatları çıkar, sınırla
             const combined = [...activeMints, ...prev];
             const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
             const next = unique.slice(0, MAX_MINTED_TOKENS);
             try { localStorage.setItem("mintedTokens", JSON.stringify(next)); } catch {}
+            return next;
+          });
+        }
+      } else if (msg.type === "recent_lps_snapshot") {
+        // Sunucu recent_lps_snapshot destekliyorsa LP loglarını da kurtarır
+        const lps = msg.data?.lps || [];
+        if (lps.length > 0) {
+          const now = Date.now();
+          setLpLogs((prev) => {
+            const activeLps = lps.filter((lp: any) => lp.expiresAt > now);
+            if (activeLps.length === 0) return prev;
+            const combined = [...activeLps, ...prev];
+            const unique = Array.from(new Map(combined.map(l => [l.id, l])).values());
+            const next = unique.slice(0, MAX_LP_LOGS);
+            try { localStorage.setItem("lpLogs", JSON.stringify(next)); } catch {}
             return next;
           });
         }
@@ -418,10 +433,10 @@ export default function Home() {
       wsInstance.onopen = () => {
         setIsConnected(true);
         setConnectionMessage("");
-        // Token karşılaştırma iste
         wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
-        // Son 100 logdaki mint_detected eventlerini iste
         wsInstance?.send(JSON.stringify({ type: "request_recent_mints" }));
+        // LP logları için de sunucudan iste (sunucu destekliyorsa)
+        wsInstance?.send(JSON.stringify({ type: "request_recent_lps" }));
       };
 
       wsInstance.onmessage = (event) => {
@@ -442,10 +457,23 @@ export default function Home() {
 
     connect();
 
+    // DÜZELTME 2: Cleanup interval artık localStorage'ı da güncelliyor
     const cleanupInterval = setInterval(() => {
       const now = Date.now();
-      setMintedTokens((prev) => prev.filter((t) => t.expiresAt > now));
-      setLpLogs((prev) => prev.filter((l) => l.expiresAt > now));
+      setMintedTokens((prev) => {
+        const next = prev.filter((t) => t.expiresAt > now);
+        if (next.length !== prev.length) {
+          try { localStorage.setItem("mintedTokens", JSON.stringify(next)); } catch {}
+        }
+        return next;
+      });
+      setLpLogs((prev) => {
+        const next = prev.filter((l) => l.expiresAt > now);
+        if (next.length !== prev.length) {
+          try { localStorage.setItem("lpLogs", JSON.stringify(next)); } catch {}
+        }
+        return next;
+      });
     }, 1000);
 
     return () => {
@@ -649,7 +677,6 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Token Karşılaştırma Paneli */}
                 <TokenComparisonPanel
                   data={tokenComparison}
                   onRefresh={() => {
@@ -658,10 +685,8 @@ export default function Home() {
                     }
                   }}
                 />
-
               </div>
             </div>
-
           </div>
         </div>
 
@@ -705,7 +730,6 @@ export default function Home() {
         <div className={`h-full ${activeTab === "files" ? "block" : "hidden"}`}>
           <FileEditor />
         </div>
-
       </div>
 
       <Dialog open={autoTraderOpen} onOpenChange={setAutoTraderOpen}>
