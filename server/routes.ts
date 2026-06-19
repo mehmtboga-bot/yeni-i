@@ -161,21 +161,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = Date.now();
       const allEvents = eventStore.getAfter(0);
       // Aynı id için en son kaydı tut (Map üzerine yaz)
-      const mintMap = new Map<string, any>();
-      const lpMap = new Map<string, any>();
+      const mintMap = new Map<string, { data: any; timestamp: number }>();
+      const lpMap = new Map<string, { data: any; timestamp: number }>();
       for (const ev of allEvents) {
         if (ev.type === "mint_detected" && ev.data?.id) {
-          mintMap.set(ev.data.id, ev.data);
+          mintMap.set(ev.data.id, { data: ev.data, timestamp: ev.timestamp });
         } else if (ev.type === "lp_detected" && ev.data?.id) {
-          lpMap.set(ev.data.id, ev.data);
+          lpMap.set(ev.data.id, { data: ev.data, timestamp: ev.timestamp });
         }
       }
-      const tokens = Array.from(mintMap.values()).filter(
-        (t) => t.expiresAt && t.expiresAt > now
-      );
-      const lpLogs = Array.from(lpMap.values()).filter(
-        (l) => l.expiresAt && l.expiresAt > now
-      );
+      const tokens = Array.from(mintMap.values())
+        .filter(({ data: t }) => t.expiresAt && t.expiresAt > now)
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+        .map(({ data }) => data);
+      const lpLogs = Array.from(lpMap.values())
+        .filter(({ data: l }) => l.expiresAt && l.expiresAt > now)
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+        .map(({ data }) => data);
       res.json({ tokens, lpLogs });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
@@ -707,21 +709,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Arayüz açıldığında sunucudaki tüm aktif (süresi dolmamış) tokenları gönder
           const now = Date.now();
           const allEvents = eventStore.getAfter(0);
-          const mintMap = new Map<string, any>();
-          const lpMap = new Map<string, any>();
+          const mintMap = new Map<string, { data: any; timestamp: number }>();
+          const lpMap = new Map<string, { data: any; timestamp: number }>();
           for (const ev of allEvents) {
             if (ev.type === "mint_detected" && ev.data?.id) {
-              mintMap.set(ev.data.id, ev.data);
+              mintMap.set(ev.data.id, { data: ev.data, timestamp: ev.timestamp });
             } else if (ev.type === "lp_detected" && ev.data?.id) {
-              lpMap.set(ev.data.id, ev.data);
+              lpMap.set(ev.data.id, { data: ev.data, timestamp: ev.timestamp });
             }
           }
-          const activeTokens = Array.from(mintMap.values()).filter(
-            (t) => t.expiresAt && t.expiresAt > now
-          );
-          const activeLpLogs = Array.from(lpMap.values()).filter(
-            (l) => l.expiresAt && l.expiresAt > now
-          );
+          const activeTokens = Array.from(mintMap.values())
+            .filter(({ data: t }) => t.expiresAt && t.expiresAt > now)
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+            .map(({ data }) => data);
+          const activeLpLogs = Array.from(lpMap.values())
+            .filter(({ data: l }) => l.expiresAt && l.expiresAt > now)
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+            .map(({ data }) => data);
           ws.send(
             JSON.stringify({
               type: "active_tokens_snapshot",
