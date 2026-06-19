@@ -122,7 +122,10 @@ function loadMintedTokens(): MintedToken[] {
     const raw = localStorage.getItem("mintedTokens");
     if (!raw) return [];
     const tokens = JSON.parse(raw) as MintedToken[];
-    return tokens.slice(0, MAX_MINTED_TOKENS);
+    const now = Date.now();
+    // Süresi dolmuş tokenları yükleme — sadece hâlâ aktif olanları göster
+    const active = tokens.filter((t) => !t.expiresAt || t.expiresAt > now);
+    return active.slice(0, MAX_MINTED_TOKENS);
   } catch {
     return [];
   }
@@ -133,7 +136,10 @@ function loadLpLogs(): LPDetection[] {
     const raw = localStorage.getItem("lpLogs");
     if (!raw) return [];
     const logs = JSON.parse(raw) as LPDetection[];
-    return logs.slice(0, MAX_LP_LOGS);
+    const now = Date.now();
+    // Süresi dolmuş LP loglarını yükleme — sadece hâlâ aktif olanları göster
+    const active = logs.filter((l) => !l.expiresAt || l.expiresAt > now);
+    return active.slice(0, MAX_LP_LOGS);
   } catch {
     return [];
   }
@@ -199,7 +205,11 @@ export default function Home() {
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
   const [tokenComparison, setTokenComparison] = useState<any[]>([]);
-  const logIdRef = useRef(0);
+  // logIdRef'i localStorage'dan yüklenen logların max id'sinden başlat
+  // böylece sayfa yenilenince yeni loglar çakışan key almaz
+  const logIdRef = useRef(
+    serverLogs.length > 0 ? Math.max(...serverLogs.map((l) => l.id)) : 0
+  );
   const logBottomRef = useRef<HTMLDivElement>(null);
 
   const handleGetBalance = (publicKey: string) => {
@@ -330,18 +340,38 @@ export default function Home() {
           return next;
         });
       } else if (msg.type === "positions_snapshot") {
-        setPositions(msg.data.positions);
-        setTradeConfig(msg.data.config);
-        setAutoTraderConfig(msg.data.autoTraderConfig || DEFAULT_AUTO_TRADER_CONFIG);
+        // Sunucudan gelen pozisyonları localStorage'dakilerle birleştir:
+        // Sunucu verisi her zaman önceliklidir, ama localStorage'da olup
+        // sunucuda olmayan açık pozisyonlar (geçici ağ kesintisi vb.) korunur.
+        const serverPositions: Position[] = Array.isArray(msg.data.positions) ? msg.data.positions : [];
+        setPositions((prev) => {
+          if (serverPositions.length === 0) {
+            // Sunucu boş liste döndürdüyse localStorage'daki veriyi koru
+            return prev;
+          }
+          // Sunucu pozisyonlarını önce al, sonra localStorage'da olup
+          // sunucuda olmayan açık pozisyonları ekle (orphan guard)
+          const serverIds = new Set(serverPositions.map((p) => p.id));
+          const localOnly = prev.filter(
+            (p) => !serverIds.has(p.id) && (p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell")
+          );
+          const merged = [...serverPositions, ...localOnly];
+          try { localStorage.setItem("positions", JSON.stringify(merged)); } catch {}
+          return merged;
+        });
+        if (msg.data.config) {
+          setTradeConfig(msg.data.config);
+          try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data.config)); } catch {}
+        }
+        const atCfg = msg.data.autoTraderConfig || DEFAULT_AUTO_TRADER_CONFIG;
+        setAutoTraderConfig(atCfg);
+        try { localStorage.setItem("autoTraderConfig", JSON.stringify(atCfg)); } catch {}
         setAutoTraderRunning(msg.data.autoTraderRunning || false);
         setTraderPublicKey(msg.data.traderPublicKey);
         setTraderReady(msg.data.traderReady);
         if (typeof msg.data.solPriceUsd === "number" && msg.data.solPriceUsd > 0) {
           setSolPriceUsd(msg.data.solPriceUsd);
         }
-        try { localStorage.setItem("positions", JSON.stringify(msg.data.positions)); } catch {}
-        try { localStorage.setItem("tradeConfig", JSON.stringify(msg.data.config)); } catch {}
-        try { localStorage.setItem("autoTraderConfig", JSON.stringify(msg.data.autoTraderConfig || DEFAULT_AUTO_TRADER_CONFIG)); } catch {}
       } else if (msg.type === "position_update") {
         const updated = msg.data;
         setPositions((prev) => {
@@ -399,17 +429,26 @@ export default function Home() {
 
     const connect = async () => {
       const lastSeen = Number(localStorage.getItem("lastEventId") || "0") || 0;
+      // Kaçırılan eventleri çek — 5 saniyelik timeout ile, başarısız olursa
+      // localStorage'daki mevcut state korunur (fallback olarak çalışır).
       try {
-        const resp = await fetch(`/api/events?afterId=${lastSeen}`);
-        if (resp.ok) {
-          const body = await resp.json();
-          const missed: StoredEvent[] = body.events || [];
-          for (const ev of missed) {
-            handleIncomingMessage(ev);
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 5000);
+        try {
+          const resp = await fetch(`/api/events?afterId=${lastSeen}`, { signal: controller.signal });
+          if (resp.ok) {
+            const body = await resp.json();
+            const missed: StoredEvent[] = body.events || [];
+            for (const ev of missed) {
+              handleIncomingMessage(ev);
+            }
           }
+        } finally {
+          clearTimeout(fetchTimeout);
         }
       } catch (err) {
-        console.warn("events fetch hatası:", err);
+        // AbortError (timeout) veya ağ hatası — localStorage state'i koru
+        console.warn("events fetch hatası (localStorage state korunuyor):", err);
       }
 
       wsInstance = new WebSocket(wsUrl);
@@ -420,7 +459,7 @@ export default function Home() {
         setConnectionMessage("");
         // Token karşılaştırma iste
         wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
-        // Son 100 logdaki mint_detected eventlerini iste
+        // Son mintleri iste — sunucu yanıt vermezse localStorage state'i zaten gösteriliyor
         wsInstance?.send(JSON.stringify({ type: "request_recent_mints" }));
       };
 
