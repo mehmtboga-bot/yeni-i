@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer } from "lucide-react";
+import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -84,6 +84,7 @@ export function TradePanel({
     return saved ?? String(config.priorityFeeManualMicroLamports);
   });
   const [takeProfitInput, setTakeProfitInput] = useState(String(config.takeProfitPct ?? 0));
+  const [halfSellGainPctInput, setHalfSellGainPctInput] = useState(String(config.halfSellGainPct ?? 100));
 
   const copyAddress = async (address: string, id: string) => {
     await navigator.clipboard.writeText(address);
@@ -133,6 +134,8 @@ export function TradePanel({
       localStorage.setItem("priorityFeeManualMicroLamports", String(prioManual));
     }
     if (!Number.isNaN(tp) && tp >= 0) partial.takeProfitPct = tp;
+    const halfSellGainPct = parseFloat(halfSellGainPctInput);
+    if (!Number.isNaN(halfSellGainPct) && halfSellGainPct >= 0) partial.halfSellGainPct = halfSellGainPct;
     if (Object.keys(partial).length) onUpdateConfig(partial);
   };
 
@@ -220,6 +223,26 @@ export function TradePanel({
                 className={parseFloat(takeProfitInput) > 0 ? "border-emerald-500/50 text-emerald-400" : ""} />
               <p className="text-[10px] text-muted-foreground">
                 {parseFloat(takeProfitInput) > 0 ? `+%${takeProfitInput}'de otomatik sat` : "0 = devre dışı"}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="half-sell-gain" className="text-xs flex items-center gap-1">
+                <Scissors className="h-3 w-3 text-amber-400" />
+                Yarı Satış Kazancı (%)
+              </Label>
+              <Input
+                id="half-sell-gain"
+                type="number"
+                step="5"
+                min="0"
+                max="10000"
+                value={halfSellGainPctInput}
+                onChange={(e) => setHalfSellGainPctInput(e.target.value)}
+                data-testid="input-half-sell-gain"
+                className={parseFloat(halfSellGainPctInput) > 0 ? "border-amber-500/50 text-amber-400" : ""}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {parseFloat(halfSellGainPctInput) > 0 ? `+%${halfSellGainPctInput}'de yarısını sat` : "0 = devre dışı"}
               </p>
             </div>
           </div>
