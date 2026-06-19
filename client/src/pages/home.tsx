@@ -417,6 +417,31 @@ export default function Home() {
             return next;
           });
         }
+      } else if (msg.type === "active_tokens_snapshot") {
+        // Arayüz açıldığında sunucudaki tüm aktif tokenları localStorage'a merge et
+        const now = Date.now();
+        const incomingTokens: any[] = (msg.data.tokens || []).filter((t: any) => t.expiresAt > now);
+        const incomingLpLogs: any[] = (msg.data.lpLogs || []).filter((l: any) => l.expiresAt > now);
+
+        if (incomingTokens.length > 0) {
+          setMintedTokens((prev) => {
+            const combined = [...incomingTokens, ...prev];
+            const unique = Array.from(new Map(combined.map((t) => [t.id, t])).values());
+            const next = unique.slice(0, MAX_MINTED_TOKENS);
+            try { localStorage.setItem("mintedTokens", JSON.stringify(next)); } catch {}
+            return next;
+          });
+        }
+
+        if (incomingLpLogs.length > 0) {
+          setLpLogs((prev) => {
+            const combined = [...incomingLpLogs, ...prev];
+            const unique = Array.from(new Map(combined.map((l) => [l.id, l])).values());
+            const next = unique.slice(0, MAX_LP_LOGS);
+            try { localStorage.setItem("lpLogs", JSON.stringify(next)); } catch {}
+            return next;
+          });
+        }
       }
 
       try {
@@ -459,7 +484,9 @@ export default function Home() {
         setConnectionMessage("");
         // Token karşılaştırma iste
         wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
-        // Son mintleri iste — sunucu yanıt vermezse localStorage state'i zaten gösteriliyor
+        // Tüm aktif tokenları iste (arayüz kapalıyken detect edilenler dahil)
+        wsInstance?.send(JSON.stringify({ type: "request_active_tokens" }));
+        // Geriye dönük uyumluluk için eski isteği de gönder
         wsInstance?.send(JSON.stringify({ type: "request_recent_mints" }));
       };
 
