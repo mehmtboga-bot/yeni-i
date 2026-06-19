@@ -118,31 +118,13 @@ function formatTime(ts: number) {
 }
 
 function loadMintedTokens(): MintedToken[] {
-  try {
-    const raw = localStorage.getItem("mintedTokens");
-    if (!raw) return [];
-    const tokens = JSON.parse(raw) as MintedToken[];
-    const now = Date.now();
-    // Süresi dolmuş tokenları yükleme — sadece hâlâ aktif olanları göster
-    const active = tokens.filter((t) => !t.expiresAt || t.expiresAt > now);
-    return active.slice(0, MAX_MINTED_TOKENS);
-  } catch {
-    return [];
-  }
+  // localStorage fallback kaldırıldı — sunucu tek kaynak
+  return [];
 }
 
 function loadLpLogs(): LPDetection[] {
-  try {
-    const raw = localStorage.getItem("lpLogs");
-    if (!raw) return [];
-    const logs = JSON.parse(raw) as LPDetection[];
-    const now = Date.now();
-    // Süresi dolmuş LP loglarını yükleme — sadece hâlâ aktif olanları göster
-    const active = logs.filter((l) => !l.expiresAt || l.expiresAt > now);
-    return active.slice(0, MAX_LP_LOGS);
-  } catch {
-    return [];
-  }
+  // localStorage fallback kaldırıldı — sunucu tek kaynak
+  return [];
 }
 
 function loadPositions(): Position[] {
@@ -304,18 +286,14 @@ export default function Home() {
       if (msg.type === "mint_detected") {
         const token = msg.data;
         setMintedTokens((prev) => {
-          const next = [token, ...prev.filter((t) => t.id !== token.id)].slice(0, MAX_MINTED_TOKENS);
-          try { localStorage.setItem("mintedTokens", JSON.stringify(next)); } catch {}
-          return next;
+          return [token, ...prev.filter((t) => t.id !== token.id)].slice(0, MAX_MINTED_TOKENS);
         });
         setNewTokenId(token.id);
         setTimeout(() => setNewTokenId(null), 1000);
       } else if (msg.type === "lp_detected") {
         const lpLog = msg.data;
         setLpLogs((prev) => {
-          const next = [lpLog, ...prev.filter((l) => l.id !== lpLog.id)].slice(0, MAX_LP_LOGS);
-          try { localStorage.setItem("lpLogs", JSON.stringify(next)); } catch {}
-          return next;
+          return [lpLog, ...prev.filter((l) => l.id !== lpLog.id)].slice(0, MAX_LP_LOGS);
         });
       } else if (msg.type === "connection_status") {
         setIsConnected(msg.data.connected);
@@ -395,87 +373,19 @@ export default function Home() {
       } else if (msg.type === "token_comparison_snapshot") {
         setTokenComparison(msg.data);
       } else if (msg.type === "recent_mints_snapshot") {
-        // Sayfa yenilenirken gelen son 100 logdaki mint_detected eventlerini ekle
-        // SADECE henüz süresi dolmamış (aktif) tokenları göster
-        const mints = msg.data.mints || [];
-        if (mints.length > 0) {
-          const now = Date.now();
-          setMintedTokens((prev) => {
-            // Gelen mintlerden sadece henüz aktif olanları filtrele (expiresAt > şu an)
-            const activeMints = mints.filter((mint: any) => mint.expiresAt > now);
-            
-            if (activeMints.length === 0) {
-              // Aktif token yoksa mevcut tokenları koru
-              return prev;
-            }
-            
-            // Aktif mintleri öncekilerle birleştir, duplikatları çıkar, sınırla
-            const combined = [...activeMints, ...prev];
-            const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
-            const next = unique.slice(0, MAX_MINTED_TOKENS);
-            try { localStorage.setItem("mintedTokens", JSON.stringify(next)); } catch {}
-            return next;
-          });
-        }
+        // recent_mints_snapshot artık kullanılmıyor — active_tokens_snapshot tercih edilir
       } else if (msg.type === "active_tokens_snapshot") {
-        // Arayüz açıldığında sunucudaki tüm aktif tokenları localStorage'a merge et
+        // Sunucu tek kaynak: gelen tokenlar direkt replace eder (merge değil)
         const now = Date.now();
         const incomingTokens: any[] = (msg.data.tokens || []).filter((t: any) => t.expiresAt > now);
         const incomingLpLogs: any[] = (msg.data.lpLogs || []).filter((l: any) => l.expiresAt > now);
 
-        if (incomingTokens.length > 0) {
-          setMintedTokens((prev) => {
-            const combined = [...incomingTokens, ...prev];
-            const unique = Array.from(new Map(combined.map((t) => [t.id, t])).values());
-            const next = unique.slice(0, MAX_MINTED_TOKENS);
-            try { localStorage.setItem("mintedTokens", JSON.stringify(next)); } catch {}
-            return next;
-          });
-        }
-
-        if (incomingLpLogs.length > 0) {
-          setLpLogs((prev) => {
-            const combined = [...incomingLpLogs, ...prev];
-            const unique = Array.from(new Map(combined.map((l) => [l.id, l])).values());
-            const next = unique.slice(0, MAX_LP_LOGS);
-            try { localStorage.setItem("lpLogs", JSON.stringify(next)); } catch {}
-            return next;
-          });
-        }
+        setMintedTokens(incomingTokens.slice(0, MAX_MINTED_TOKENS));
+        setLpLogs(incomingLpLogs.slice(0, MAX_LP_LOGS));
       }
-
-      try {
-        const last = Number(localStorage.getItem("lastEventId") || "0");
-        if (typeof msg.id === "number" && msg.id > last) {
-          localStorage.setItem("lastEventId", String(msg.id));
-        }
-      } catch {}
     };
 
-    const connect = async () => {
-      const lastSeen = Number(localStorage.getItem("lastEventId") || "0") || 0;
-      // Kaçırılan eventleri çek — 5 saniyelik timeout ile, başarısız olursa
-      // localStorage'daki mevcut state korunur (fallback olarak çalışır).
-      try {
-        const controller = new AbortController();
-        const fetchTimeout = setTimeout(() => controller.abort(), 5000);
-        try {
-          const resp = await fetch(`/api/events?afterId=${lastSeen}`, { signal: controller.signal });
-          if (resp.ok) {
-            const body = await resp.json();
-            const missed: StoredEvent[] = body.events || [];
-            for (const ev of missed) {
-              handleIncomingMessage(ev);
-            }
-          }
-        } finally {
-          clearTimeout(fetchTimeout);
-        }
-      } catch (err) {
-        // AbortError (timeout) veya ağ hatası — localStorage state'i koru
-        console.warn("events fetch hatası (localStorage state korunuyor):", err);
-      }
-
+    const connect = () => {
       wsInstance = new WebSocket(wsUrl);
       setWs(wsInstance);
 
@@ -484,10 +394,8 @@ export default function Home() {
         setConnectionMessage("");
         // Token karşılaştırma iste
         wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
-        // Tüm aktif tokenları iste (arayüz kapalıyken detect edilenler dahil)
+        // Sunucudan tüm aktif tokenları çek — localStorage değil, sunucu tek kaynak
         wsInstance?.send(JSON.stringify({ type: "request_active_tokens" }));
-        // Geriye dönük uyumluluk için eski isteği de gönder
-        wsInstance?.send(JSON.stringify({ type: "request_recent_mints" }));
       };
 
       wsInstance.onmessage = (event) => {
