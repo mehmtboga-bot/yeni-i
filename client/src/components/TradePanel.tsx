@@ -643,18 +643,14 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
               {p.status === "pending_buy" ? "Alınıyor" : "Satılıyor"}
             </Button>
           )}
-          {!isOpen && (
+          {isPending && (
             <Button
               size="icon" variant="ghost"
               onClick={() => {
-                if (isPending) {
-                  if (confirm(`${p.status === "pending_buy" ? "Alım" : "Satış"} iptal edilecek, emin misin?`)) onDelete(p.id);
-                } else {
-                  onDelete(p.id);
-                }
+                if (confirm(`${p.status === "pending_buy" ? "Alım" : "Satış"} iptal edilecek, emin misin?`)) onDelete(p.id);
               }}
               className="h-8 w-8 text-destructive/60 hover:text-destructive"
-              title={isPending ? "İşlemi iptal et" : "Pozisyonu sil"}
+              title="İşlemi iptal et"
             >
               ✕
             </Button>
