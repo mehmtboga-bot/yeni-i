@@ -155,6 +155,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Yeni endpoint: tüm aktif (süresi dolmamış) tokenları ve LP loglarını döndür
+  app.get("/api/active-tokens", (_req, res) => {
+    try {
+      const now = Date.now();
+      const allEvents = eventStore.getAfter(0);
+      // Aynı id için en son kaydı tut (Map üzerine yaz)
+      const mintMap = new Map<string, any>();
+      const lpMap = new Map<string, any>();
+      for (const ev of allEvents) {
+        if (ev.type === "mint_detected" && ev.data?.id) {
+          mintMap.set(ev.data.id, ev.data);
+        } else if (ev.type === "lp_detected" && ev.data?.id) {
+          lpMap.set(ev.data.id, ev.data);
+        }
+      }
+      const tokens = Array.from(mintMap.values()).filter(
+        (t) => t.expiresAt && t.expiresAt > now
+      );
+      const lpLogs = Array.from(lpMap.values()).filter(
+        (l) => l.expiresAt && l.expiresAt > now
+      );
+      res.json({ tokens, lpLogs });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
   app.post("/api/update-secrets", (req, res) => {
     const { HELIUS_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TRADER_PRIVATE_KEY } = req.body || {};
     try {
@@ -674,6 +701,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             JSON.stringify({
               type: "recent_mints_snapshot",
               data: { mints },
+            })
+          );
+        } else if (message.type === "request_active_tokens") {
+          // Arayüz açıldığında sunucudaki tüm aktif (süresi dolmamış) tokenları gönder
+          const now = Date.now();
+          const allEvents = eventStore.getAfter(0);
+          const mintMap = new Map<string, any>();
+          const lpMap = new Map<string, any>();
+          for (const ev of allEvents) {
+            if (ev.type === "mint_detected" && ev.data?.id) {
+              mintMap.set(ev.data.id, ev.data);
+            } else if (ev.type === "lp_detected" && ev.data?.id) {
+              lpMap.set(ev.data.id, ev.data);
+            }
+          }
+          const activeTokens = Array.from(mintMap.values()).filter(
+            (t) => t.expiresAt && t.expiresAt > now
+          );
+          const activeLpLogs = Array.from(lpMap.values()).filter(
+            (l) => l.expiresAt && l.expiresAt > now
+          );
+          ws.send(
+            JSON.stringify({
+              type: "active_tokens_snapshot",
+              data: { tokens: activeTokens, lpLogs: activeLpLogs },
             })
           );
         }
