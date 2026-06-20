@@ -904,6 +904,7 @@ export class JupiterTrader {
         const halfBuyCost = (pos.buySolAmount ?? 0) / 2;
         const pnlSol = estimatedSolOut - halfBuyCost;
         const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
+        const sellPriceSol = result.halfAmount > 0 ? estimatedSolOut / result.halfAmount : 0;
         updated = {
           ...pos,
           status: "open",
@@ -911,6 +912,12 @@ export class JupiterTrader {
           sellTxSignature: result.sig,
           pnlSol,
           pnlPct,
+          lastHalfSellTimestamp: Date.now(),
+          lastHalfSellSolAmount: estimatedSolOut,
+          lastHalfSellPriceSol: sellPriceSol,
+          lastHalfSellTxSignature: result.sig,
+          lastHalfSellPnlSol: pnlSol,
+          lastHalfSellPnlPct: pnlPct,
         };
         this.updateAndEmit(updated);
         console.log(`✅ [PumpSwap] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfAmount.toLocaleString()} token → ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
@@ -966,6 +973,12 @@ export class JupiterTrader {
             sellTxSignature: result.sig,
             pnlSol,
             pnlPct,
+            lastHalfSellTimestamp: Date.now(),
+            lastHalfSellSolAmount: result.solOut,
+            lastHalfSellPriceSol: result.sellPriceSol,
+            lastHalfSellTxSignature: result.sig,
+            lastHalfSellPnlSol: pnlSol,
+            lastHalfSellPnlPct: pnlPct,
           };
           this.updateAndEmit(updated);
           console.log(`✅ [Jupiter] YARI SATIŞ tamam: ${pos.symbol} | ${result.halfUiAmount.toFixed(4)} token → ${result.solOut.toFixed(4)} SOL | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
@@ -1010,6 +1023,7 @@ export class JupiterTrader {
           const halfBuyCost = (pos.buySolAmount ?? 0) / 2;
           const pnlSol = estimatedSolOut - halfBuyCost;
           const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
+          const fallbackSellPriceSol = result.halfAmount > 0 ? estimatedSolOut / result.halfAmount : 0;
           updated = {
             ...pos,
             status: "open",
@@ -1017,6 +1031,12 @@ export class JupiterTrader {
             sellTxSignature: result.sig,
             pnlSol,
             pnlPct,
+            lastHalfSellTimestamp: Date.now(),
+            lastHalfSellSolAmount: estimatedSolOut,
+            lastHalfSellPriceSol: fallbackSellPriceSol,
+            lastHalfSellTxSignature: result.sig,
+            lastHalfSellPnlSol: pnlSol,
+            lastHalfSellPnlPct: pnlPct,
           };
           this.updateAndEmit(updated);
           console.log(`✅ [PumpSwap Fallback] YARI SATIŞ tamam: ${pos.symbol} | ~${estimatedSolOut.toFixed(4)} SOL (tahmini) | PnL ${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | tx ${result.sig.slice(0, 16)}...`);
