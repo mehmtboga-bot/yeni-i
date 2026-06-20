@@ -356,6 +356,9 @@ export class HeliusMonitor {
       if (tokenRecord && Date.now() - tokenRecord.timestamp < this.RECENT_TOKEN_WINDOW_MS) {
         console.log(`⏭️ [LP] ${symbol} son 12 dakikada görüldü, arayüzde gösteriliyor (otomatik alım yapılmayacak)`);
 
+        // Zamanı güncelle — pencere her görülmede sıfırlanır
+        this.recentTokenSymbols.set(symbol, Date.now());
+
         // Atlanan token'i kaydet
         const existing = this.skippedTokens.find(t => t.symbol === symbol);
         if (existing) {
