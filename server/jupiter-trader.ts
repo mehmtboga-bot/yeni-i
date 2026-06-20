@@ -150,7 +150,7 @@ export class JupiterTrader {
       const uiAmount = Number(totalRaw) / Math.pow(10, decimals);
       return { uiAmount, raw: totalRaw.toString(), decimals };
     } catch (err) {
-      console.error("❌ Token bakiye okunamadı:", (err as Error).message);
+      // Silent fail - hata loglanmasın
       return null;
     }
   }
