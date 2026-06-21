@@ -37,8 +37,10 @@ export class AutoTraderEngine {
   private records: Map<string, AutoTradeRecord> = new Map();
   private isRunning = false;
   private sellCheckInterval: NodeJS.Timeout | null = null;
-  private processedLPs: Set<string> = new Set();
-  private recentlySeenTokens: Array<{ symbol: string; name: string; firstSeenAt: number }> = [];
+  // mint → shouldSellAt timestamp; süresi dolmuşsa aynı mint için yeniden alım yapılabilir
+  private processedLPs: Map<string, number> = new Map();
+  // symbol → { name, firstSeenAt, shouldSellAt }; süresi dolmuşsa aynı sembol için yeniden alım yapılabilir
+  private recentlySeenTokens: Array<{ symbol: string; name: string; firstSeenAt: number; shouldSellAt: number }> = [];
 
   // Satış tetikleme takibi — sell() kendi sonsuz döngüsünü yönetir, engine sadece ilk çağrıyı yapar
   private sellInProgress: Set<string> = new Set(); // mint → sell() zaten tetiklendi mi
@@ -86,9 +88,21 @@ export class AutoTraderEngine {
     const { mintAddress, name, symbol } = lpData;
     if (!mintAddress) return;
 
-    if (this.processedLPs.has(mintAddress)) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} zaten işlendi, atlanıyor`);
-      return;
+    const now = Date.now();
+    const customHoldDurationMs: number | undefined = lpData.customHoldDurationMs;
+    const holdMs = customHoldDurationMs ?? config.holdDurationMs;
+
+    // ── processedLPs kontrolü: aynı mint için aktif (süresi dolmamış) pozisyon varsa atla ──
+    const existingLPSellAt = this.processedLPs.get(mintAddress);
+    if (existingLPSellAt !== undefined) {
+      if (existingLPSellAt > now) {
+        // Süresi henüz dolmamış — aktif pozisyon var, atla
+        console.log(`⏭️ [Auto-Trader] ${symbol} aktif pozisyon var (${((existingLPSellAt - now) / 1000).toFixed(0)}s kaldı), atlanıyor`);
+        return;
+      }
+      // Süresi dolmuş — eski pozisyon kapandı, yeni alım yapılabilir
+      console.log(`🔄 [Auto-Trader] ${symbol} önceki pozisyon süresi doldu, yeni alım yapılıyor`);
+      this.processedLPs.delete(mintAddress);
     }
 
     const liquidityUsd: number | undefined = lpData.liquidityUsd ?? lpData.tvlUsd;
@@ -97,16 +111,23 @@ export class AutoTraderEngine {
       return;
     }
 
-    // Check if token was seen in last 13 minutes
-    const isRecentlySeen = this.recentlySeenTokens.some((t) => t.symbol === symbol);
-    if (isRecentlySeen) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} son 13 dakikada görüldü, atlanıyor`);
-      return;
+    // ── recentlySeenTokens kontrolü: aynı sembol için aktif (süresi dolmamış) kayıt varsa atla ──
+    const recentEntry = this.recentlySeenTokens.find((t) => t.symbol === symbol);
+    if (recentEntry) {
+      if (recentEntry.shouldSellAt > now) {
+        // Süresi henüz dolmamış — aktif pozisyon var, atla
+        console.log(`⏭️ [Auto-Trader] ${symbol} son görülme süresi dolmadı (${((recentEntry.shouldSellAt - now) / 1000).toFixed(0)}s kaldı), atlanıyor`);
+        return;
+      }
+      // Süresi dolmuş — eski kaydı listeden çıkar, yeni alım yapılabilir
+      console.log(`🔄 [Auto-Trader] ${symbol} önceki kayıt süresi doldu, yeni alım için liste güncelleniyor`);
+      this.recentlySeenTokens = this.recentlySeenTokens.filter((t) => t.symbol !== symbol);
     }
 
     // Token not in recent list, add it now
-    this.recentlySeenTokens.push({ symbol, name, firstSeenAt: Date.now() });
-    console.log(`✅ [Auto-Trader] ${symbol} ilk kez görüldü, 13 dk timer başladı`);
+    const sellAt = now + holdMs;
+    this.recentlySeenTokens.push({ symbol, name, firstSeenAt: now, shouldSellAt: sellAt });
+    console.log(`✅ [Auto-Trader] ${symbol} ilk kez görüldü, ${(holdMs / 1000).toFixed(0)}s timer başladı`);
 
     const openPositions = this.tradeStore.getAll().filter(
       (p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell"
@@ -116,10 +137,8 @@ export class AutoTraderEngine {
       return;
     }
 
-    this.processedLPs.add(mintAddress);
+    this.processedLPs.set(mintAddress, sellAt);
     const recordId = `auto-${mintAddress}-${Date.now()}`;
-    const customHoldDurationMs: number | undefined = lpData.customHoldDurationMs;
-    const holdMs = customHoldDurationMs ?? config.holdDurationMs;
 
     const record: AutoTradeRecord = {
       id: recordId,
@@ -149,16 +168,24 @@ export class AutoTraderEngine {
 
   private cleanupOldTokens() {
     const now = Date.now();
-    const CLEANUP_AGE_MS = 13 * 60 * 1000;
+    // Süresi dolmuş kayıtları temizle (shouldSellAt geçmişse + 5 dk grace period)
+    const GRACE_MS = 5 * 60 * 1000;
 
     this.recentlySeenTokens = this.recentlySeenTokens.filter((token) => {
-      const age = now - token.firstSeenAt;
-      if (age > CLEANUP_AGE_MS) {
-        console.log(`🧹 [Auto-Trader] ${token.symbol} 13 dk geçti, listeden silindi`);
+      const expired = now > token.shouldSellAt + GRACE_MS;
+      if (expired) {
+        console.log(`🧹 [Auto-Trader] ${token.symbol} süresi doldu + grace period geçti, listeden silindi`);
         return false;
       }
       return true;
     });
+
+    // processedLPs'den de süresi dolmuş mint'leri temizle
+    for (const [mint, sellAt] of this.processedLPs.entries()) {
+      if (now > sellAt + GRACE_MS) {
+        this.processedLPs.delete(mint);
+      }
+    }
   }
 
   private checkAndSell() {
@@ -235,6 +262,11 @@ export class AutoTraderEngine {
         const holdMs = position?.customHoldDurationMs ?? config.holdDurationMs;
         record.shouldSellAt = Date.now() + holdMs;
 
+        // processedLPs ve recentlySeenTokens'ı gerçek shouldSellAt ile güncelle
+        this.processedLPs.set(mintAddress, record.shouldSellAt);
+        const recentEntry = this.recentlySeenTokens.find((t) => t.symbol === record.tokenSymbol);
+        if (recentEntry) recentEntry.shouldSellAt = record.shouldSellAt;
+
         this.emit("auto_trade_record_updated", record);
         this.emit("auto_sell_at_updated", { mintAddress, autoSellAt: record.shouldSellAt });
         console.log(
@@ -251,6 +283,12 @@ export class AutoTraderEngine {
       if (record.mintAddress === mintAddress && (record.status === "active" || record.status === "pending")) {
         const newSellAt = record.buyTimestamp + holdDurationMs;
         record.shouldSellAt = newSellAt;
+
+        // processedLPs ve recentlySeenTokens'ı yeni shouldSellAt ile güncelle
+        this.processedLPs.set(mintAddress, newSellAt);
+        const recentEntry = this.recentlySeenTokens.find((t) => t.symbol === record.tokenSymbol);
+        if (recentEntry) recentEntry.shouldSellAt = newSellAt;
+
         this.emit("auto_trade_record_updated", record);
         this.emit("auto_sell_at_updated", { mintAddress, autoSellAt: newSellAt });
         console.log(`⏱️ [Auto-Trader] ${record.tokenSymbol} özel tutma süresi güncellendi: ${(holdDurationMs / 1000).toFixed(0)}s`);
