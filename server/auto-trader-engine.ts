@@ -87,8 +87,21 @@ export class AutoTraderEngine {
     if (!mintAddress) return;
 
     if (this.processedLPs.has(mintAddress)) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} zaten işlendi, atlanıyor`);
-      return;
+      // Aynı mint için aktif (süresi dolmamış) bir pozisyon var mı kontrol et
+      const now = Date.now();
+      const activeRecord = Array.from(this.records.values()).find(
+        (r) =>
+          r.mintAddress === mintAddress &&
+          (r.status === "pending" || r.status === "active") &&
+          r.shouldSellAt > now
+      );
+      if (activeRecord) {
+        console.log(`⏭️ [Auto-Trader] ${symbol} aktif pozisyon mevcut (süresi dolmamış), atlanıyor`);
+        return;
+      }
+      // Süresi bitmiş pozisyon — yeni alım için processedLPs'den çıkar
+      console.log(`🔄 [Auto-Trader] ${symbol} önceki pozisyonun süresi dolmuş, yeni alım için serbest bırakılıyor`);
+      this.processedLPs.delete(mintAddress);
     }
 
     const liquidityUsd: number | undefined = lpData.liquidityUsd ?? lpData.tvlUsd;
