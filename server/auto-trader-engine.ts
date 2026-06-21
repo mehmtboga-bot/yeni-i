@@ -37,8 +37,7 @@ export class AutoTraderEngine {
   private records: Map<string, AutoTradeRecord> = new Map();
   private isRunning = false;
   private sellCheckInterval: NodeJS.Timeout | null = null;
-  private processedLPs: Set<string> = new Set();
-  private recentlySeenTokens: Array<{ symbol: string; name: string; firstSeenAt: number }> = [];
+
 
   // Satış tetikleme takibi — sell() kendi sonsuz döngüsünü yönetir, engine sadece ilk çağrıyı yapar
   private sellInProgress: Set<string> = new Set(); // mint → sell() zaten tetiklendi mi
@@ -86,37 +85,21 @@ export class AutoTraderEngine {
     const { mintAddress, name, symbol } = lpData;
     if (!mintAddress) return;
 
-    if (this.processedLPs.has(mintAddress)) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} zaten işlendi, atlanıyor`);
-      return;
-    }
-
     const liquidityUsd: number | undefined = lpData.liquidityUsd ?? lpData.tvlUsd;
     if (config.minLiquidityUsd > 0 && (liquidityUsd === undefined || liquidityUsd < config.minLiquidityUsd)) {
       console.log(`🚫 [Auto-Trader] Düşük likidite — ${symbol} atlanıyor | Likidite: ${liquidityUsd?.toFixed(0) ?? "?"} | Eşik: ${config.minLiquidityUsd}`);
       return;
     }
 
-    // Check if token was seen in last 13 minutes
-    const isRecentlySeen = this.recentlySeenTokens.some((t) => t.symbol === symbol);
-    if (isRecentlySeen) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} son 13 dakikada görüldü, atlanıyor`);
-      return;
-    }
-
-    // Token not in recent list, add it now
-    this.recentlySeenTokens.push({ symbol, name, firstSeenAt: Date.now() });
-    console.log(`✅ [Auto-Trader] ${symbol} ilk kez görüldü, 13 dk timer başladı`);
-
-    const openPositions = this.tradeStore.getAll().filter(
-      (p) => p.status === "open" || p.status === "pending_buy" || p.status === "pending_sell"
+    // Süresi henüz dolmamış aktif bir pozisyon varsa atla
+    const now = Date.now();
+    const existingRecord = Array.from(this.records.values()).find(
+      (r) => r.mintAddress === mintAddress && r.shouldSellAt > now && (r.status === "pending" || r.status === "active")
     );
-    if (openPositions.length >= config.maxTokensHeld) {
-      console.warn(`⚠️ [Auto-Trader] Max token sayısına ulaşıldı (${openPositions.length}/${config.maxTokensHeld}), ${symbol} atlanıyor`);
+    if (existingRecord) {
+      console.log(`⏭️ [Auto-Trader] ${symbol} için süresi dolmamış aktif pozisyon var, atlanıyor`);
       return;
     }
-
-    this.processedLPs.add(mintAddress);
     const recordId = `auto-${mintAddress}-${Date.now()}`;
     const customHoldDurationMs: number | undefined = lpData.customHoldDurationMs;
     const holdMs = customHoldDurationMs ?? config.holdDurationMs;
@@ -144,21 +127,6 @@ export class AutoTraderEngine {
 
   private startSellChecker() {
     this.sellCheckInterval = setInterval(() => this.checkAndSell(), 100);
-    setInterval(() => this.cleanupOldTokens(), 60 * 1000);
-  }
-
-  private cleanupOldTokens() {
-    const now = Date.now();
-    const CLEANUP_AGE_MS = 13 * 60 * 1000;
-
-    this.recentlySeenTokens = this.recentlySeenTokens.filter((token) => {
-      const age = now - token.firstSeenAt;
-      if (age > CLEANUP_AGE_MS) {
-        console.log(`🧹 [Auto-Trader] ${token.symbol} 13 dk geçti, listeden silindi`);
-        return false;
-      }
-      return true;
-    });
   }
 
   private checkAndSell() {
