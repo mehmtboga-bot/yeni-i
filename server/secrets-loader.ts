@@ -8,6 +8,7 @@ interface Secrets {
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
   TRADER_PRIVATE_KEY: string;
+  PHANTOM_WALLET_ADDRESS: string;
 }
 
 const DEFAULT_SECRETS: Secrets = {
@@ -15,6 +16,7 @@ const DEFAULT_SECRETS: Secrets = {
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",
   TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || "",
   TRADER_PRIVATE_KEY: process.env.TRADER_PRIVATE_KEY || "",
+  PHANTOM_WALLET_ADDRESS: process.env.PHANTOM_WALLET_ADDRESS || "",
 };
 
 function loadSecrets(): Secrets {

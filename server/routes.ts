@@ -7,12 +7,13 @@ import { TradeStore } from "./trade-store";
 import { PositionPricer } from "./position-pricer";
 import { AutoTraderConfigStore } from "./auto-trader-config";
 import { AutoTraderEngine } from "./auto-trader-engine";
-import { saveSecrets } from "./secrets-loader";
+import { saveSecrets, secrets } from "./secrets-loader";
 import { WhitelistManager } from "./whitelist-manager";
 import fs from "fs";
 import path from "path";
 import { EventStore } from "./event-store";
 import { LiquidityMonitor } from "./liquidity-monitor";
+import { PhantomMonitor } from "./phantom-monitor";
 
 const ROOT = process.cwd();
 
@@ -185,14 +186,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/update-secrets", (req, res) => {
-    const { HELIUS_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TRADER_PRIVATE_KEY } = req.body || {};
+    const { HELIUS_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TRADER_PRIVATE_KEY, PHANTOM_WALLET_ADDRESS } = req.body || {};
     try {
-      if (HELIUS_API_KEY !== undefined || TELEGRAM_BOT_TOKEN !== undefined || TELEGRAM_CHAT_ID !== undefined || TRADER_PRIVATE_KEY !== undefined) {
+      if (HELIUS_API_KEY !== undefined || TELEGRAM_BOT_TOKEN !== undefined || TELEGRAM_CHAT_ID !== undefined || TRADER_PRIVATE_KEY !== undefined || PHANTOM_WALLET_ADDRESS !== undefined) {
         const updates: Record<string, string> = {};
         if (typeof HELIUS_API_KEY === "string") updates.HELIUS_API_KEY = HELIUS_API_KEY;
         if (typeof TELEGRAM_BOT_TOKEN === "string") updates.TELEGRAM_BOT_TOKEN = TELEGRAM_BOT_TOKEN;
         if (typeof TELEGRAM_CHAT_ID === "string") updates.TELEGRAM_CHAT_ID = TELEGRAM_CHAT_ID;
         if (typeof TRADER_PRIVATE_KEY === "string") updates.TRADER_PRIVATE_KEY = TRADER_PRIVATE_KEY;
+        if (typeof PHANTOM_WALLET_ADDRESS === "string") updates.PHANTOM_WALLET_ADDRESS = PHANTOM_WALLET_ADDRESS;
         if (Object.keys(updates).length > 0) {
           saveSecrets(updates);
           _origLog("🔐 Secrets güncellendu (⚠️ Restart gerekli)");
@@ -467,6 +469,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   monitor.start();
+
+  // ---- Phantom Cüzdan Monitor ----
+  // Phantom cüzdanındaki tokenları her 5 saniyede bir polling yaparak takip eder.
+  // Yeni token tespit edilince mint_detected event'i olarak broadcast edilir.
+  // Otomatik satış yapılmaz — tamamen manuel kontrol.
+  const phantomWalletAddress = secrets.PHANTOM_WALLET_ADDRESS;
+  const phantomMonitor = new PhantomMonitor(phantomWalletAddress, broadcastToClients);
+  phantomMonitor.start();
+  // --------------------------------
 
   // Canlı fiyat güncelleme (açık pozisyonlar için)
   const pricer = new PositionPricer(
@@ -776,8 +787,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   // ------------------------
 
-  process.on("SIGTERM", () => { monitor.stop(); autoTraderEngine.stop(); wss.close(); });
-  process.on("SIGINT",  () => { monitor.stop(); autoTraderEngine.stop(); wss.close(); });
+  process.on("SIGTERM", () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); wss.close(); });
+  process.on("SIGINT",  () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); wss.close(); });
 
   return httpServer;
 }
