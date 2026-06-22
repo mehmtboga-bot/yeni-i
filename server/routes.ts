@@ -699,22 +699,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (positionId && typeof holdDurationMs === "number" && holdDurationMs > 0) {
             const pos = tradeStore.getById(positionId);
             if (pos && (pos.status === "open" || pos.status === "pending_buy")) {
-              // Auto-trader engine'de tutma süresini güncelle
-              autoTraderEngine.updatePositionHoldDuration(pos.mintAddress, holdDurationMs);
-
-              // Güncel autoSellAt'ı al
-              const autoSellAt = autoTraderEngine.getShouldSellAt(pos.mintAddress);
-
-              // Position'u güncelle (customHoldDurationMs + autoSellAt)
-              const updated = {
-                ...pos,
-                customHoldDurationMs: holdDurationMs,
-                ...(autoSellAt ? { autoSellAt } : {}),
-              };
+              const updated = { ...pos, customHoldDurationMs: holdDurationMs };
               tradeStore.upsert(updated);
               broadcastToClients({ type: "position_update", data: updated });
-
-              console.log(`⏱️ [Routes] ${pos.symbol} tutma süresi güncellendi: ${(holdDurationMs / 1000).toFixed(0)}s | autoSellAt: ${new Date(autoSellAt || 0).toLocaleTimeString()}`);
+              // Auto-trader engine'de de güncelle (autoSellAt yeniden hesapla)
+              autoTraderEngine.updatePositionHoldDuration(pos.mintAddress, holdDurationMs);
+              console.log(`⏱️ [Routes] ${pos.symbol} özel tutma süresi: ${(holdDurationMs / 1000).toFixed(0)}s`);
             }
           }
         } else if (message.type === "request_positions") {
