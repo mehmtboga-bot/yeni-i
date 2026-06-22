@@ -539,9 +539,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
               : config.solAmount;
             if (dex === "pumpswap") {
               trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
+                .then((pos: any) => {
+                  if (pos) {
+                    const autoSellAt = autoTraderEngine.getShouldSellAt(pos.mintAddress);
+                    if (autoSellAt) {
+                      const withSellAt = { ...pos, autoSellAt };
+                      tradeStore.upsert(withSellAt);
+                      broadcastToClients({ type: "position_update", data: withSellAt });
+                    }
+                  }
+                })
                 .catch((err) => console.error("buyPumpSwap hatası:", err));
             } else {
               trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
+                .then((pos: any) => {
+                  if (pos) {
+                    const autoSellAt = autoTraderEngine.getShouldSellAt(pos.mintAddress);
+                    if (autoSellAt) {
+                      const withSellAt = { ...pos, autoSellAt };
+                      tradeStore.upsert(withSellAt);
+                      broadcastToClients({ type: "position_update", data: withSellAt });
+                    }
+                  }
+                })
                 .catch((err) => console.error("buy_token hatası:", err));
             }
           }
@@ -675,11 +695,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (positionId && typeof holdDurationMs === "number" && holdDurationMs > 0) {
             const pos = tradeStore.getById(positionId);
             if (pos && (pos.status === "open" || pos.status === "pending_buy")) {
-              const updated = { ...pos, customHoldDurationMs: holdDurationMs };
-              tradeStore.upsert(updated);
-              broadcastToClients({ type: "position_update", data: updated });
               // Auto-trader engine'de de güncelle (autoSellAt yeniden hesapla)
               autoTraderEngine.updatePositionHoldDuration(pos.mintAddress, holdDurationMs);
+              const autoSellAt = autoTraderEngine.getShouldSellAt(pos.mintAddress);
+              const updated = { ...pos, customHoldDurationMs: holdDurationMs, ...(autoSellAt ? { autoSellAt } : {}) };
+              tradeStore.upsert(updated);
+              broadcastToClients({ type: "position_update", data: updated });
               console.log(`⏱️ [Routes] ${pos.symbol} özel tutma süresi: ${(holdDurationMs / 1000).toFixed(0)}s`);
             }
           }
