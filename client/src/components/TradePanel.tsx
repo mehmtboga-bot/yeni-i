@@ -619,7 +619,9 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                   size="sm"
                   variant="outline"
                   className="h-6 px-2 text-xs border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
+                  disabled={!onUpdateHoldDuration}
                   onClick={() => {
+                    if (!onUpdateHoldDuration) return;
                     const secs = parseInt(holdDurationInput, 10);
                     if (!Number.isNaN(secs) && secs > 0) {
                       onUpdateHoldDuration(p.id, secs * 1000);
