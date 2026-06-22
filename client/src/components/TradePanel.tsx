@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer, ShoppingCart } from "lucide-react";
+import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -366,8 +366,6 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : ""
   );
   const [isHalfSelling, setIsHalfSelling] = useState(false);
-  const [manualBuyAmount, setManualBuyAmount] = useState("");
-  const [isBuying, setIsBuying] = useState(false);
 
   // İşlem sunucuya ulaşınca (pending_sell) veya kapanınca loading'i temizle
   useEffect(() => {
@@ -375,14 +373,6 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
       setIsHalfSelling(false);
     }
   }, [p.status, isHalfSelling]);
-
-  // Alım tamamlanınca (yeni pozisyon açılır, bu pozisyon değişmez) loading'i temizle
-  useEffect(() => {
-    if (isBuying) {
-      const timer = setTimeout(() => setIsBuying(false), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [isBuying]);
 
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
   const profitPct = isOpen ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
@@ -408,14 +398,6 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     return () => clearInterval(interval);
   }, [p.autoSellAt]);
 
-  const handleManualBuy = () => {
-    const amount = parseFloat(manualBuyAmount);
-    if (Number.isNaN(amount) || amount <= 0) return;
-    setIsBuying(true);
-    onBuy(p.mintAddress, p.name, p.symbol, (p.dex as "jupiter" | "pumpswap") ?? "jupiter", amount);
-    setManualBuyAmount("");
-  };
-
   return (
     <div
       className={`bg-card border rounded-lg overflow-hidden ${
@@ -427,42 +409,6 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
       }`}
       data-testid={`row-position-${p.id}`}
     >
-      {/* Manuel Alım Çubuğu — sadece açık pozisyonlar için */}
-      {isOpen && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 border-b border-border/40">
-          <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <Input
-            type="number"
-            step="0.001"
-            min="0.001"
-            placeholder="Tutar (SOL)"
-            value={manualBuyAmount}
-            onChange={(e) => setManualBuyAmount(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleManualBuy()}
-            className="h-6 text-xs w-28 px-2 bg-background/60"
-            data-testid={`input-manual-buy-${p.id}`}
-          />
-          <span className="text-[10px] text-muted-foreground">SOL</span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 px-2.5 text-xs border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
-            disabled={isBuying || !manualBuyAmount || parseFloat(manualBuyAmount) <= 0}
-            onClick={handleManualBuy}
-            data-testid={`button-manual-buy-${p.id}`}
-          >
-            {isBuying ? (
-              <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Al</>
-            ) : (
-              "Al"
-            )}
-          </Button>
-          <span className="text-[10px] text-muted-foreground/60 ml-auto hidden sm:inline">
-            Aynı token için yeni pozisyon açar
-          </span>
-        </div>
-      )}
-
       <div className="p-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex-1 min-w-0 space-y-1.5">
