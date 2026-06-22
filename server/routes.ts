@@ -537,37 +537,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? msgSolAmount
               : config.solAmount;
 
-            // Manuel alım için auto-trader kaydı oluştur (otomatik satış tetiklensin)
-            const autoConfig = autoTraderConfigStore.getConfig();
-            const pos = tradeStore.getByMint(mintAddress);
-            const holdMs = pos?.customHoldDurationMs ?? autoConfig.holdDurationMs;
-            autoTraderEngine.createRecordForManualBuy(mintAddress, nm, sym, holdMs);
-
             if (dex === "pumpswap") {
               trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
-                .then((position: any) => {
-                  if (position) {
-                    const autoSellAt = autoTraderEngine.getShouldSellAt(mintAddress);
-                    if (autoSellAt) {
-                      const updated = { ...position, autoSellAt };
-                      tradeStore.upsert(updated);
-                      broadcastToClients({ type: "position_update", data: updated });
-                    }
-                  }
-                })
                 .catch((err) => console.error("buyPumpSwap hatası:", err));
             } else {
               trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
-                .then((position: any) => {
-                  if (position) {
-                    const autoSellAt = autoTraderEngine.getShouldSellAt(mintAddress);
-                    if (autoSellAt) {
-                      const updated = { ...position, autoSellAt };
-                      tradeStore.upsert(updated);
-                      broadcastToClients({ type: "position_update", data: updated });
-                    }
-                  }
-                })
                 .catch((err) => console.error("buy_token hatası:", err));
             }
           }
