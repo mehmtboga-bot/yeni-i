@@ -370,10 +370,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
 
-  // Otomatik trader enabled ise başlat
-  if (autoTraderConfigStore.getConfig().enabled) {
-    autoTraderEngine.start();
-  }
+  // Satış kontrolcüsü her zaman çalışsın (manuel alımlar da otomatik satılsın)
+  // enabled flag sadece LP tespitinde otomatik alımı kontrol eder
+  autoTraderEngine.start();
   // ----------------------------
 
   const monitor = new HeliusMonitor((event: string, data: any) => {
@@ -537,11 +536,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const solAmount = (typeof msgSolAmount === "number" && msgSolAmount > 0)
               ? msgSolAmount
               : config.solAmount;
+
+            // Manuel alım için auto-trader kaydı oluştur (otomatik satış tetiklensin)
+            const autoConfig = autoTraderConfigStore.getConfig();
+            const pos = tradeStore.getByMint(mintAddress);
+            const holdMs = pos?.customHoldDurationMs ?? autoConfig.holdDurationMs;
+            autoTraderEngine.createRecordForManualBuy(mintAddress, nm, sym, holdMs);
+
             if (dex === "pumpswap") {
               trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
+                .then((position: any) => {
+                  if (position) {
+                    const autoSellAt = autoTraderEngine.getShouldSellAt(mintAddress);
+                    if (autoSellAt) {
+                      const updated = { ...position, autoSellAt };
+                      tradeStore.upsert(updated);
+                      broadcastToClients({ type: "position_update", data: updated });
+                    }
+                  }
+                })
                 .catch((err) => console.error("buyPumpSwap hatası:", err));
             } else {
               trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
+                .then((position: any) => {
+                  if (position) {
+                    const autoSellAt = autoTraderEngine.getShouldSellAt(mintAddress);
+                    if (autoSellAt) {
+                      const updated = { ...position, autoSellAt };
+                      tradeStore.upsert(updated);
+                      broadcastToClients({ type: "position_update", data: updated });
+                    }
+                  }
+                })
                 .catch((err) => console.error("buy_token hatası:", err));
             }
           }
@@ -590,10 +616,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (typeof halfSellTarget2 === "number" && halfSellTarget2 >= 0) partial.halfSellTarget2 = halfSellTarget2;
           if (typeof halfSellTarget3 === "number" && halfSellTarget3 >= 0) partial.halfSellTarget3 = halfSellTarget3;
           if (typeof enabled === "boolean") {
-            if (enabled) {
+            // Satış kontrolcüsü her zaman çalışır; enabled sadece otomatik alımı etkiler
+            if (!autoTraderEngine.getIsRunning()) {
               autoTraderEngine.start();
-            } else {
-              autoTraderEngine.stop();
             }
             partial.enabled = enabled;
           }
@@ -604,14 +629,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             data: { config: updatedConfig },
           });
         } else if (message.type === "toggle_auto_trader") {
-          // Otomatik trader'i aç/kapat
+          // Otomatik trader'i aç/kapat (sadece otomatik alım; satış kontrolcüsü her zaman çalışır)
           const { enabled } = message.data || {};
           if (typeof enabled === "boolean") {
             autoTraderConfigStore.updateConfig({ enabled });
-            if (enabled) {
+            // Satış kontrolcüsü her zaman çalışır; enabled sadece otomatik alımı etkiler
+            if (!autoTraderEngine.getIsRunning()) {
               autoTraderEngine.start();
-            } else {
-              autoTraderEngine.stop();
             }
             broadcastToClients({
               type: "auto_trader_config_updated",
