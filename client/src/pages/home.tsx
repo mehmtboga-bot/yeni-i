@@ -200,9 +200,11 @@ export default function Home() {
     }
   };
 
-  const handleBuy = (mintAddress: string, name: string, symbol: string, dex: "jupiter" | "pumpswap" = "jupiter") => {
+  const handleBuy = (mintAddress: string, name: string, symbol: string, dex: "jupiter" | "pumpswap" = "jupiter", solAmount?: number) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "buy_token", data: { mintAddress, name, symbol, dex } }));
+      const payload: Record<string, any> = { mintAddress, name, symbol, dex };
+      if (typeof solAmount === "number" && solAmount > 0) payload.solAmount = solAmount;
+      ws.send(JSON.stringify({ type: "buy_token", data: payload }));
     }
   };
 
@@ -648,6 +650,7 @@ export default function Home() {
               traderReady={traderReady}
               solPriceUsd={solPriceUsd}
               globalHoldDurationMs={autoTraderConfig.holdDurationMs}
+              onBuy={handleBuy}
               onSell={handleSell}
               onSellHalf={handleSellHalf}
               onDelete={handleDeletePosition}

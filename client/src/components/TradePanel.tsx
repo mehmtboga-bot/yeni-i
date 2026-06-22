@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer } from "lucide-react";
+import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,7 @@ interface TradePanelProps {
   solPriceUsd: number;
   tradingRecords?: TradeRecord[];
   globalHoldDurationMs?: number;
+  onBuy: (mintAddress: string, name: string, symbol: string, dex?: "jupiter" | "pumpswap", solAmount?: number) => void;
   onSell: (positionId: string) => void;
   onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
@@ -68,6 +69,7 @@ export function TradePanel({
   solPriceUsd,
   tradingRecords = [],
   globalHoldDurationMs,
+  onBuy,
   onSell,
   onSellHalf,
   onDelete,
@@ -135,7 +137,6 @@ export function TradePanel({
     if (!Number.isNaN(tp) && tp >= 0) partial.takeProfitPct = tp;
     if (Object.keys(partial).length) onUpdateConfig(partial);
   };
-
 
   const takeProfitPct = config.takeProfitPct ?? 0;
 
@@ -276,7 +277,7 @@ export function TradePanel({
               </div>
               {globalHoldPositions.map((p) => (
                 <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onBuy={onBuy} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
                   onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
               ))}
             </div>
@@ -294,7 +295,7 @@ export function TradePanel({
               </div>
               {customHoldPositions.map((p) => (
                 <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onBuy={onBuy} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
                   onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
               ))}
             </div>
@@ -308,7 +309,7 @@ export function TradePanel({
               )}
               {nonOpenFiltered.map((p) => (
                 <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onBuy={onBuy} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
                   onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
               ))}
             </div>
@@ -350,6 +351,7 @@ interface PositionRowProps {
   solPriceUsd: number;
   takeProfitPct: number;
   onCopy: (addr: string, id: string) => void;
+  onBuy: (mintAddress: string, name: string, symbol: string, dex?: "jupiter" | "pumpswap", solAmount?: number) => void;
   onSell: (positionId: string) => void;
   onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
@@ -357,13 +359,15 @@ interface PositionRowProps {
   onUpdateHoldDuration?: (positionId: string, holdDurationMs: number) => void;
 }
 
-function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onSell, onSellHalf, onDelete, onMarkRugPull, onUpdateHoldDuration }: PositionRowProps) {
+function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onBuy, onSell, onSellHalf, onDelete, onMarkRugPull, onUpdateHoldDuration }: PositionRowProps) {
   const isOpen = p.status === "open";
   const isPending = p.status === "pending_buy" || p.status === "pending_sell";
   const [holdDurationInput, setHoldDurationInput] = useState<string>(
     p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : ""
   );
   const [isHalfSelling, setIsHalfSelling] = useState(false);
+  const [manualBuyAmount, setManualBuyAmount] = useState("");
+  const [isBuying, setIsBuying] = useState(false);
 
   // İşlem sunucuya ulaşınca (pending_sell) veya kapanınca loading'i temizle
   useEffect(() => {
@@ -371,6 +375,15 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
       setIsHalfSelling(false);
     }
   }, [p.status, isHalfSelling]);
+
+  // Alım tamamlanınca (yeni pozisyon açılır, bu pozisyon değişmez) loading'i temizle
+  useEffect(() => {
+    if (isBuying) {
+      const timer = setTimeout(() => setIsBuying(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isBuying]);
+
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
   const profitPct = isOpen ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
   const profitPositive = (profitPct ?? 0) >= 0;
@@ -395,9 +408,17 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     return () => clearInterval(interval);
   }, [p.autoSellAt]);
 
+  const handleManualBuy = () => {
+    const amount = parseFloat(manualBuyAmount);
+    if (Number.isNaN(amount) || amount <= 0) return;
+    setIsBuying(true);
+    onBuy(p.mintAddress, p.name, p.symbol, (p.dex as "jupiter" | "pumpswap") ?? "jupiter", amount);
+    setManualBuyAmount("");
+  };
+
   return (
     <div
-      className={`bg-card border rounded-lg p-3 ${
+      className={`bg-card border rounded-lg overflow-hidden ${
         p.status === "closed" && p.error === "Rug Pull" ? "border-red-500/50"
         : p.status === "closed" ? (pnlPositive ? "border-emerald-500/30" : "border-destructive/30")
         : p.status === "failed" ? "border-destructive/40"
@@ -406,259 +427,297 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
       }`}
       data-testid={`row-position-${p.id}`}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex-1 min-w-0 space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm" data-testid="text-pos-name">{p.name}</span>
-            <span className="text-xs text-muted-foreground">{p.symbol}</span>
-            <StatusBadge status={p.status} error={p.error} />
-            {p.dex && (
-              <Badge className={`text-[10px] ${p.dex === "pumpswap" ? "bg-orange-500/15 text-orange-400 border border-orange-500/30" : "bg-primary/15 text-primary border border-primary/30"}`}>
-                {p.dex === "pumpswap" ? "PumpSwap" : "Jupiter"}
-              </Badge>
+      {/* Manuel Alım Çubuğu — sadece açık pozisyonlar için */}
+      {isOpen && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 border-b border-border/40">
+          <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <Input
+            type="number"
+            step="0.001"
+            min="0.001"
+            placeholder="Tutar (SOL)"
+            value={manualBuyAmount}
+            onChange={(e) => setManualBuyAmount(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleManualBuy()}
+            className="h-6 text-xs w-28 px-2 bg-background/60"
+            data-testid={`input-manual-buy-${p.id}`}
+          />
+          <span className="text-[10px] text-muted-foreground">SOL</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2.5 text-xs border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
+            disabled={isBuying || !manualBuyAmount || parseFloat(manualBuyAmount) <= 0}
+            onClick={handleManualBuy}
+            data-testid={`button-manual-buy-${p.id}`}
+          >
+            {isBuying ? (
+              <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Al</>
+            ) : (
+              "Al"
             )}
-            {profitPct !== null && (
-              <Badge
-                className={`text-xs gap-1 font-bold ${
-                  profitPositive
-                    ? nearTarget
-                      ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/60 animate-pulse"
-                      : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
-                    : "bg-destructive/15 text-destructive border border-destructive/40"
-                }`}
-                data-testid="badge-pos-pnl-pct"
-              >
-                {profitPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                {profitPositive ? "+" : ""}{profitPct.toFixed(1)}%
-                {nearTarget && takeProfitPct > 0 && ` → %${takeProfitPct}`}
-              </Badge>
-            )}
-            {autoSellSecsLeft !== null && isOpen && (
-              <Badge
-                className={`text-xs gap-1 font-bold font-mono ${
-                  autoSellSecsLeft === 0
-                    ? "bg-orange-500/20 text-orange-300 border border-orange-400/60 animate-pulse"
-                    : autoSellSecsLeft <= 10
-                    ? "bg-red-500/20 text-red-300 border border-red-400/60 animate-pulse"
-                    : autoSellSecsLeft <= 30
-                    ? "bg-orange-500/15 text-orange-400 border border-orange-500/40"
-                    : "bg-amber-500/15 text-amber-400 border border-amber-500/40"
-                }`}
-                title="Auto-trader otomatik satış zamanı"
-              >
-                <Timer className="h-3 w-3" />
-                {autoSellSecsLeft === 0 ? "Satış Bekleniyor" : `Satışa Kalan: ${autoSellSecsLeft}s`}
-              </Badge>
-            )}
-            {isHalfSelling && (
-              <Badge className="text-xs gap-1 font-bold bg-amber-500/20 text-amber-300 border border-amber-400/60 animate-pulse">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Yarısını Sat
-              </Badge>
-            )}
-            <span className="text-[10px] text-muted-foreground ml-auto">{formatTime(p.buyTimestamp)}</span>
-          </div>
+          </Button>
+          <span className="text-[10px] text-muted-foreground/60 ml-auto hidden sm:inline">
+            Aynı token için yeni pozisyon açar
+          </span>
+        </div>
+      )}
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <code className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
-              {truncate(p.mintAddress)}
-            </code>
-            <Button size="icon" variant="ghost" onClick={() => onCopy(p.mintAddress, p.id)} className="h-6 w-6" data-testid="button-copy-pos-address">
-              {copiedId === p.id ? <Check className="h-3 w-3 text-chart-4" /> : <Copy className="h-3 w-3" />}
-            </Button>
-            <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
-              <a href={`https://dexscreener.com/solana/${p.mintAddress}`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3 w-3 mr-1" />Dex
-              </a>
-            </Button>
-            <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
-              <a href={`https://jup.ag/swap/SOL-${p.mintAddress}`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3 w-3 mr-1" />Jup
-              </a>
-            </Button>
-            {p.buyTxSignature && (
+      <div className="p-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-sm" data-testid="text-pos-name">{p.name}</span>
+              <span className="text-xs text-muted-foreground">{p.symbol}</span>
+              <StatusBadge status={p.status} error={p.error} />
+              {p.dex && (
+                <Badge className={`text-[10px] ${p.dex === "pumpswap" ? "bg-orange-500/15 text-orange-400 border border-orange-500/30" : "bg-primary/15 text-primary border border-primary/30"}`}>
+                  {p.dex === "pumpswap" ? "PumpSwap" : "Jupiter"}
+                </Badge>
+              )}
+              {profitPct !== null && (
+                <Badge
+                  className={`text-xs gap-1 font-bold ${
+                    profitPositive
+                      ? nearTarget
+                        ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/60 animate-pulse"
+                        : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
+                      : "bg-destructive/15 text-destructive border border-destructive/40"
+                  }`}
+                  data-testid="badge-pos-pnl-pct"
+                >
+                  {profitPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  {profitPositive ? "+" : ""}{profitPct.toFixed(1)}%
+                  {nearTarget && takeProfitPct > 0 && ` → %${takeProfitPct}`}
+                </Badge>
+              )}
+              {autoSellSecsLeft !== null && isOpen && (
+                <Badge
+                  className={`text-xs gap-1 font-bold font-mono ${
+                    autoSellSecsLeft === 0
+                      ? "bg-orange-500/20 text-orange-300 border border-orange-400/60 animate-pulse"
+                      : autoSellSecsLeft <= 10
+                      ? "bg-red-500/20 text-red-300 border border-red-400/60 animate-pulse"
+                      : autoSellSecsLeft <= 30
+                      ? "bg-orange-500/15 text-orange-400 border border-orange-500/40"
+                      : "bg-amber-500/15 text-amber-400 border border-amber-500/40"
+                  }`}
+                  title="Auto-trader otomatik satış zamanı"
+                >
+                  <Timer className="h-3 w-3" />
+                  {autoSellSecsLeft === 0 ? "Satış Bekleniyor" : `Satışa Kalan: ${autoSellSecsLeft}s`}
+                </Badge>
+              )}
+              {isHalfSelling && (
+                <Badge className="text-xs gap-1 font-bold bg-amber-500/20 text-amber-300 border border-amber-400/60 animate-pulse">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Yarısını Sat
+                </Badge>
+              )}
+              <span className="text-[10px] text-muted-foreground ml-auto">{formatTime(p.buyTimestamp)}</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <code className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                {truncate(p.mintAddress)}
+              </code>
+              <Button size="icon" variant="ghost" onClick={() => onCopy(p.mintAddress, p.id)} className="h-6 w-6" data-testid="button-copy-pos-address">
+                {copiedId === p.id ? <Check className="h-3 w-3 text-chart-4" /> : <Copy className="h-3 w-3" />}
+              </Button>
               <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
-                <a href={`https://solscan.io/tx/${p.buyTxSignature}`} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-3 w-3 mr-1" />Buy TX
+                <a href={`https://dexscreener.com/solana/${p.mintAddress}`} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3 w-3 mr-1" />Dex
                 </a>
               </Button>
-            )}
-            {p.sellTxSignature && (
               <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
-                <a href={`https://solscan.io/tx/${p.sellTxSignature}`} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-3 w-3 mr-1" />Sell TX
+                <a href={`https://jup.ag/swap/SOL-${p.mintAddress}`} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3 w-3 mr-1" />Jup
                 </a>
               </Button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] pt-1">
-            <Cell
-              label="Harcanan"
-              value={`${p.buySolAmount.toFixed(4)} SOL`}
-              sub={solPriceUsd > 0 ? formatUsd(p.buySolAmount * solPriceUsd) : undefined}
-            />
-            <Cell
-              label="Alınan Token"
-              value={p.buyTokenAmount ? `${formatCompact(p.buyTokenAmount)} ${p.symbol}` : "—"}
-              sub={p.buyTokenAmount ? formatNumber(p.buyTokenAmount, 4) : undefined}
-            />
-            <Cell
-              label={isOpen && p.currentPriceUsd ? "Şu Anki Fiyat" : "Alım Fiyatı"}
-              value={
-                isOpen && p.currentPriceUsd ? formatUsd(p.currentPriceUsd)
-                : solPriceUsd > 0 && p.buyPriceSol ? formatUsd(p.buyPriceSol * solPriceUsd)
-                : `${formatPrice(p.buyPriceSol)} SOL`
-              }
-              sub={
-                isOpen && p.currentPriceUsd && p.buyPriceSol
-                  ? `Aldığın: ${formatUsd(p.buyPriceSol * solPriceUsd)}`
-                  : solPriceUsd > 0 && p.buyPriceSol ? `${formatPrice(p.buyPriceSol)} SOL` : undefined
-              }
-            />
-            <Cell
-              label={isOpen && p.unrealizedPnlSol !== undefined ? "Unrealized PnL" : "Satış Fiyatı"}
-              value={
-                isOpen && p.unrealizedPnlSol !== undefined
-                  ? `${p.unrealizedPnlSol >= 0 ? "+" : ""}${formatUsd(Math.abs(p.unrealizedPnlSol * solPriceUsd))}`
-                  : p.sellPriceSol
-                    ? solPriceUsd > 0 ? formatUsd(p.sellPriceSol * solPriceUsd) : `${formatPrice(p.sellPriceSol)} SOL`
-                    : "—"
-              }
-              sub={
-                isOpen && p.unrealizedPnlPct !== undefined
-                  ? `${p.unrealizedPnlPct >= 0 ? "+" : ""}${p.unrealizedPnlPct.toFixed(2)}%`
-                  : p.sellSolAmount
-                    ? `${p.sellSolAmount.toFixed(4)} SOL${solPriceUsd > 0 ? ` (${formatUsd(p.sellSolAmount * solPriceUsd)})` : ""}`
-                    : undefined
-              }
-              highlight={isOpen && (p.unrealizedPnlPct ?? 0) >= 0 ? "green" : isOpen ? "red" : undefined}
-            />
-          </div>
-
-          {p.error && (
-            <div className="text-[11px] text-destructive bg-destructive/10 rounded px-2 py-1">⚠️ {p.error}</div>
-          )}
-
-          {/* Özel tutma süresi ayarı — sadece açık pozisyonlar için */}
-          {isOpen && onUpdateHoldDuration && (
-            <div className="flex items-center gap-2 pt-1">
-              <Label htmlFor={`hold-dur-${p.id}`} className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
-                <Timer className="h-3 w-3 text-violet-400" />
-                Tutma Süresi (sn)
-              </Label>
-              <Input
-                id={`hold-dur-${p.id}`}
-                type="number"
-                min="1"
-                step="30"
-                placeholder={p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : "örn: 300"}
-                value={holdDurationInput}
-                onChange={(e) => setHoldDurationInput(e.target.value)}
-                className="h-6 text-xs w-24 px-2"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 px-2 text-xs border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
-                onClick={() => {
-                  const secs = parseInt(holdDurationInput, 10);
-                  if (!Number.isNaN(secs) && secs > 0) {
-                    onUpdateHoldDuration(p.id, secs * 1000);
-                  }
-                }}
-              >
-                ✓
-              </Button>
-              {p.customHoldDurationMs && (
-                <span className="text-[10px] text-violet-400">
-                  ✓ {Math.round(p.customHoldDurationMs / 1000)}s ayarlı
-                </span>
+              {p.buyTxSignature && (
+                <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
+                  <a href={`https://solscan.io/tx/${p.buyTxSignature}`} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3 w-3 mr-1" />Buy TX
+                  </a>
+                </Button>
+              )}
+              {p.sellTxSignature && (
+                <Button size="sm" variant="ghost" asChild className="h-6 px-1.5 text-xs">
+                  <a href={`https://solscan.io/tx/${p.sellTxSignature}`} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3 w-3 mr-1" />Sell TX
+                  </a>
+                </Button>
               )}
             </div>
-          )}
-        </div>
 
-        <div className="shrink-0 flex gap-2">
-          {isOpen && (
-            <>
-              <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
-                Sat
-              </Button>
-              {(p.buyTokenAmount ?? 0) > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] pt-1">
+              <Cell
+                label="Harcanan"
+                value={`${p.buySolAmount.toFixed(4)} SOL`}
+                sub={solPriceUsd > 0 ? formatUsd(p.buySolAmount * solPriceUsd) : undefined}
+              />
+              <Cell
+                label="Alınan Token"
+                value={p.buyTokenAmount ? `${formatCompact(p.buyTokenAmount)} ${p.symbol}` : "—"}
+                sub={p.buyTokenAmount ? formatNumber(p.buyTokenAmount, 4) : undefined}
+              />
+              <Cell
+                label={isOpen && p.currentPriceUsd ? "Şu Anki Fiyat" : "Alım Fiyatı"}
+                value={
+                  isOpen && p.currentPriceUsd ? formatUsd(p.currentPriceUsd)
+                  : solPriceUsd > 0 && p.buyPriceSol ? formatUsd(p.buyPriceSol * solPriceUsd)
+                  : `${formatPrice(p.buyPriceSol)} SOL`
+                }
+                sub={
+                  isOpen && p.currentPriceUsd && p.buyPriceSol
+                    ? `Aldığın: ${formatUsd(p.buyPriceSol * solPriceUsd)}`
+                    : solPriceUsd > 0 && p.buyPriceSol ? `${formatPrice(p.buyPriceSol)} SOL` : undefined
+                }
+              />
+              <Cell
+                label={isOpen && p.unrealizedPnlSol !== undefined ? "Unrealized PnL" : "Satış Fiyatı"}
+                value={
+                  isOpen && p.unrealizedPnlSol !== undefined
+                    ? `${p.unrealizedPnlSol >= 0 ? "+" : ""}${formatUsd(Math.abs(p.unrealizedPnlSol * solPriceUsd))}`
+                    : p.sellPriceSol
+                      ? solPriceUsd > 0 ? formatUsd(p.sellPriceSol * solPriceUsd) : `${formatPrice(p.sellPriceSol)} SOL`
+                      : "—"
+                }
+                sub={
+                  isOpen && p.unrealizedPnlPct !== undefined
+                    ? `${p.unrealizedPnlPct >= 0 ? "+" : ""}${p.unrealizedPnlPct.toFixed(2)}%`
+                    : p.sellSolAmount
+                      ? `${p.sellSolAmount.toFixed(4)} SOL${solPriceUsd > 0 ? ` (${formatUsd(p.sellSolAmount * solPriceUsd)})` : ""}`
+                      : undefined
+                }
+                highlight={isOpen && (p.unrealizedPnlPct ?? 0) >= 0 ? "green" : isOpen ? "red" : undefined}
+              />
+            </div>
+
+            {p.error && (
+              <div className="text-[11px] text-destructive bg-destructive/10 rounded px-2 py-1">⚠️ {p.error}</div>
+            )}
+
+            {/* Özel tutma süresi ayarı — sadece açık pozisyonlar için */}
+            {isOpen && onUpdateHoldDuration && (
+              <div className="flex items-center gap-2 pt-1">
+                <Label htmlFor={`hold-dur-${p.id}`} className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                  <Timer className="h-3 w-3 text-violet-400" />
+                  Tutma Süresi (sn)
+                </Label>
+                <Input
+                  id={`hold-dur-${p.id}`}
+                  type="number"
+                  min="1"
+                  step="30"
+                  placeholder={p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : "örn: 300"}
+                  value={holdDurationInput}
+                  onChange={(e) => setHoldDurationInput(e.target.value)}
+                  className="h-6 text-xs w-24 px-2"
+                />
                 <Button
                   size="sm"
                   variant="outline"
-                  className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
-                  disabled={isPending || isHalfSelling}
+                  className="h-6 px-2 text-xs border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
                   onClick={() => {
-                    setIsHalfSelling(true);
-                    onSellHalf(p.id);
+                    const secs = parseInt(holdDurationInput, 10);
+                    if (!Number.isNaN(secs) && secs > 0) {
+                      onUpdateHoldDuration(p.id, secs * 1000);
+                    }
                   }}
-                  data-testid={`button-half-sell-${p.id}`}
                 >
-                  {isHalfSelling ? (
-                    <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Satılıyor</>
-                  ) : (
-                    "½ Sat"
-                  )}
+                  ✓
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-red-500/50 text-red-400 hover:bg-red-500/10"
-                onClick={() => {
-                  if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek ve "Kapanan" bölümünde görünecek.`)) {
-                    onMarkRugPull(p.id);
-                  }
-                }}
-                data-testid={`button-rug-${p.id}`}
-              >
-                🚨 Rug
+                {p.customHoldDurationMs && (
+                  <span className="text-[10px] text-violet-400">
+                    ✓ {Math.round(p.customHoldDurationMs / 1000)}s ayarlı
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 flex gap-2">
+            {isOpen && (
+              <>
+                <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-sell-${p.id}`}>
+                  Sat
+                </Button>
+                {(p.buyTokenAmount ?? 0) > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                    disabled={isPending || isHalfSelling}
+                    onClick={() => {
+                      setIsHalfSelling(true);
+                      onSellHalf(p.id);
+                    }}
+                    data-testid={`button-half-sell-${p.id}`}
+                  >
+                    {isHalfSelling ? (
+                      <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Satılıyor</>
+                    ) : (
+                      "½ Sat"
+                    )}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                  onClick={() => {
+                    if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek ve "Kapanan" bölümünde görünecek.`)) {
+                      onMarkRugPull(p.id);
+                    }
+                  }}
+                  data-testid={`button-rug-${p.id}`}
+                >
+                  🚨 Rug
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                  onClick={() => {
+                    if (confirm(`${p.symbol} işlemini iptal etmek istediğine emin misin?`)) {
+                      onDelete(p.id);
+                    }
+                  }}
+                  data-testid={`button-cancel-${p.id}`}
+                >
+                  ✕ İptal
+                </Button>
+              </>
+            )}
+            {p.status === "failed" && p.buyTxSignature && (
+              <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
+                Tekrar Sat
               </Button>
+            )}
+            {isPending && (
+              <Button size="sm" variant="outline" disabled>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                {p.status === "pending_buy" ? "Alınıyor" : "Satılıyor"}
+              </Button>
+            )}
+            {!isOpen && (
               <Button
-                size="sm"
-                variant="outline"
-                className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                size="icon" variant="ghost"
                 onClick={() => {
-                  if (confirm(`${p.symbol} işlemini iptal etmek istediğine emin misin?`)) {
+                  if (isPending) {
+                    if (confirm(`${p.status === "pending_buy" ? "Alım" : "Satış"} iptal edilecek, emin misin?`)) onDelete(p.id);
+                  } else {
                     onDelete(p.id);
                   }
                 }}
-                data-testid={`button-cancel-${p.id}`}
+                className="h-8 w-8 text-destructive/60 hover:text-destructive"
+                title={isPending ? "İşlemi iptal et" : "Pozisyonu sil"}
               >
-                ✕ İptal
+                ✕
               </Button>
-            </>
-          )}
-          {p.status === "failed" && p.buyTxSignature && (
-            <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
-              Tekrar Sat
-            </Button>
-          )}
-          {isPending && (
-            <Button size="sm" variant="outline" disabled>
-              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              {p.status === "pending_buy" ? "Alınıyor" : "Satılıyor"}
-            </Button>
-          )}
-          {!isOpen && (
-            <Button
-              size="icon" variant="ghost"
-              onClick={() => {
-                if (isPending) {
-                  if (confirm(`${p.status === "pending_buy" ? "Alım" : "Satış"} iptal edilecek, emin misin?`)) onDelete(p.id);
-                } else {
-                  onDelete(p.id);
-                }
-              }}
-              className="h-8 w-8 text-destructive/60 hover:text-destructive"
-              title={isPending ? "İşlemi iptal et" : "Pozisyonu sil"}
-            >
-              ✕
-            </Button>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

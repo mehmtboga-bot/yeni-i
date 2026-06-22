@@ -529,12 +529,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }));
           }
         } else if (message.type === "buy_token") {
-          const { mintAddress, name, symbol, dex } = message.data || {};
+          const { mintAddress, name, symbol, dex, solAmount: msgSolAmount } = message.data || {};
           if (mintAddress) {
             const nm = name || "Bilinmiyor";
             const sym = symbol || "?";
             const config = tradeStore.getConfig();
-            const solAmount = config.solAmount;
+            const solAmount = (typeof msgSolAmount === "number" && msgSolAmount > 0)
+              ? msgSolAmount
+              : config.solAmount;
             if (dex === "pumpswap") {
               trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
                 .catch((err) => console.error("buyPumpSwap hatası:", err));
