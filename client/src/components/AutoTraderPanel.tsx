@@ -405,7 +405,6 @@ export function AutoTraderPanel({
         <div className="flex gap-2 pt-2">
           <Button
             onClick={saveConfig}
-            disabled={isRunning}
             className="flex-1 bg-primary hover:bg-primary/90"
             data-testid="button-auto-save-config"
           >
@@ -413,7 +412,6 @@ export function AutoTraderPanel({
           </Button>
           <Button
             onClick={resetToDefaults}
-            disabled={isRunning}
             variant="outline"
             data-testid="button-auto-reset-config"
           >
