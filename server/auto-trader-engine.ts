@@ -269,46 +269,6 @@ export class AutoTraderEngine {
     }
   }
 
-  /**
-   * Manuel alım yapıldığında auto-trader kaydı oluşturur.
-   * Böylece tutma süresi dolduğunda otomatik satış tetiklenir.
-   */
-  createRecordForManualBuy(
-    mintAddress: string,
-    name: string,
-    symbol: string,
-    holdDurationMs: number
-  ) {
-    // Süresi henüz dolmamış aktif bir kayıt varsa yeni kayıt oluşturma
-    const now = Date.now();
-    const existingRecord = Array.from(this.records.values()).find(
-      (r) =>
-        r.mintAddress === mintAddress &&
-        r.shouldSellAt > now &&
-        (r.status === "pending" || r.status === "active")
-    );
-    if (existingRecord) {
-      console.log(`⏭️ [Auto-Trader] ${symbol} için süresi dolmamış aktif kayıt var, manuel alım kaydı oluşturulmadı`);
-      return;
-    }
-
-    const recordId = `manual-${mintAddress}-${Date.now()}`;
-    const record: AutoTradeRecord = {
-      id: recordId,
-      mintAddress,
-      tokenName: name || "Bilinmiyor",
-      tokenSymbol: symbol || "?",
-      buyTimestamp: now,
-      shouldSellAt: now + holdDurationMs,
-      status: "pending",
-    };
-    this.records.set(recordId, record);
-    this.emit("auto_trade_record_updated", record);
-    console.log(
-      `📝 [Auto-Trader] Manuel alım kaydı oluşturuldu: ${symbol} | Tutma süresi: ${(holdDurationMs / 1000).toFixed(0)}s | Satış: ${new Date(record.shouldSellAt).toLocaleTimeString()}`
-    );
-  }
-
   markRecordFailed(mintAddress: string, error: string) {
     for (const [, record] of this.records.entries()) {
       if (record.mintAddress === mintAddress && (record.status === "pending" || record.status === "active")) {
