@@ -202,12 +202,7 @@ export default function Home() {
 
   const handleBuy = (mintAddress: string, name: string, symbol: string, dex: "jupiter" | "pumpswap" = "jupiter", solAmount?: number) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      const payload: Record<string, any> = { 
-        mintAddress, 
-        name, 
-        symbol, 
-        dex: dex || "jupiter"  // Undefined ise default "jupiter" kullan
-      };
+      const payload: Record<string, any> = { mintAddress, name, symbol, dex };
       if (typeof solAmount === "number" && solAmount > 0) payload.solAmount = solAmount;
       ws.send(JSON.stringify({ type: "buy_token", data: payload }));
     }
