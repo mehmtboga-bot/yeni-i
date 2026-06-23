@@ -221,15 +221,27 @@ function TokenRow({
       <div className="flex items-center gap-2 shrink-0">
         <RiskBar score={token.rugPullRiskScore} />
         <RecommendationBadge recommendation={token.recommendation} />
-        {onSelect && !isRug && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-[10px] border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-            onClick={() => onSelect(token.mintAddress, token.symbol)}
-          >
-            AL
-          </Button>
+        {onSelect && (
+          isRug ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => onSelect(token.mintAddress, token.symbol)}
+              disabled
+            >
+              🚩 RUG
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-[10px] border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+              onClick={() => onSelect(token.mintAddress, token.symbol)}
+            >
+              AL
+            </Button>
+          )
         )}
       </div>
     </div>
