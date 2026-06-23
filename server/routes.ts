@@ -14,6 +14,7 @@ import path from "path";
 import { EventStore } from "./event-store";
 import { LiquidityMonitor } from "./liquidity-monitor";
 import { PhantomMonitor } from "./phantom-monitor";
+import { TokenBalancePoller } from "./token-balance-poller";
 
 const ROOT = process.cwd();
 
@@ -494,6 +495,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
   pricer.start();
 
+  // ---- Token Bakiye Poller ----
+  // Açık pozisyonların token bakiyesini 30sn aralıkla Helius'tan çeker.
+  // Başka bir bot veya manuel işlem sonucu bakiye değişirse P&L doğru kalır.
+  const tokenBalancePoller = new TokenBalancePoller(
+    tradeStore,
+    (event, data) => {
+      if (event === "position_update") broadcastToClients({ type: "position_update", data });
+    },
+    secrets.HELIUS_API_KEY,
+  );
+  tokenBalancePoller.start();
+  // ----------------------------
+
   wss.on("connection", (ws: WebSocket) => {
     _origLog("👤 Yeni client bağlandı");
     clients.add(ws);
@@ -863,8 +877,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   // ------------------------
 
-  process.on("SIGTERM", () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); wss.close(); });
-  process.on("SIGINT",  () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); wss.close(); });
+  process.on("SIGTERM", () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
+  process.on("SIGINT",  () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
 
   return httpServer;
 }
