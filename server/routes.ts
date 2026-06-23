@@ -852,7 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Alım yap (Jupiter kullan)
       console.log(`💰 [Quick-Buy] Alım başlatılıyor: ${symbol} | ${solAmount} SOL`);
 
-      await trader.buy({
+      const pos = await trader.buy({
         mintAddress,
         name,
         symbol,
@@ -861,6 +861,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log(`✅ [Quick-Buy] Alım başarılı: ${symbol}`);
+
+      // Position'a kar hedefi ayarla (manual trader ayarlarından)
+      if (pos && pos.status === "open") {
+        const config = tradeStore.getConfig();
+        const takeProfitPct = config.takeProfitPct ?? 0;
+
+        if (takeProfitPct > 0) {
+          const updated = { ...pos, takeProfitPct };
+          tradeStore.upsert(updated);
+          broadcastToClients({ type: "position_update", data: updated });
+          console.log(`🎯 [Quick-Buy] ${symbol} kar hedefi ayarlandı: +%${takeProfitPct}`);
+        }
+      }
 
       // Position'ı al
       const position = tradeStore.getByMint(mintAddress);

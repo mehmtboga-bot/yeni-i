@@ -161,8 +161,13 @@ export class PositionPricer {
       this.store.upsert(updated);
       this.emit("position_update", updated);
 
+      // Position başına kar hedefi varsa onu kullan, yoksa global config'i kullan
+      const effectiveTakeProfitPct = (pos.takeProfitPct != null && pos.takeProfitPct > 0)
+        ? pos.takeProfitPct
+        : takeProfitPct;
+
       // Take-profit: yanlış tetiklenmeyi önlemek için art arda 2 okuma gerekli
-      if (takeProfitPct > 0 && unrealizedPnlPct >= takeProfitPct) {
+      if (effectiveTakeProfitPct > 0 && unrealizedPnlPct >= effectiveTakeProfitPct) {
         const count = (this.aboveThresholdCount.get(pos.id) ?? 0) + 1;
         this.aboveThresholdCount.set(pos.id, count);
 
@@ -187,7 +192,7 @@ export class PositionPricer {
       }
 
       // Yarı satış hedef 1
-      if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget1 ?? 0) && (takeProfitPct === 0 || unrealizedPnlPct < takeProfitPct)) {
+      if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget1 ?? 0) && (effectiveTakeProfitPct === 0 || unrealizedPnlPct < effectiveTakeProfitPct)) {
         const count = (this.halfSellTarget1Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget1Count.set(pos.id, count);
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
@@ -201,7 +206,7 @@ export class PositionPricer {
       }
 
       // Yarı satış hedef 2
-      if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget2 ?? 0) && (takeProfitPct === 0 || unrealizedPnlPct < takeProfitPct)) {
+      if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget2 ?? 0) && (effectiveTakeProfitPct === 0 || unrealizedPnlPct < effectiveTakeProfitPct)) {
         const count = (this.halfSellTarget2Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget2Count.set(pos.id, count);
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
@@ -215,7 +220,7 @@ export class PositionPricer {
       }
 
       // Yarı satış hedef 3
-      if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget3 ?? 0) && (takeProfitPct === 0 || unrealizedPnlPct < takeProfitPct)) {
+      if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget3 ?? 0) && (effectiveTakeProfitPct === 0 || unrealizedPnlPct < effectiveTakeProfitPct)) {
         const count = (this.halfSellTarget3Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget3Count.set(pos.id, count);
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
