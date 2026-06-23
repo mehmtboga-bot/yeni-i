@@ -576,6 +576,90 @@ export class JupiterTrader {
     }
   }
 
+  // ========== EK ALIM (mevcut pozisyona ekleme) ==========
+  // Mevcut açık pozisyon için ek SOL harcayarak token alır.
+  // Yeni position oluşturmaz — mevcut position'ın buySolAmount ve buyTokenAmount'ını günceller.
+  async additionalBuy(input: {
+    positionId: string;
+    mintAddress: string;
+    symbol: string;
+    dex: "jupiter" | "pumpswap";
+    solAmount: number;
+  }): Promise<{ tokensReceived: number; txSignature: string } | null> {
+    const { positionId, mintAddress, symbol, dex, solAmount } = input;
+    if (!this.isReady()) { console.error("❌ Cüzdan hazır değil — ek alım atlandı"); return null; }
+    if (this.inFlight.has(`addl-buy:${positionId}`)) { console.warn(`⏳ ${symbol} ek alım zaten devam ediyor`); return null; }
+
+    this.inFlight.add(`addl-buy:${positionId}`);
+    const config = this.store.getConfig();
+    const lamports = Math.floor(solAmount * 1e9);
+    const priorityFee = config.priorityFeeManualMicroLamports;
+    const slippagePct = Math.floor(config.slippageBps / 100);
+    const priorityFeeSol = priorityFee / 1_000_000_000;
+
+    console.log(`🛒 [AdditionalBuy] ${symbol} ek alım: ${solAmount} SOL | DEX: ${dex}`);
+
+    try {
+      let swapSignature: string | null = null;
+      let tokensReceived = 0;
+
+      if (dex === "pumpswap") {
+        const result = await this.withRetry(async () => {
+          if (swapSignature !== null) {
+            const bal = await this.getTokenBalance(mintAddress);
+            if (bal && bal.uiAmount > 0) {
+              return { sig: swapSignature!, tokensReceived: bal.uiAmount };
+            }
+          }
+          swapSignature = await this.pumpSwapTx({ action: "buy", mint: mintAddress, amount: solAmount, denominatedInSol: true, slippagePct, priorityFeeSol });
+          console.log(`📤 [AdditionalBuy/PumpSwap] TX gönderildi: ${swapSignature}`);
+          await new Promise((r) => setTimeout(r, 750));
+          let received = 0;
+          for (let c = 0; c < 20; c++) {
+            await new Promise((r) => setTimeout(r, 500));
+            const bal = await this.getTokenBalance(mintAddress);
+            if (bal && bal.uiAmount > 0) { received = bal.uiAmount; break; }
+          }
+          if (received === 0) throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
+          return { sig: swapSignature!, tokensReceived: received };
+        }, `AdditionalBuy/PumpSwap ${symbol}`, 2);
+        swapSignature = result.sig;
+        tokensReceived = result.tokensReceived;
+      } else {
+        const result = await this.withRetry(async () => {
+          if (swapSignature !== null) {
+            const bal = await this.getTokenBalance(mintAddress);
+            if (bal && bal.uiAmount > 0) {
+              return { sig: swapSignature!, tokensReceived: bal.uiAmount };
+            }
+          }
+          const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
+          swapSignature = await this.swap(quote, priorityFee);
+          console.log(`📤 [AdditionalBuy/Jupiter] TX gönderildi: ${swapSignature}`);
+          await new Promise((r) => setTimeout(r, 750));
+          let received = 0;
+          for (let c = 0; c < 20; c++) {
+            await new Promise((r) => setTimeout(r, 500));
+            const bal = await this.getTokenBalance(mintAddress);
+            if (bal && bal.uiAmount > 0) { received = bal.uiAmount; break; }
+          }
+          if (received === 0) throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
+          return { sig: swapSignature!, tokensReceived: received };
+        }, `AdditionalBuy/Jupiter ${symbol}`, 2);
+        swapSignature = result.sig;
+        tokensReceived = result.tokensReceived;
+      }
+
+      console.log(`✅ [AdditionalBuy] ${symbol} ek alım tamam: ${tokensReceived} token | tx: ${swapSignature!.slice(0, 16)}...`);
+      return { tokensReceived, txSignature: swapSignature! };
+    } catch (err) {
+      console.error(`❌ [AdditionalBuy] ${symbol} ek alım hatası:`, (err as Error).message);
+      return null;
+    } finally {
+      this.inFlight.delete(`addl-buy:${positionId}`);
+    }
+  }
+
   // ========== SATIŞ (Jupiter veya PumpSwap) ==========
   // Satış başarısız olursa status "open" kalır, exponential backoff ile tekrar denenir.
   // MAX_SELL_RETRIES aşılırsa "failed" olarak işaretlenir.

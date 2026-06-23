@@ -115,6 +115,21 @@ export function TradePanel({
     );
   };
 
+  // Mevcut pozisyona ek alım — yeni position oluşturmaz, buySolAmount ve buyTokenAmount güncellenir
+  const onAdditionalBuy = (positionId: string, mintAddress: string, symbol: string, dex: "jupiter" | "pumpswap", solAmount: number) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.error("❌ WebSocket bağlantısı yok — ek alım gönderilemedi");
+      return;
+    }
+    console.log(`🔄 [TradePanel] Ek alım tetikleniyor: ${symbol} | ${solAmount} SOL | positionId: ${positionId}`);
+    ws.send(
+      JSON.stringify({
+        type: "additional_buy",
+        data: { positionId, mintAddress, symbol, dex, solAmount },
+      })
+    );
+  };
+
   const copyAddress = async (address: string, id: string) => {
     await navigator.clipboard.writeText(address);
     setCopiedId(id);
@@ -416,7 +431,7 @@ export function TradePanel({
               </div>
               {globalHoldPositions.map((p) => (
                 <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onBuy={onBuy} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onBuy={onBuy} onAdditionalBuy={onAdditionalBuy} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
                   onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
               ))}
             </div>
@@ -434,7 +449,7 @@ export function TradePanel({
               </div>
               {customHoldPositions.map((p) => (
                 <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onBuy={onBuy} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onBuy={onBuy} onAdditionalBuy={onAdditionalBuy} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
                   onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
               ))}
             </div>
@@ -448,7 +463,7 @@ export function TradePanel({
               )}
               {nonOpenFiltered.map((p) => (
                 <PositionRow key={p.id} position={p} copiedId={copiedId} solPriceUsd={solPriceUsd}
-                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onBuy={onBuy} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
+                  takeProfitPct={takeProfitPct} onCopy={copyAddress} onBuy={onBuy} onAdditionalBuy={onAdditionalBuy} onSell={onSell} onSellHalf={onSellHalf} onDelete={onDelete}
                   onMarkRugPull={onMarkRugPull} onUpdateHoldDuration={onUpdateHoldDuration} />
               ))}
             </div>
@@ -491,6 +506,7 @@ interface PositionRowProps {
   takeProfitPct: number;
   onCopy: (addr: string, id: string) => void;
   onBuy: (mintAddress: string, name: string, symbol: string, dex?: "jupiter" | "pumpswap", solAmount?: number) => void;
+  onAdditionalBuy?: (positionId: string, mintAddress: string, symbol: string, dex: "jupiter" | "pumpswap", solAmount: number) => void;
   onSell: (positionId: string) => void;
   onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
@@ -498,7 +514,7 @@ interface PositionRowProps {
   onUpdateHoldDuration?: (positionId: string, holdDurationMs: number) => void;
 }
 
-function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onBuy, onSell, onSellHalf, onDelete, onMarkRugPull, onUpdateHoldDuration }: PositionRowProps) {
+function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy, onBuy, onAdditionalBuy, onSell, onSellHalf, onDelete, onMarkRugPull, onUpdateHoldDuration }: PositionRowProps) {
   const isOpen = p.status === "open";
   const isPending = p.status === "pending_buy" || p.status === "pending_sell";
   const [holdDurationInput, setHoldDurationInput] = useState<string>(
@@ -516,7 +532,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     }
   }, [p.status, isHalfSelling]);
 
-  // Tekrar alım fonksiyonu
+  // Tekrar alım fonksiyonu — mevcut pozisyona ekleme yapar (yeni pozisyon oluşturmaz)
   const handleAdditionalBuy = async () => {
     const solAmount = parseFloat(additionalBuyInput);
     if (Number.isNaN(solAmount) || solAmount <= 0) {
@@ -527,19 +543,27 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     setIsAdditionalBuying(true);
     setBuyRetries(0);
 
-    const attemptBuy = (retryCount: number) => {
-      console.log(`🔄 [PositionRow] Alım denemesi ${retryCount + 1}/3: ${p.symbol} | ${solAmount} SOL`);
+    const dex = p.dex ?? "jupiter";
 
-      onBuy(p.mintAddress, p.name, p.symbol, p.dex, solAmount);
+    const attemptBuy = (retryCount: number) => {
+      console.log(`🔄 [PositionRow] Ek alım denemesi ${retryCount + 1}/3: ${p.symbol} | ${solAmount} SOL`);
+
+      if (onAdditionalBuy) {
+        // Mevcut pozisyona ekleme — yeni position oluşturmaz
+        onAdditionalBuy(p.id, p.mintAddress, p.symbol, dex, solAmount);
+      } else {
+        // Fallback: eski davranış
+        onBuy(p.mintAddress, p.name, p.symbol, dex, solAmount);
+      }
 
       // 5 saniye sonra kontrol et - alım başarılı mı?
       const checkTimeout = setTimeout(() => {
         if (retryCount < 2) {
-          console.log(`⚠️ [PositionRow] Alım yanıt vermedi, tekrar deneniyor...`);
+          console.log(`⚠️ [PositionRow] Ek alım yanıt vermedi, tekrar deneniyor...`);
           setBuyRetries(retryCount + 1);
           attemptBuy(retryCount + 1);
         } else {
-          console.error(`❌ [PositionRow] Alım 3 denemede başarısız oldu`);
+          console.error(`❌ [PositionRow] Ek alım 3 denemede başarısız oldu`);
           setIsAdditionalBuying(false);
         }
       }, 5000);
@@ -904,38 +928,72 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
         </div>
 
         {isOpen && (
-          <div className="flex gap-2 items-end border-t border-card-border pt-3 mt-3">
-            <div className="flex-1">
-              <Label className="text-xs">Tekrar Al (SOL)</Label>
-              <Input
-                type="number"
-                placeholder="SOL"
-                value={additionalBuyInput}
-                onChange={(e) => setAdditionalBuyInput(e.target.value)}
-                step="0.001"
-                min="0"
-                disabled={isAdditionalBuying}
-                className="text-xs"
-              />
+          <div className="space-y-3 border-t border-card-border pt-3 mt-3">
+            {/* Tekrar Al */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <Label className="text-xs">Tekrar Al (SOL)</Label>
+                <Input
+                  type="number"
+                  placeholder="SOL"
+                  value={additionalBuyInput}
+                  onChange={(e) => setAdditionalBuyInput(e.target.value)}
+                  step="0.001"
+                  min="0"
+                  disabled={isAdditionalBuying}
+                  className="text-xs"
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={handleAdditionalBuy}
+                disabled={isAdditionalBuying || !additionalBuyInput}
+                className="bg-emerald-600 hover:bg-emerald-700"
+                data-testid={`button-additional-buy-${p.id}`}
+              >
+                {isAdditionalBuying ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Alınıyor...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Al
+                  </>
+                )}
+              </Button>
             </div>
-            <Button
-              size="sm"
-              onClick={handleAdditionalBuy}
-              disabled={isAdditionalBuying || !additionalBuyInput}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              {isAdditionalBuying ? (
-                <>
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  Alınıyor...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-3 w-3 mr-1" />
-                  Al
-                </>
-              )}
-            </Button>
+
+            {/* Tutma Süresi Kaydet */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <Label className="text-xs">Tutma Süresi (saniye)</Label>
+                <Input
+                  type="number"
+                  placeholder="300"
+                  value={holdDurationInput}
+                  onChange={(e) => setHoldDurationInput(e.target.value)}
+                  step="1"
+                  min="1"
+                  className="text-xs"
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  const seconds = parseInt(holdDurationInput, 10);
+                  if (!Number.isNaN(seconds) && seconds > 0 && onUpdateHoldDuration) {
+                    onUpdateHoldDuration(p.id, seconds * 1000);
+                    setHoldDurationInput("");
+                  }
+                }}
+                className="bg-violet-600 hover:bg-violet-700"
+                data-testid={`button-update-hold-duration-${p.id}`}
+              >
+                Kaydet
+              </Button>
+            </div>
           </div>
         )}
       </div>

@@ -635,6 +635,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             executeBuyWithRetry();
           }
+        } else if (message.type === "additional_buy") {
+          // Mevcut pozisyona ek alım — yeni position oluşturmaz
+          // trader.additionalBuy() swap'ı çalıştırır, buySolAmount ve buyTokenAmount güncellenir
+          const { positionId, mintAddress, symbol, dex, solAmount: addSolAmount } = message.data || {};
+          if (positionId && mintAddress && typeof addSolAmount === "number" && addSolAmount > 0) {
+            const pos = tradeStore.getById(positionId);
+            if (!pos || pos.status !== "open") {
+              console.warn(`⚠️ [AdditionalBuy] Pozisyon bulunamadı veya açık değil: ${positionId}`);
+            } else {
+              console.log(`🔄 [AdditionalBuy] ${symbol} ek alım başlatılıyor: +${addSolAmount} SOL (mevcut: ${pos.buySolAmount} SOL)`);
+
+              trader.additionalBuy({
+                positionId,
+                mintAddress,
+                symbol: pos.symbol,
+                dex: (dex === "pumpswap" ? "pumpswap" : "jupiter") as "jupiter" | "pumpswap",
+                solAmount: addSolAmount,
+              }).then((result) => {
+                if (result) {
+                  // Güncel pozisyonu tekrar oku (arada değişmiş olabilir)
+                  const currentPos = tradeStore.getById(positionId);
+                  if (currentPos && currentPos.status === "open") {
+                    // tokensReceived = cüzdandaki toplam bakiye (eski + yeni)
+                    // buySolAmount = toplam harcanan SOL
+                    const updatedPos = {
+                      ...currentPos,
+                      buySolAmount: currentPos.buySolAmount + addSolAmount,
+                      buyTokenAmount: result.tokensReceived, // Toplam cüzdan bakiyesi
+                    };
+                    tradeStore.upsert(updatedPos);
+                    broadcastToClients({ type: "position_update", data: updatedPos });
+                    console.log(`✅ [AdditionalBuy] ${symbol} ek alım tamam: toplam ${updatedPos.buySolAmount.toFixed(4)} SOL | ${updatedPos.buyTokenAmount?.toFixed(0)} token`);
+                  }
+                } else {
+                  console.error(`❌ [AdditionalBuy] ${symbol} ek alım başarısız`);
+                }
+              }).catch((err) => {
+                console.error(`❌ [AdditionalBuy] ${symbol} ek alım hatası:`, err);
+              });
+            }
+          }
         } else if (message.type === "sell_token") {
           const { positionId } = message.data || {};
           if (positionId) {
