@@ -830,6 +830,37 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
             )}
           </div>
 
+          {isOpen && onAdditionalBuy && (
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                step="0.001"
+                min="0.001"
+                placeholder="0.001"
+                value={additionalBuyInput}
+                onChange={(e) => setAdditionalBuyInput(e.target.value)}
+                disabled={isAdditionalBuying}
+                className="h-8 text-xs w-20 px-2"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 h-8"
+                disabled={isAdditionalBuying || !additionalBuyInput}
+                onClick={handleAdditionalBuy}
+              >
+                {isAdditionalBuying ? (
+                  <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Alınıyor</>
+                ) : (
+                  <>
+                    <Plus className="h-3 w-3 mr-1" />
+                    + Al
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
           <div className="shrink-0 flex gap-2">
             {isOpen && (
               <>
@@ -917,46 +948,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
           </div>
         </div>
 
-        {isOpen && (
-          <div className="space-y-3 border-t border-card-border pt-3 mt-3">
-            {/* Tekrar Al */}
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <Label className="text-xs">Tekrar Al (SOL)</Label>
-                <Input
-                  type="number"
-                  placeholder="SOL"
-                  value={additionalBuyInput}
-                  onChange={(e) => setAdditionalBuyInput(e.target.value)}
-                  step="0.001"
-                  min="0"
-                  disabled={isAdditionalBuying}
-                  className="text-xs"
-                />
-              </div>
-              <Button
-                size="sm"
-                onClick={handleAdditionalBuy}
-                disabled={isAdditionalBuying || !additionalBuyInput}
-                className="bg-emerald-600 hover:bg-emerald-700"
-                data-testid={`button-additional-buy-${p.id}`}
-              >
-                {isAdditionalBuying ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Alınıyor...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Al
-                  </>
-                )}
-              </Button>
-            </div>
 
-          </div>
-        )}
       </div>
     </div>
   );
