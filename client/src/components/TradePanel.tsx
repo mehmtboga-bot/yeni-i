@@ -157,9 +157,10 @@ export function TradePanel({
       return;
     }
 
-    // Mint address validation (44 karakter, base58)
-    if (mint.length !== 44) {
-      setQuickBuyError("Geçersiz mint address (44 karakter olmalı)");
+    // Mint address validation (42-44 karakter, base58)
+    const isValidBase58 = /^[1-9A-HJ-NP-Z]{42,44}$/.test(mint);
+    if (!isValidBase58) {
+      setQuickBuyError("Geçersiz mint address (42-44 karakter, base58 format)");
       return;
     }
 
@@ -345,7 +346,7 @@ export function TradePanel({
             <Input
               id="quick-buy-mint"
               type="text"
-              placeholder="Mint address yapıştır (44 karakter)"
+              placeholder="Mint address yapıştır (42-44 karakter)"
               value={quickBuyMintInput}
               onChange={(e) => {
                 setQuickBuyMintInput(e.target.value);
