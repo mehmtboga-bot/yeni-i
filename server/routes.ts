@@ -571,15 +571,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             };
 
-            if (dex === "pumpswap") {
-              trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount })
-                .then(manualBuyHandler)
-                .catch((err) => console.error("buyPumpSwap hatası:", err));
-            } else {
-              trader.buy({ mintAddress, name: nm, symbol: sym, solAmount })
-                .then(manualBuyHandler)
-                .catch((err) => console.error("buy_token hatası:", err));
-            }
+            // Alım kesin tetiklensin — retry logic ile (3 deneme)
+            const executeBuyWithRetry = async (retryCount = 0) => {
+              try {
+                if (dex === "pumpswap") {
+                  await trader.buyPumpSwap({ mintAddress, name: nm, symbol: sym, solAmount });
+                } else {
+                  await trader.buy({ mintAddress, name: nm, symbol: sym, solAmount });
+                }
+                console.log(`✅ [Buy] Alım başarılı: ${sym} | ${solAmount} SOL`);
+                manualBuyHandler();
+              } catch (err) {
+                if (retryCount < 2) {
+                  console.warn(`⚠️ [Buy] Alım başarısız, tekrar deneniyor (${retryCount + 1}/3): ${err}`);
+                  setTimeout(() => executeBuyWithRetry(retryCount + 1), 2000);
+                } else {
+                  console.error(`❌ [Buy] Alım 3 denemede başarısız: ${err}`);
+                }
+              }
+            };
+
+            executeBuyWithRetry();
           }
         } else if (message.type === "sell_token") {
           const { positionId } = message.data || {};
