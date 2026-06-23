@@ -20,7 +20,6 @@ interface TradePanelProps {
   globalHoldDurationMs?: number;
   ws?: WebSocket | null;
   onBuy: (mintAddress: string, name: string, symbol: string, dex?: "jupiter" | "pumpswap", solAmount?: number) => void;
-  onAdditionalBuy?: (positionId: string, mintAddress: string, symbol: string, dex: "jupiter" | "pumpswap", solAmount: number) => void;
   onSell: (positionId: string) => void;
   onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
@@ -73,7 +72,6 @@ export function TradePanel({
   globalHoldDurationMs,
   ws,
   onBuy: onBuyProp,
-  onAdditionalBuy: onAdditionalBuyProp,
   onSell,
   onSellHalf,
   onDelete,
@@ -119,10 +117,6 @@ export function TradePanel({
 
   // Mevcut pozisyona ek alım — yeni position oluşturmaz, buySolAmount ve buyTokenAmount güncellenir
   const onAdditionalBuy = (positionId: string, mintAddress: string, symbol: string, dex: "jupiter" | "pumpswap", solAmount: number) => {
-    if (onAdditionalBuyProp) {
-      onAdditionalBuyProp(positionId, mintAddress, symbol, dex, solAmount);
-      return;
-    }
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(
         JSON.stringify({
