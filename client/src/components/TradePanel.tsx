@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer, Plus, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -527,6 +527,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
   const [additionalBuyInput, setAdditionalBuyInput] = useState<string>("");
   const [isAdditionalBuying, setIsAdditionalBuying] = useState(false);
   const [buyRetries, setBuyRetries] = useState(0);
+  const attemptBuyRef = useRef<NodeJS.Timeout | null>(null);
 
   // İşlem sunucuya ulaşınca (pending_sell) veya kapanınca loading'i temizle
   useEffect(() => {
@@ -571,15 +572,20 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
         }
       }, 5000);
 
-      return () => clearTimeout(checkTimeout);
+      attemptBuyRef.current = checkTimeout;
     };
 
     attemptBuy(0);
   };
 
-  // Position buySolAmount güncellenince alım başarılı sayılır — state'i temizle
+  // Position buySolAmount güncellenince alım başarılı sayılır — timeout'u iptal et
   useEffect(() => {
     if (isAdditionalBuying && p.status === "open") {
+      // Timeout'u iptal et (retry yapılmasın)
+      if (attemptBuyRef.current) {
+        clearTimeout(attemptBuyRef.current);
+        attemptBuyRef.current = null;
+      }
       setAdditionalBuyInput("");
       setIsAdditionalBuying(false);
       console.log(`✅ [PositionRow] Alım başarılı: ${p.symbol}`);
