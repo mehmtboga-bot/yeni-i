@@ -804,47 +804,6 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                 )}
               </div>
             )}
-
-            {/* Tekrar alım — sadece açık pozisyonlar için */}
-            {isOpen && (
-              <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-                <Label htmlFor={`additional-buy-${p.id}`} className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
-                  <Plus className="h-3 w-3 text-emerald-400" />
-                  Tekrar Al (SOL)
-                </Label>
-                <Input
-                  id={`additional-buy-${p.id}`}
-                  type="number"
-                  step="0.01"
-                  min="0.0001"
-                  placeholder="0.1"
-                  value={additionalBuyInput}
-                  onChange={(e) => setAdditionalBuyInput(e.target.value)}
-                  disabled={isAdditionalBuying}
-                  className="h-6 text-xs w-20 px-2"
-                />
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="h-6 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
-                  disabled={isAdditionalBuying || !additionalBuyInput}
-                  onClick={handleAdditionalBuy}
-                  data-testid={`button-additional-buy-${p.id}`}
-                >
-                  {isAdditionalBuying ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Alınıyor ({buyRetries + 1}/3)
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="h-3 w-3 mr-1" />
-                      Al
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
           </div>
 
           <div className="shrink-0 flex gap-2">
@@ -933,6 +892,42 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
             )}
           </div>
         </div>
+
+        {isOpen && (
+          <div className="flex gap-2 items-end border-t border-card-border pt-3 mt-3">
+            <div className="flex-1">
+              <Label className="text-xs">Tekrar Al (SOL)</Label>
+              <Input
+                type="number"
+                placeholder="SOL"
+                value={additionalBuyInput}
+                onChange={(e) => setAdditionalBuyInput(e.target.value)}
+                step="0.001"
+                min="0"
+                disabled={isAdditionalBuying}
+                className="text-xs"
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={handleAdditionalBuy}
+              disabled={isAdditionalBuying || !additionalBuyInput}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {isAdditionalBuying ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Alınıyor...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Al
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
