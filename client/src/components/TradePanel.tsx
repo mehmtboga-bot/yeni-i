@@ -872,6 +872,10 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                     )}
                   </Button>
                 )}
+              </>
+            )}
+            {(isOpen || isPending) && (
+              <>
                 <Button
                   size="sm"
                   variant="outline"
