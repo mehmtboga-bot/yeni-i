@@ -176,7 +176,6 @@ export function AutoTraderPanel({
               min="0.0001"
               value={solAmountInput}
               onChange={(e) => setSolAmountInput(e.target.value)}
-              disabled={isRunning}
               data-testid="input-auto-sol-amount"
               className="font-mono"
             />
@@ -196,7 +195,6 @@ export function AutoTraderPanel({
               min="1"
               value={maxTokensInput}
               onChange={(e) => setMaxTokensInput(e.target.value)}
-              disabled={isRunning}
               data-testid="input-auto-max-tokens"
               className="font-mono"
             />
@@ -217,7 +215,6 @@ export function AutoTraderPanel({
               min="10"
               value={holdDurationInput}
               onChange={(e) => setHoldDurationInput(e.target.value)}
-              disabled={isRunning}
               data-testid="input-auto-hold-duration"
               className="font-mono"
             />
@@ -238,7 +235,6 @@ export function AutoTraderPanel({
               min="0"
               value={stopLossInput}
               onChange={(e) => setStopLossInput(e.target.value)}
-              disabled={isRunning}
               data-testid="input-auto-stop-loss"
               className="font-mono"
             />
@@ -258,7 +254,6 @@ export function AutoTraderPanel({
               min="50"
               value={slippageInput}
               onChange={(e) => setSlippageInput(e.target.value)}
-              disabled={isRunning}
               data-testid="input-auto-slippage"
               className="font-mono"
             />
@@ -279,7 +274,6 @@ export function AutoTraderPanel({
               min="0"
               value={priorityInput}
               onChange={(e) => setPriorityInput(e.target.value)}
-              disabled={isRunning}
               data-testid="input-auto-priority"
               className="font-mono"
             />
@@ -299,7 +293,6 @@ export function AutoTraderPanel({
               min="0"
               value={minLiquidityInput}
               onChange={(e) => setMinLiquidityInput(e.target.value)}
-              disabled={isRunning}
               data-testid="input-auto-min-liquidity"
               className="font-mono"
             />
@@ -330,7 +323,6 @@ export function AutoTraderPanel({
                 min="0"
                 value={profitTargetInput}
                 onChange={(e) => setProfitTargetInput(e.target.value)}
-                disabled={isRunning}
                 data-testid="input-auto-profit-target"
                 className={`font-mono ${parseFloat(profitTargetInput) > 0 ? "border-emerald-500/50 text-emerald-400" : ""}`}
               />
@@ -350,7 +342,6 @@ export function AutoTraderPanel({
                 min="0"
                 value={halfSellTarget1Input}
                 onChange={(e) => setHalfSellTarget1Input(e.target.value)}
-                disabled={isRunning}
                 data-testid="input-auto-half-sell-1"
                 className={`font-mono ${parseFloat(halfSellTarget1Input) > 0 ? "border-amber-500/50 text-amber-400" : ""}`}
               />
@@ -370,7 +361,6 @@ export function AutoTraderPanel({
                 min="0"
                 value={halfSellTarget2Input}
                 onChange={(e) => setHalfSellTarget2Input(e.target.value)}
-                disabled={isRunning}
                 data-testid="input-auto-half-sell-2"
                 className={`font-mono ${parseFloat(halfSellTarget2Input) > 0 ? "border-amber-500/50 text-amber-400" : ""}`}
               />
@@ -390,7 +380,6 @@ export function AutoTraderPanel({
                 min="0"
                 value={halfSellTarget3Input}
                 onChange={(e) => setHalfSellTarget3Input(e.target.value)}
-                disabled={isRunning}
                 data-testid="input-auto-half-sell-3"
                 className={`font-mono ${parseFloat(halfSellTarget3Input) > 0 ? "border-amber-500/50 text-amber-400" : ""}`}
               />
@@ -405,7 +394,6 @@ export function AutoTraderPanel({
         <div className="flex gap-2 pt-2">
           <Button
             onClick={saveConfig}
-            disabled={isRunning}
             className="flex-1 bg-primary hover:bg-primary/90"
             data-testid="button-auto-save-config"
           >
@@ -413,7 +401,6 @@ export function AutoTraderPanel({
           </Button>
           <Button
             onClick={resetToDefaults}
-            disabled={isRunning}
             variant="outline"
             data-testid="button-auto-reset-config"
           >
