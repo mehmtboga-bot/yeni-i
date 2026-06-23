@@ -724,9 +724,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const updated = { ...pos, customHoldDurationMs: holdDurationMs };
               tradeStore.upsert(updated);
               broadcastToClients({ type: "position_update", data: updated });
-              // Auto-trader engine'de de güncelle (autoSellAt yeniden hesapla)
+              // Auto-trader engine'de mevcut kaydı güncelle (autoSellAt yeniden hesapla)
               autoTraderEngine.updatePositionHoldDuration(pos.mintAddress, holdDurationMs);
-              console.log(`⏱️ [Routes] ${pos.symbol} özel tutma süresi: ${(holdDurationMs / 1000).toFixed(0)}s`);
+              // Eğer bu pozisyon için henüz auto-trader kaydı yoksa (manuel alım), yeni kayıt oluştur
+              // Böylece satış kontrolcüsü süre dolduğunda satışı tetikler
+              if (autoTraderEngine.getShouldSellAt(pos.mintAddress) === undefined) {
+                autoTraderEngine.createRecordForManualBuy(
+                  pos.mintAddress,
+                  pos.name ?? pos.symbol ?? "Bilinmiyor",
+                  pos.symbol ?? "?",
+                  holdDurationMs
+                );
+                console.log(`📝 [Routes] ${pos.symbol} için auto-trader satış kaydı oluşturuldu: ${(holdDurationMs / 1000).toFixed(0)}s`);
+              } else {
+                console.log(`⏱️ [Routes] ${pos.symbol} özel tutma süresi: ${(holdDurationMs / 1000).toFixed(0)}s`);
+              }
             }
           }
         } else if (message.type === "request_positions") {
