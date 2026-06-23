@@ -165,13 +165,15 @@ export function TradePanel({
 
     console.log(`🚀 [QuickBuy] Mint bilgileri çekiliyor: ${mint}`);
 
+    const solAmount = parseFloat(solAmountInput) || config.solAmount;
+
     try {
       const res = await fetch("/api/quick-buy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mintAddress: mint,
-          solAmount: config.solAmount,
+          solAmount: solAmount,
           slippageBps: config.slippageBps,
           priorityFeeMicroLamports: config.priorityFeeManualMicroLamports,
         }),
