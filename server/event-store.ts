@@ -68,4 +68,10 @@ export class EventStore {
   getLast(count = 100) {
     return this.store.events.slice(-count);
   }
+
+  // Tüm event geçmişini sıfırla
+  clear(): void {
+    this.store = { lastId: 0, events: [] };
+    saveStore(this.store);
+  }
 }
