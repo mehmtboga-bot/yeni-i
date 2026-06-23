@@ -398,6 +398,27 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     return () => clearInterval(interval);
   }, [p.autoSellAt]);
 
+  // Özel tutma süresi countdown
+  const [customHoldSecsLeft, setCustomHoldSecsLeft] = useState<number | null>(() => {
+    if (!p.customHoldDurationMs || !p.buyTimestamp) return null;
+    const elapsed = Date.now() - p.buyTimestamp;
+    return Math.max(0, Math.floor((p.customHoldDurationMs - elapsed) / 1000));
+  });
+
+  useEffect(() => {
+    if (!p.customHoldDurationMs || !p.buyTimestamp) {
+      setCustomHoldSecsLeft(null);
+      return;
+    }
+    const update = () => {
+      const elapsed = Date.now() - p.buyTimestamp!;
+      setCustomHoldSecsLeft(Math.max(0, Math.floor((p.customHoldDurationMs! - elapsed) / 1000)));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [p.customHoldDurationMs, p.buyTimestamp]);
+
   return (
     <div
       className={`bg-card border rounded-lg overflow-hidden ${
@@ -452,6 +473,23 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                 >
                   <Timer className="h-3 w-3" />
                   {autoSellSecsLeft === 0 ? "Satış Bekleniyor" : `Satışa Kalan: ${autoSellSecsLeft}s`}
+                </Badge>
+              )}
+              {customHoldSecsLeft !== null && isOpen && (
+                <Badge
+                  className={`text-xs gap-1 font-bold font-mono ${
+                    customHoldSecsLeft === 0
+                      ? "bg-violet-500/20 text-violet-300 border border-violet-400/60 animate-pulse"
+                      : customHoldSecsLeft <= 10
+                      ? "bg-red-500/20 text-red-300 border border-red-400/60 animate-pulse"
+                      : customHoldSecsLeft <= 30
+                      ? "bg-orange-500/15 text-orange-400 border border-orange-500/40"
+                      : "bg-violet-500/15 text-violet-400 border border-violet-500/40"
+                  }`}
+                  title="Özel tutma süresi countdown"
+                >
+                  <Timer className="h-3 w-3" />
+                  {customHoldSecsLeft === 0 ? "Satış Bekleniyor" : `Kaldı: ${customHoldSecsLeft}s`}
                 </Badge>
               )}
               {isHalfSelling && (
