@@ -210,34 +210,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/quick-buy", async (req, res) => {
-    const { mintAddress, solAmount } = req.body || {};
-
-    if (!mintAddress) {
-      return res.status(400).json({ error: "mintAddress gerekli" });
-    }
-
-    if (typeof solAmount !== "number" || solAmount <= 0) {
-      return res.status(400).json({ error: "solAmount gerekli" });
-    }
-
-    try {
-      // buy_token mesajı gönder
-      broadcastToClients({
-        type: "buy_token",
-        data: {
-          mintAddress,
-          solAmount,
-        },
-      });
-
-      res.json({ ok: true, message: "Alım başlatıldı" });
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-  // --------------------------
-
   // ---- Trade store + Jupiter ----
   const tradeStore = new TradeStore();
 
@@ -840,87 +812,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   wss.on("error", (error) => {
     _origError("❌ WebSocket Server hatası:", error);
   });
-
-  // ---- Quick Buy API ----
-  // Mint bilgilerini Helius'tan çek ve manual trader ayarlarıyla alım yap
-  app.post("/api/quick-buy", async (req, res) => {
-    const { mintAddress, solAmount, slippageBps, priorityFeeMicroLamports } = req.body || {};
-
-    if (!mintAddress || !solAmount) {
-      return res.status(400).json({ error: "mintAddress ve solAmount gerekli" });
-    }
-
-    try {
-      console.log(`🚀 [Quick-Buy] Mint bilgileri çekiliyor: ${mintAddress}`);
-
-      // Helius API'den mint info al
-      const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${secrets.HELIUS_API_KEY}`;
-      const heliusRes = await fetch(heliusUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: "quick-buy",
-          method: "getAsset",
-          params: { id: mintAddress },
-        }),
-      });
-
-      const heliusData = await heliusRes.json();
-      if (heliusData.error || !heliusData.result) {
-        console.error("Helius hatası:", heliusData.error);
-        return res.status(400).json({ error: "Mint bulunamadı" });
-      }
-
-      const asset = heliusData.result;
-      const name = asset.content?.metadata?.name || "Bilinmiyor";
-      const symbol = asset.content?.metadata?.symbol || "?";
-
-      console.log(`✅ [Quick-Buy] Mint bilgileri çekildi: ${symbol} (${name})`);
-
-      // Alım yap (Jupiter kullan)
-      console.log(`💰 [Quick-Buy] Alım başlatılıyor: ${symbol} | ${solAmount} SOL`);
-
-      const pos = await trader.buy({
-        mintAddress,
-        name,
-        symbol,
-        solAmount,
-        isAuto: false,
-      });
-
-      console.log(`✅ [Quick-Buy] Alım başarılı: ${symbol}`);
-
-      // Position'a kar hedefi ayarla (manual trader ayarlarından)
-      if (pos && pos.status === "open") {
-        const config = tradeStore.getConfig();
-        const takeProfitPct = config.takeProfitPct ?? 0;
-
-        if (takeProfitPct > 0) {
-          const updated = { ...pos, takeProfitPct };
-          tradeStore.upsert(updated);
-          broadcastToClients({ type: "position_update", data: updated });
-          console.log(`🎯 [Quick-Buy] ${symbol} kar hedefi ayarlandı: +%${takeProfitPct}`);
-        }
-      }
-
-      // Position'ı al
-      const position = tradeStore.getByMint(mintAddress);
-
-      res.json({
-        ok: true,
-        message: `${symbol} alındı`,
-        position,
-        name,
-        symbol,
-      });
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error(`❌ [Quick-Buy] Hata: ${errorMsg}`);
-      res.status(500).json({ error: errorMsg });
-    }
-  });
-  // ----------------------
 
   // ---- Yarı Satış API ----
   app.post("/api/sell-half", async (req, res) => {
