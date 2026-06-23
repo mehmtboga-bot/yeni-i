@@ -111,7 +111,7 @@ export class PositionPricer {
 
     const config = this.store.getConfig();
     const autoConfig = this.autoTraderConfigStore?.getConfig();
-    const takeProfitPct = autoConfig?.profitTargetPct ?? config.takeProfitPct ?? 0;
+    const takeProfitPct = config.takeProfitPct ?? autoConfig?.profitTargetPct ?? 0;
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
