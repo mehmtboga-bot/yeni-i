@@ -896,6 +896,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     _origError("❌ WebSocket Server hatası:", error);
   });
 
+  // ---- Tüm Pozisyonları Sil API ----
+  app.post("/api/clear-all-positions", (req, res) => {
+    try {
+      const allPositions = tradeStore.getAll();
+      for (const pos of allPositions) {
+        tradeStore.delete(pos.id);
+        autoTraderEngine.markRecordClosed(pos.mintAddress);
+        const lm = liquidityMonitors.get(pos.id);
+        if (lm) {
+          lm.stop();
+          liquidityMonitors.delete(pos.id);
+        }
+      }
+      broadcastToClients({ type: "positions_cleared", data: { count: allPositions.length } });
+      console.log(`🗑️ [API] Tüm pozisyonlar silindi (${allPositions.length} adet)`);
+      res.json({ ok: true, message: `${allPositions.length} pozisyon silindi` });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+  // -----------------------------------
+
   // ---- Yarı Satış API ----
   app.post("/api/sell-half", async (req, res) => {
     const { positionId } = req.body || {};

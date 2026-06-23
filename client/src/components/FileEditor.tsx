@@ -122,6 +122,32 @@ export function FileEditor() {
             </button>
           ))}
         </nav>
+        {/* Tüm Pozisyonları Sil */}
+        <div className="px-2 py-3 border-t border-zinc-800">
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-full text-xs"
+            onClick={async () => {
+              if (!confirm("Tüm pozisyonları silmek istediğine emin misin? Bu işlem geri alınamaz!")) return;
+              try {
+                const res = await fetch("/api/clear-all-positions", { method: "POST" });
+                const data = await res.json();
+                if (res.ok) {
+                  alert(`✅ ${data.message}`);
+                  window.location.reload();
+                } else {
+                  alert(`❌ Hata: ${data.error}`);
+                }
+              } catch (err) {
+                alert(`❌ Bağlantı hatası: ${err}`);
+              }
+            }}
+            data-testid="button-clear-all-positions"
+          >
+            🗑️ Tüm Pozisyonları Sil
+          </Button>
+        </div>
       </aside>
 
       {/* Sağ: editör */}
