@@ -157,38 +157,35 @@ export function TradePanel({
       return;
     }
 
-    // Mint address validation kaldır - server-side validation yeterli
-    // Herhangi bir address'i kabul et
-
     setIsQuickBuying(true);
     setQuickBuyError("");
-
-    console.log(`🚀 [QuickBuy] Mint bilgileri çekiliyor: ${mint}`);
 
     const solAmount = parseFloat(solAmountInput) || config.solAmount;
 
     try {
-      const res = await fetch("/api/quick-buy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mintAddress: mint,
-          solAmount: solAmount,
-          slippageBps: config.slippageBps,
-          priorityFeeMicroLamports: config.priorityFeeManualMicroLamports,
-        }),
-      });
+      console.log(`🚀 [QuickBuy] Alım başlatılıyor: ${mint} | ${solAmount} SOL`);
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Bilinmeyen hata" }));
-        setQuickBuyError(err.error || "Alım başarısız");
-        console.error("Quick-buy hatası:", err);
+      // Doğrudan WebSocket üzerinden buy_token gönder
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        setQuickBuyError("WebSocket bağlantısı yok");
         setIsQuickBuying(false);
         return;
       }
 
-      const result = await res.json();
-      console.log(`✅ [QuickBuy] Alım başarılı:`, result);
+      ws.send(
+        JSON.stringify({
+          type: "buy_token",
+          data: {
+            mintAddress: mint,
+            name: "Bilinmiyor",
+            symbol: "?",
+            dex: "jupiter",
+            solAmount: solAmount,
+          },
+        })
+      );
+
+      console.log(`✅ [QuickBuy] Alım mesajı gönderildi`);
 
       // Input'u temizle
       setQuickBuyMintInput("");
@@ -198,7 +195,7 @@ export function TradePanel({
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Bağlantı hatası";
       setQuickBuyError(errorMsg);
-      console.error("Quick-buy isteği hatası:", err);
+      console.error("Quick-buy hatası:", err);
     } finally {
       setIsQuickBuying(false);
     }
