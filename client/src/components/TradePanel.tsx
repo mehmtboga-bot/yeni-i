@@ -117,17 +117,14 @@ export function TradePanel({
 
   // Mevcut pozisyona ek alım — yeni position oluşturmaz, buySolAmount ve buyTokenAmount güncellenir
   const onAdditionalBuy = (positionId: string, mintAddress: string, symbol: string, dex: "jupiter" | "pumpswap", solAmount: number) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.error("❌ WebSocket bağlantısı yok — ek alım gönderilemedi");
-      return;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: "additional_buy",
+          data: { positionId, mintAddress, symbol, dex, solAmount },
+        })
+      );
     }
-    console.log(`🔄 [TradePanel] Ek alım tetikleniyor: ${symbol} | ${solAmount} SOL | positionId: ${positionId}`);
-    ws.send(
-      JSON.stringify({
-        type: "additional_buy",
-        data: { positionId, mintAddress, symbol, dex, solAmount },
-      })
-    );
   };
 
   const copyAddress = async (address: string, id: string) => {
