@@ -17,6 +17,35 @@ import { PhantomMonitor } from "./phantom-monitor";
 
 const ROOT = process.cwd();
 
+// ─── Utility: Token metadata (Helius getAsset) ────────────────────────────────
+// Bot'un HeliusMonitor.fetchTokenMetadata() ile aynı kaynak ve mantık.
+async function fetchTokenMetadata(mintAddress: string): Promise<{ name: string; symbol: string } | null> {
+  try {
+    const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${secrets.HELIUS_API_KEY}`;
+    const res = await fetch(heliusUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getAsset",
+        params: { id: mintAddress },
+      }),
+    });
+    const data = await res.json();
+    const result = data.result;
+    if (!result) return null;
+    const name   = result.content?.metadata?.name   || "Bilinmiyor";
+    const symbol = result.content?.metadata?.symbol || "?";
+    if (name === "Bilinmiyor" && symbol === "?") return null;
+    return { name, symbol };
+  } catch (err) {
+    console.warn(`⚠️ fetchTokenMetadata hatası:`, err);
+    return null;
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const ALLOWED_FILES = [
   "data/whitelist.txt",
 ];
@@ -552,22 +581,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!name || !symbol) {
               try {
                 console.log(`🔍 [Buy] Mint info çekiliyor: ${mintAddress}`);
-                const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${secrets.HELIUS_API_KEY}`;
-                const heliusRes = await fetch(heliusUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    jsonrpc: "2.0",
-                    id: "buy-token",
-                    method: "getAsset",
-                    params: { id: mintAddress },
-                  }),
-                });
-                const heliusData = await heliusRes.json();
-                if (heliusData.result) {
-                  const asset = heliusData.result;
-                  nm = asset.content?.metadata?.name || "Bilinmiyor";
-                  sym = asset.content?.metadata?.symbol || "?";
+                const metadata = await fetchTokenMetadata(mintAddress);
+                if (metadata) {
+                  nm = metadata.name;
+                  sym = metadata.symbol;
                   console.log(`✅ [Buy] Mint info çekildi: ${sym} (${nm})`);
                 }
               } catch (err) {
