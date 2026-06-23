@@ -223,6 +223,9 @@ export function TradePanel({
 
   const takeProfitPct = config.takeProfitPct ?? 0;
 
+  const quickBuySolAmount = parseFloat(solAmountInput) || config.solAmount;
+  const quickBuySlippageBps = parseInt(slippageInput || "0") || config.slippageBps;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Üst Bilgi */}
@@ -379,7 +382,7 @@ export function TradePanel({
           )}
 
           <p className="text-xs text-muted-foreground">
-            Manual trader ayarları kullanılır: {config.solAmount} SOL, {Math.floor(config.slippageBps / 100)}% slippage
+            Manual trader ayarları kullanılır: {quickBuySolAmount} SOL, {Math.floor(quickBuySlippageBps / 100)}% slippage
           </p>
         </div>
       </Card>
