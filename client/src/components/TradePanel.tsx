@@ -157,12 +157,8 @@ export function TradePanel({
       return;
     }
 
-    // Mint address validation (42-44 karakter, base58)
-    const isValidBase58 = /^[1-9A-HJ-NP-Z]{42,44}$/.test(mint);
-    if (!isValidBase58) {
-      setQuickBuyError("Geçersiz mint address (42-44 karakter, base58 format)");
-      return;
-    }
+    // Mint address validation kaldır - server-side validation yeterli
+    // Herhangi bir address'i kabul et
 
     setIsQuickBuying(true);
     setQuickBuyError("");
