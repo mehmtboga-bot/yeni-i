@@ -209,6 +209,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: (err as Error).message });
     }
   });
+
+  app.post("/api/quick-buy", async (req, res) => {
+    const { mintAddress, solAmount } = req.body || {};
+
+    if (!mintAddress) {
+      return res.status(400).json({ error: "mintAddress gerekli" });
+    }
+
+    if (typeof solAmount !== "number" || solAmount <= 0) {
+      return res.status(400).json({ error: "solAmount gerekli" });
+    }
+
+    try {
+      // buy_token mesajı gönder
+      broadcastToClients({
+        type: "buy_token",
+        data: {
+          mintAddress,
+          solAmount,
+        },
+      });
+
+      res.json({ ok: true, message: "Alım başlatıldı" });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
   // --------------------------
 
   // ---- Trade store + Jupiter ----
