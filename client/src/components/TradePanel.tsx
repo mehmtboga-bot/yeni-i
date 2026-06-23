@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer } from "lucide-react";
+import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -366,6 +366,9 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : ""
   );
   const [isHalfSelling, setIsHalfSelling] = useState(false);
+  const [additionalBuyInput, setAdditionalBuyInput] = useState<string>("");
+  const [isAdditionalBuying, setIsAdditionalBuying] = useState(false);
+  const [buyRetries, setBuyRetries] = useState(0);
 
   // İşlem sunucuya ulaşınca (pending_sell) veya kapanınca loading'i temizle
   useEffect(() => {
@@ -373,6 +376,49 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
       setIsHalfSelling(false);
     }
   }, [p.status, isHalfSelling]);
+
+  // Tekrar alım fonksiyonu
+  const handleAdditionalBuy = async () => {
+    const solAmount = parseFloat(additionalBuyInput);
+    if (Number.isNaN(solAmount) || solAmount <= 0) {
+      console.warn("❌ Geçersiz SOL miktarı");
+      return;
+    }
+
+    setIsAdditionalBuying(true);
+    setBuyRetries(0);
+
+    const attemptBuy = (retryCount: number) => {
+      console.log(`🔄 [PositionRow] Alım denemesi ${retryCount + 1}/3: ${p.symbol} | ${solAmount} SOL`);
+
+      onBuy(p.mintAddress, p.name, p.symbol, p.dex, solAmount);
+
+      // 5 saniye sonra kontrol et - alım başarılı mı?
+      const checkTimeout = setTimeout(() => {
+        if (retryCount < 2) {
+          console.log(`⚠️ [PositionRow] Alım yanıt vermedi, tekrar deneniyor...`);
+          setBuyRetries(retryCount + 1);
+          attemptBuy(retryCount + 1);
+        } else {
+          console.error(`❌ [PositionRow] Alım 3 denemede başarısız oldu`);
+          setIsAdditionalBuying(false);
+        }
+      }, 5000);
+
+      return () => clearTimeout(checkTimeout);
+    };
+
+    attemptBuy(0);
+  };
+
+  // Position buySolAmount güncellenince alım başarılı sayılır — state'i temizle
+  useEffect(() => {
+    if (isAdditionalBuying && p.status === "open") {
+      setAdditionalBuyInput("");
+      setIsAdditionalBuying(false);
+      console.log(`✅ [PositionRow] Alım başarılı: ${p.symbol}`);
+    }
+  }, [p.buySolAmount, isAdditionalBuying]);
 
   const pnlPositive = (p.pnlSol ?? 0) >= 0;
   const profitPct = isOpen ? (p.unrealizedPnlPct ?? null) : (p.pnlPct ?? null);
@@ -617,6 +663,47 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                     ✓ {Math.round(p.customHoldDurationMs / 1000)}s ayarlı
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* Tekrar alım — sadece açık pozisyonlar için */}
+            {isOpen && (
+              <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                <Label htmlFor={`additional-buy-${p.id}`} className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                  <Plus className="h-3 w-3 text-emerald-400" />
+                  Tekrar Al (SOL)
+                </Label>
+                <Input
+                  id={`additional-buy-${p.id}`}
+                  type="number"
+                  step="0.01"
+                  min="0.0001"
+                  placeholder="0.1"
+                  value={additionalBuyInput}
+                  onChange={(e) => setAdditionalBuyInput(e.target.value)}
+                  disabled={isAdditionalBuying}
+                  className="h-6 text-xs w-20 px-2"
+                />
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-6 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
+                  disabled={isAdditionalBuying || !additionalBuyInput}
+                  onClick={handleAdditionalBuy}
+                  data-testid={`button-additional-buy-${p.id}`}
+                >
+                  {isAdditionalBuying ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Alınıyor ({buyRetries + 1}/3)
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-3 w-3 mr-1" />
+                      Al
+                    </>
+                  )}
+                </Button>
               </div>
             )}
           </div>
