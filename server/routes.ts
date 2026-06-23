@@ -540,12 +540,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (message.type === "buy_token") {
           const { mintAddress, name, symbol, dex, solAmount: msgSolAmount } = message.data || {};
           if (mintAddress) {
-            const nm = name || "Bilinmiyor";
-            const sym = symbol || "?";
             const config = tradeStore.getConfig();
             const solAmount = (typeof msgSolAmount === "number" && msgSolAmount > 0)
               ? msgSolAmount
               : config.solAmount;
+
+            // Eğer name/symbol yoksa Helius'tan çek
+            let nm = name || "Bilinmiyor";
+            let sym = symbol || "?";
+
+            if (!name || !symbol) {
+              try {
+                console.log(`🔍 [Buy] Mint info çekiliyor: ${mintAddress}`);
+                const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${secrets.HELIUS_API_KEY}`;
+                const heliusRes = await fetch(heliusUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    id: "buy-token",
+                    method: "getAsset",
+                    params: { id: mintAddress },
+                  }),
+                });
+                const heliusData = await heliusRes.json();
+                if (heliusData.result) {
+                  const asset = heliusData.result;
+                  nm = asset.content?.metadata?.name || "Bilinmiyor";
+                  sym = asset.content?.metadata?.symbol || "?";
+                  console.log(`✅ [Buy] Mint info çekildi: ${sym} (${nm})`);
+                }
+              } catch (err) {
+                console.warn(`⚠️ [Buy] Mint info çekilemedi, default değerler kullanılıyor:`, err);
+              }
+            }
 
             const manualBuyHandler = () => {
               // Manuel alım — otomatik trader ayarlarından bağımsız

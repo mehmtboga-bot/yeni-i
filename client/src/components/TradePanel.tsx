@@ -165,20 +165,22 @@ export function TradePanel({
     try {
       console.log(`🚀 [QuickBuy] Alım başlatılıyor: ${mint} | ${solAmount} SOL`);
 
-      // Doğrudan WebSocket üzerinden buy_token gönder
+      // WebSocket bağlantısını kontrol et
       if (!ws || ws.readyState !== WebSocket.OPEN) {
-        setQuickBuyError("WebSocket bağlantısı yok");
+        setQuickBuyError("WebSocket bağlantısı yok. Sayfayı yenile.");
         setIsQuickBuying(false);
         return;
       }
 
+      // Doğrudan WebSocket üzerinden buy_token gönder
+      // Server'daki buy_token handler mint info'yu Helius'tan çekecek
       ws.send(
         JSON.stringify({
           type: "buy_token",
           data: {
             mintAddress: mint,
-            name: "Bilinmiyor",
-            symbol: "?",
+            name: undefined,   // Server Helius'tan çekecek
+            symbol: undefined, // Server Helius'tan çekecek
             dex: "jupiter",
             solAmount: solAmount,
           },
