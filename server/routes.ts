@@ -558,7 +558,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   mintAddress,
                   nm,
                   sym,
-                  pos.customHoldDurationMs
+                  pos.customHoldDurationMs,
+                  pos.buyTimestamp  // ✅ Gerçek alım zamanını kullan — sayaç doğru başlasın
                 );
                 console.log(
                   `📝 [Manual-Buy] ${sym} özel tutma süresi ile auto-trader record'u oluşturuldu`
@@ -733,7 +734,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   pos.mintAddress,
                   pos.name ?? pos.symbol ?? "Bilinmiyor",
                   pos.symbol ?? "?",
-                  holdDurationMs
+                  holdDurationMs,
+                  pos.buyTimestamp  // ✅ Gerçek alım zamanını kullan — updatePositionHoldDuration da doğru hesaplasın
                 );
                 console.log(`📝 [Routes] ${pos.symbol} için auto-trader satış kaydı oluşturuldu: ${(holdDurationMs / 1000).toFixed(0)}s`);
               } else {
