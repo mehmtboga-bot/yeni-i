@@ -558,7 +558,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   mintAddress,
                   nm,
                   sym,
-                  pos.customHoldDurationMs
+                  pos.customHoldDurationMs,
+                  pos.buyTimestamp  // Gerçek alım zamanını geç
                 );
                 console.log(
                   `📝 [Manual-Buy] ${sym} özel tutma süresi ile auto-trader record'u oluşturuldu`
@@ -733,9 +734,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   pos.mintAddress,
                   pos.name ?? pos.symbol ?? "Bilinmiyor",
                   pos.symbol ?? "?",
-                  holdDurationMs
+                  holdDurationMs,
+                  pos.buyTimestamp  // Gerçek alım zamanını geç — süre alımdan itibaren sayılsın
                 );
-                console.log(`📝 [Routes] ${pos.symbol} için auto-trader satış kaydı oluşturuldu: ${(holdDurationMs / 1000).toFixed(0)}s`);
+                console.log(`📝 [Routes] ${pos.symbol} için auto-trader satış kaydı oluşturuldu: ${(holdDurationMs / 1000).toFixed(0)}s (alımdan itibaren)`);
               } else {
                 console.log(`⏱️ [Routes] ${pos.symbol} özel tutma süresi: ${(holdDurationMs / 1000).toFixed(0)}s`);
               }
@@ -860,22 +862,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isAuto: false,
       });
 
-      console.log(`✅ [Quick-Buy] Alım başarılı: ${symbol}`);
-
-      // Position'a kar hedefi ayarla (manual trader ayarlarından)
-      if (pos && pos.status === "open") {
-        const config = tradeStore.getConfig();
-        const takeProfitPct = config.takeProfitPct ?? 0;
-
-        if (takeProfitPct > 0) {
-          const updated = { ...pos, takeProfitPct };
-          tradeStore.upsert(updated);
-          broadcastToClients({ type: "position_update", data: updated });
-          console.log(`🎯 [Quick-Buy] ${symbol} kar hedefi ayarlandı: +%${takeProfitPct}`);
-        }
+      if (!pos) {
+        console.error(`❌ [Quick-Buy] Alım başarısız: ${symbol} — trader null döndürdü`);
+        return res.status(500).json({ error: "Alım başarısız — trader hazır değil veya pozisyon oluşturulamadı" });
       }
 
-      // Position'ı al
+      console.log(`✅ [Quick-Buy] Alım başlatıldı: ${symbol} (status: ${pos.status})`);
+
+      // Position'a kar hedefi ayarla (manual trader ayarlarından)
+      // status kontrolü yok — pending_buy veya open olsa da takeProfitPct set edilmeli
+      const config = tradeStore.getConfig();
+      const takeProfitPct = config.takeProfitPct ?? 0;
+
+      if (takeProfitPct > 0) {
+        const withTp = { ...pos, takeProfitPct };
+        tradeStore.upsert(withTp);
+        broadcastToClients({ type: "position_update", data: withTp });
+        console.log(`🎯 [Quick-Buy] ${symbol} kar hedefi ayarlandı: +%${takeProfitPct}`);
+      }
+
+      // Position'ı al (en güncel haliyle)
       const position = tradeStore.getByMint(mintAddress);
 
       res.json({
