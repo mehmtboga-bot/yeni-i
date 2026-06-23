@@ -887,16 +887,6 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                 </Button>
               </>
             )}
-            {/* Rug Pull Butonları */}
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => onMarkRugPull(p.id)}
-              className="flex-1"
-              data-testid={`button-mark-rug-pull-${p.id}`}
-            >
-              🚩 Rug Pull
-            </Button>
             {p.status === "failed" && p.buyTxSignature && (
               <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
                 Tekrar Sat
@@ -965,35 +955,6 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
               </Button>
             </div>
 
-            {/* Tutma Süresi Kaydet */}
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <Label className="text-xs">Tutma Süresi (saniye)</Label>
-                <Input
-                  type="number"
-                  placeholder="300"
-                  value={holdDurationInput}
-                  onChange={(e) => setHoldDurationInput(e.target.value)}
-                  step="1"
-                  min="1"
-                  className="text-xs"
-                />
-              </div>
-              <Button
-                size="sm"
-                onClick={() => {
-                  const seconds = parseInt(holdDurationInput, 10);
-                  if (!Number.isNaN(seconds) && seconds > 0 && onUpdateHoldDuration) {
-                    onUpdateHoldDuration(p.id, seconds * 1000);
-                    setHoldDurationInput("");
-                  }
-                }}
-                className="bg-violet-600 hover:bg-violet-700"
-                data-testid={`button-update-hold-duration-${p.id}`}
-              >
-                Kaydet
-              </Button>
-            </div>
           </div>
         )}
       </div>
