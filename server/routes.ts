@@ -918,6 +918,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   // ------------------------
 
+  // ---- Tüm Pozisyonları Sil API ----
+  app.post("/api/clear-all-positions", (req, res) => {
+    try {
+      const allPositions = tradeStore.getAll();
+      const count = allPositions.length;
+
+      // Tüm pozisyonları sil
+      for (const pos of allPositions) {
+        tradeStore.delete(pos.id);
+        autoTraderEngine.markRecordClosed(pos.mintAddress);
+        const lm = liquidityMonitors.get(pos.id);
+        if (lm) {
+          lm.stop();
+          liquidityMonitors.delete(pos.id);
+        }
+      }
+
+      // Arayüzü güncelle — positions_snapshot gönder (boş liste)
+      broadcastToClients({
+        type: "positions_snapshot",
+        data: {
+          positions: [],
+          config: tradeStore.getConfig(),
+          autoTraderConfig: autoTraderConfigStore.getConfig(),
+          autoTraderRunning: autoTraderEngine.getIsRunning(),
+          traderPublicKey: trader.getPublicKey(),
+          traderReady: trader.isReady(),
+          solPriceUsd: monitor.getSolPriceUsd(),
+        },
+      });
+
+      console.log(`🗑️ [API] Tüm pozisyonlar silindi (${count} adet)`);
+      res.json({ ok: true, message: `${count} pozisyon silindi` });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+  // -----------------------------------
+
   process.on("SIGTERM", () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
   process.on("SIGINT",  () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
 
