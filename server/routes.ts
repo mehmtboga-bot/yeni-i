@@ -549,11 +549,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
               : config.solAmount;
 
             const manualBuyHandler = () => {
-              // Manuel alım için auto-trader kaydı oluştur (otomatik satışı tetiklemek için)
-              const autoConfig = autoTraderConfigStore.getConfig();
+              // Manuel alım — otomatik trader ayarlarından bağımsız
+              // Sadece customHoldDurationMs varsa auto-trader record'u oluştur
               const pos = tradeStore.getByMint(mintAddress);
-              const holdMs = pos?.customHoldDurationMs ?? autoConfig.holdDurationMs;
-              autoTraderEngine.createRecordForManualBuy(mintAddress, nm, sym, holdMs);
+              if (pos?.customHoldDurationMs) {
+                // Özel tutma süresi varsa auto-trader record'u oluştur
+                autoTraderEngine.createRecordForManualBuy(
+                  mintAddress,
+                  nm,
+                  sym,
+                  pos.customHoldDurationMs
+                );
+                console.log(
+                  `📝 [Manual-Buy] ${sym} özel tutma süresi ile auto-trader record'u oluşturuldu`
+                );
+              } else {
+                // Özel tutma süresi yoksa — manuel satış için bekleme (otomatik trader ayarlarından bağımsız)
+                console.log(
+                  `📝 [Manual-Buy] ${sym} manuel alım — otomatik trader ayarlarından bağımsız`
+                );
+              }
             };
 
             if (dex === "pumpswap") {
