@@ -325,9 +325,10 @@ export default function Home() {
         // sunucuda olmayan açık pozisyonlar (geçici ağ kesintisi vb.) korunur.
         const serverPositions: Position[] = Array.isArray(msg.data.positions) ? msg.data.positions : [];
         setPositions((prev) => {
+          // Sunucu boş liste döndürdüyse localStorage'ı da temizle
           if (serverPositions.length === 0) {
-            // Sunucu boş liste döndürdüyse localStorage'daki veriyi koru
-            return prev;
+            try { localStorage.removeItem("positions"); } catch {}
+            return [];
           }
           // Sunucu pozisyonlarını önce al, sonra localStorage'da olup
           // sunucuda olmayan açık pozisyonları ekle (orphan guard)
