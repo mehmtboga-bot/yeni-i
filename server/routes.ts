@@ -217,9 +217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: "mintAddress gerekli" });
     }
 
-    if (typeof solAmount !== "number" || solAmount <= 0) {
-      return res.status(400).json({ error: "solAmount gerekli" });
-    }
+    // solAmount undefined veya geçersiz ise default değer kullan
+    const finalSolAmount = (typeof solAmount === "number" && solAmount > 0) ? solAmount : 0.01;
 
     try {
       // buy_token mesajı gönder
@@ -227,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: "buy_token",
         data: {
           mintAddress,
-          solAmount,
+          solAmount: finalSolAmount,
         },
       });
 
@@ -846,9 +845,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quick-buy", async (req, res) => {
     const { mintAddress, solAmount, slippageBps, priorityFeeMicroLamports } = req.body || {};
 
-    if (!mintAddress || !solAmount) {
-      return res.status(400).json({ error: "mintAddress ve solAmount gerekli" });
+    if (!mintAddress) {
+      return res.status(400).json({ error: "mintAddress gerekli" });
     }
+
+    // solAmount undefined veya geçersiz ise default değer kullan
+    const finalSolAmount = (typeof solAmount === "number" && solAmount > 0) ? solAmount : 0.01;
 
     try {
       console.log(`🚀 [Quick-Buy] Mint bilgileri çekiliyor: ${mintAddress}`);
@@ -879,13 +881,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`✅ [Quick-Buy] Mint bilgileri çekildi: ${symbol} (${name})`);
 
       // Alım yap (Jupiter kullan)
-      console.log(`💰 [Quick-Buy] Alım başlatılıyor: ${symbol} | ${solAmount} SOL`);
+      console.log(`💰 [Quick-Buy] Alım başlatılıyor: ${symbol} | ${finalSolAmount} SOL`);
 
       const pos = await trader.buy({
         mintAddress,
         name,
         symbol,
-        solAmount,
+        solAmount: finalSolAmount,
         isAuto: false,
       });
 
