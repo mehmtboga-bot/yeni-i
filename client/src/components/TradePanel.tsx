@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer, Plus } from "lucide-react";
+import { ExternalLink, Copy, Check, TrendingUp, TrendingDown, Wallet, Settings, Loader2, AlertCircle, Target, Timer, Plus, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -86,6 +86,9 @@ export function TradePanel({
     return saved ?? String(config.priorityFeeManualMicroLamports);
   });
   const [takeProfitInput, setTakeProfitInput] = useState(String(config.takeProfitPct ?? 0));
+  const [quickBuyMintInput, setQuickBuyMintInput] = useState<string>("");
+  const [isQuickBuying, setIsQuickBuying] = useState(false);
+  const [quickBuyError, setQuickBuyError] = useState<string>("");
 
   const copyAddress = async (address: string, id: string) => {
     await navigator.clipboard.writeText(address);
@@ -121,6 +124,61 @@ export function TradePanel({
     const realized = closed.reduce((s, p) => s + (p.pnlSol ?? 0), 0);
     return { openCount: open.length, closedCount: closed.length, totalSpent, realized };
   }, [positions]);
+
+  const handleQuickBuy = async () => {
+    const mint = quickBuyMintInput.trim();
+    if (!mint) {
+      setQuickBuyError("Mint address yazmalısın");
+      return;
+    }
+
+    // Mint address validation (44 karakter, base58)
+    if (mint.length !== 44) {
+      setQuickBuyError("Geçersiz mint address (44 karakter olmalı)");
+      return;
+    }
+
+    setIsQuickBuying(true);
+    setQuickBuyError("");
+
+    console.log(`🚀 [QuickBuy] Mint bilgileri çekiliyor: ${mint}`);
+
+    try {
+      const res = await fetch("/api/quick-buy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mintAddress: mint,
+          solAmount: config.solAmount,
+          slippageBps: config.slippageBps,
+          priorityFeeMicroLamports: config.priorityFeeManualMicroLamports,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Bilinmeyen hata" }));
+        setQuickBuyError(err.error || "Alım başarısız");
+        console.error("Quick-buy hatası:", err);
+        setIsQuickBuying(false);
+        return;
+      }
+
+      const result = await res.json();
+      console.log(`✅ [QuickBuy] Alım başarılı:`, result);
+
+      // Input'u temizle
+      setQuickBuyMintInput("");
+      setQuickBuyError("");
+
+      // WebSocket üzerinden position güncellemesi gelecek
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Bağlantı hatası";
+      setQuickBuyError(errorMsg);
+      console.error("Quick-buy isteği hatası:", err);
+    } finally {
+      setIsQuickBuying(false);
+    }
+  };
 
   const saveConfig = () => {
     const sol = parseFloat(solAmountInput);
@@ -245,6 +303,61 @@ export function TradePanel({
           )}
         </Card>
       </div>
+
+      {/* Quick Buy Kartı */}
+      <Card className="p-4 space-y-3 border-emerald-500/30 bg-emerald-500/5">
+        <div className="flex items-center gap-2">
+          <Zap className="h-5 w-5 text-emerald-400" />
+          <h2 className="text-base font-semibold">⚡ Hızlı Alım</h2>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="quick-buy-mint" className="text-sm">Mint Address</Label>
+          <div className="flex gap-2">
+            <Input
+              id="quick-buy-mint"
+              type="text"
+              placeholder="Mint address yapıştır (44 karakter)"
+              value={quickBuyMintInput}
+              onChange={(e) => {
+                setQuickBuyMintInput(e.target.value);
+                setQuickBuyError("");
+              }}
+              disabled={isQuickBuying}
+              className="flex-1 font-mono text-xs"
+            />
+            <Button
+              onClick={handleQuickBuy}
+              disabled={isQuickBuying || !quickBuyMintInput}
+              className="bg-emerald-600 hover:bg-emerald-700"
+              data-testid="button-quick-buy"
+            >
+              {isQuickBuying ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Alınıyor...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Al
+                </>
+              )}
+            </Button>
+          </div>
+
+          {quickBuyError && (
+            <div className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1.5 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3 shrink-0" />
+              {quickBuyError}
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Manual trader ayarları kullanılır: {config.solAmount} SOL, {Math.floor(config.slippageBps / 100)}% slippage
+          </p>
+        </div>
+      </Card>
 
       {/* Filtre */}
       <div className="flex items-center gap-2 flex-wrap">
