@@ -650,6 +650,7 @@ export default function Home() {
               traderReady={traderReady}
               solPriceUsd={solPriceUsd}
               globalHoldDurationMs={autoTraderConfig.holdDurationMs}
+              ws={ws}
               onBuy={handleBuy}
               onSell={handleSell}
               onSellHalf={handleSellHalf}
