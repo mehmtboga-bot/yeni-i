@@ -928,6 +928,19 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
             </Button>
           </div>
         )}
+        {isPending && (
+          <div className="flex gap-2 border-t border-card-border pt-3 mt-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onDelete(p.id)}
+              className="flex-1 border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+              data-testid={`button-cancel-pending-${p.id}`}
+            >
+              ⏸️ İptal
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
