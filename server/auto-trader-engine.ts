@@ -273,7 +273,8 @@ export class AutoTraderEngine {
     mintAddress: string,
     name: string,
     symbol: string,
-    holdDurationMs: number
+    holdDurationMs: number,
+    buyTimestamp?: number
   ) {
     // Süresi henüz dolmamış aktif bir kayıt varsa yeni kayıt oluşturma
     const now = Date.now();
@@ -288,14 +289,16 @@ export class AutoTraderEngine {
       return;
     }
 
-    const recordId = `manual-${mintAddress}-${Date.now()}`;
+    // Gerçek alım zamanını kullan (varsa) — böylece shouldSellAt alımdan itibaren hesaplanır
+    const effectiveBuyTimestamp = buyTimestamp ?? now;
+    const recordId = `manual-${mintAddress}-${now}`;
     const record: AutoTradeRecord = {
       id: recordId,
       mintAddress,
       tokenName: name || "Bilinmiyor",
       tokenSymbol: symbol || "?",
-      buyTimestamp: now,
-      shouldSellAt: now + holdDurationMs,
+      buyTimestamp: effectiveBuyTimestamp,
+      shouldSellAt: effectiveBuyTimestamp + holdDurationMs,
       status: "active",
     };
     this.records.set(recordId, record);

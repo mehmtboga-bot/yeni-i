@@ -100,6 +100,23 @@ export const skippedTokenSchema = z.object({
 
 export type SkippedToken = z.infer<typeof skippedTokenSchema>;
 
+export const tradeRecordSchema = z.object({
+  id: z.string(),
+  mintAddress: z.string(),
+  name: z.string(),
+  symbol: z.string(),
+  timestamp: z.number(),
+  buyTime: z.number(),
+  sellTime: z.number(),
+  buyPrice: z.number(),
+  sellPrice: z.number(),
+  quantity: z.number(),
+  profitLoss: z.number(),
+  dexscreenerUrl: z.string().optional(),
+});
+
+export type TradeRecord = z.infer<typeof tradeRecordSchema>;
+
 export const wsMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mint_detected"), data: mintedTokenSchema }),
   z.object({ type: z.literal("lp_detected"), data: lpDetectionSchema }),
