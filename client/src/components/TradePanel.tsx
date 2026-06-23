@@ -863,6 +863,16 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                 </Button>
               </>
             )}
+            {/* Rug Pull Butonları */}
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => onMarkRugPull(p.id)}
+              className="flex-1"
+              data-testid={`button-mark-rug-pull-${p.id}`}
+            >
+              🚩 Rug Pull
+            </Button>
             {p.status === "failed" && p.buyTxSignature && (
               <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
                 Tekrar Sat
