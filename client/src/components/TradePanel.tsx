@@ -18,6 +18,7 @@ interface TradePanelProps {
   solPriceUsd: number;
   tradingRecords?: TradeRecord[];
   globalHoldDurationMs?: number;
+  ws?: WebSocket | null;
   onBuy: (mintAddress: string, name: string, symbol: string, dex?: "jupiter" | "pumpswap", solAmount?: number) => void;
   onSell: (positionId: string) => void;
   onSellHalf: (positionId: string) => void;
@@ -69,7 +70,8 @@ export function TradePanel({
   solPriceUsd,
   tradingRecords = [],
   globalHoldDurationMs,
-  onBuy,
+  ws,
+  onBuy: onBuyProp,
   onSell,
   onSellHalf,
   onDelete,
@@ -89,6 +91,29 @@ export function TradePanel({
   const [quickBuyMintInput, setQuickBuyMintInput] = useState<string>("");
   const [isQuickBuying, setIsQuickBuying] = useState(false);
   const [quickBuyError, setQuickBuyError] = useState<string>("");
+
+  const onBuy = (mintAddress: string, name: string, symbol: string, dex: "jupiter" | "pumpswap" = "jupiter", solAmount?: number) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.error("❌ WebSocket bağlantısı yok");
+      onBuyProp(mintAddress, name, symbol, dex, solAmount);
+      return;
+    }
+
+    console.log(`🔄 [TradePanel] Alım tetikleniyor: ${symbol} | ${solAmount} SOL`);
+
+    ws.send(
+      JSON.stringify({
+        type: "buy_token",
+        data: {
+          mintAddress,
+          name,
+          symbol,
+          dex,
+          solAmount,
+        },
+      })
+    );
+  };
 
   const copyAddress = async (address: string, id: string) => {
     await navigator.clipboard.writeText(address);
