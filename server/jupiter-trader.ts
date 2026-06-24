@@ -633,6 +633,8 @@ export class JupiterTrader {
               return { sig: swapSignature!, tokensReceived: bal.uiAmount };
             }
           }
+          const balBefore = await this.getTokenBalance(mintAddress);
+          const prevAmount = balBefore?.uiAmount ?? 0;
           const quote = await this.getQuote({ inputMint: SOL_MINT, outputMint: mintAddress, amount: String(lamports), slippageBps: config.slippageBps });
           swapSignature = await this.swap(quote, priorityFee);
           console.log(`📤 [AdditionalBuy/Jupiter] TX gönderildi: ${swapSignature}`);
@@ -641,7 +643,7 @@ export class JupiterTrader {
           for (let c = 0; c < 20; c++) {
             await new Promise((r) => setTimeout(r, 500));
             const bal = await this.getTokenBalance(mintAddress);
-            if (bal && bal.uiAmount > 0) { received = bal.uiAmount; break; }
+            if (bal && bal.uiAmount > prevAmount) { received = bal.uiAmount - prevAmount; break; }
           }
           if (received === 0) throw new Error(`Token bakiyesi 0 (sig: ${swapSignature!.slice(0, 16)}...)`);
           return { sig: swapSignature!, tokensReceived: received };
