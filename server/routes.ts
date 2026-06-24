@@ -559,30 +559,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? msgSolAmount
               : config.solAmount;
 
-            // Eğer name/symbol yoksa Helius'tan çek
+            // Eğer name/symbol yoksa DexScreener → Jupiter sırasıyla çek
             let nm = name || "Bilinmiyor";
             let sym = symbol || "?";
 
             if (!name || !symbol) {
               try {
                 console.log(`🔍 [Buy] Mint info çekiliyor: ${mintAddress}`);
-                const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${secrets.HELIUS_API_KEY}`;
-                const heliusRes = await fetch(heliusUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    jsonrpc: "2.0",
-                    id: "buy-token",
-                    method: "getAsset",
-                    params: { id: mintAddress },
-                  }),
-                });
-                const heliusData = await heliusRes.json();
-                if (heliusData.result) {
-                  const asset = heliusData.result;
-                  nm = asset.content?.metadata?.name || "Bilinmiyor";
-                  sym = asset.content?.metadata?.symbol || "?";
-                  console.log(`✅ [Buy] Mint info çekildi: ${sym} (${nm})`);
+
+                // 1. DexScreener API'den çek
+                const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`);
+                const dexData = await dexRes.json();
+
+                if (dexData.pairs && dexData.pairs.length > 0) {
+                  const pair = dexData.pairs[0];
+                  nm = pair.baseToken?.name || "Bilinmiyor";
+                  sym = pair.baseToken?.symbol || "?";
+                  console.log(`✅ [Buy] Mint info çekildi (DexScreener): ${sym} (${nm})`);
+                } else {
+                  // 2. DexScreener başarısız ise Jupiter API'den çek
+                  const jupRes = await fetch(`https://token.jup.ag/mint/${mintAddress}`);
+                  const jupData = await jupRes.json();
+
+                  if (jupData.name) {
+                    nm = jupData.name || "Bilinmiyor";
+                    sym = jupData.symbol || "?";
+                    console.log(`✅ [Buy] Mint info çekildi (Jupiter): ${sym} (${nm})`);
+                  }
                 }
               } catch (err) {
                 console.warn(`⚠️ [Buy] Mint info çekilemedi, default değerler kullanılıyor:`, err);
