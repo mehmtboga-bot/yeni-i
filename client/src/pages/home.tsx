@@ -246,8 +246,12 @@ export default function Home() {
   };
 
   const handleMarkRugPull = (positionId: string) => {
+    console.log("🚨 [Home] handleMarkRugPull çağrıldı:", positionId);
     if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log("📤 [Home] mark_rug_pull mesajı gönderiliyor");
       ws.send(JSON.stringify({ type: "mark_rug_pull", data: { positionId } }));
+    } else {
+      console.log("❌ [Home] WebSocket bağlı değil:", ws?.readyState);
     }
   };
 
@@ -378,13 +382,20 @@ export default function Home() {
       } else if (msg.type === "recent_mints_snapshot") {
         // recent_mints_snapshot artık kullanılmıyor — active_tokens_snapshot tercih edilir
       } else if (msg.type === "active_tokens_snapshot") {
-        // Sunucu tek kaynak: gelen tokenlar direkt replace eder (merge değil)
         const now = Date.now();
         const incomingTokens: any[] = (msg.data.tokens || []).filter((t: any) => t.expiresAt > now);
         const incomingLpLogs: any[] = (msg.data.lpLogs || []).filter((l: any) => l.expiresAt > now);
 
-        setMintedTokens(incomingTokens.slice(0, MAX_MINTED_TOKENS));
-        setLpLogs(incomingLpLogs.slice(0, MAX_LP_LOGS));
+        // Eski tokenları koru, yenileriyle merge et — süresi dolmamış olanları filtrele
+        setMintedTokens((prev) => {
+          const merged = [...incomingTokens, ...prev.filter((p) => !incomingTokens.find((t) => t.id === p.id))];
+          return merged.filter((t) => t.expiresAt > now).slice(0, MAX_MINTED_TOKENS);
+        });
+
+        setLpLogs((prev) => {
+          const merged = [...incomingLpLogs, ...prev.filter((p) => !incomingLpLogs.find((l) => l.id === p.id))];
+          return merged.filter((l) => l.expiresAt > now).slice(0, MAX_LP_LOGS);
+        });
       }
     };
 
