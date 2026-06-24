@@ -781,22 +781,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { positionId } = message.data || {};
           if (positionId) {
             const pos = tradeStore.getById(positionId);
-            if (pos && (pos.status === "pending_buy" || pos.status === "pending_sell")) {
-              trader.cancel(positionId);
+            if (pos) {
+              tradeStore.delete(positionId);
+              autoTraderEngine.markRecordClosed(pos.mintAddress);
+              // Stop liquidity monitoring if still running
+              const lm = liquidityMonitors.get(positionId);
+              if (lm) {
+                lm.stop();
+                liquidityMonitors.delete(positionId);
+              }
+              broadcastToClients({ type: "position_deleted", data: { positionId } });
+              console.log(`🗑️ [Delete] ${pos.symbol} (${positionId}) silindi`);
             }
-            tradeStore.delete(positionId);
-            broadcastToClients({
-              type: "positions_snapshot",
-              data: {
-                positions: tradeStore.getAll(),
-                config: tradeStore.getConfig(),
-                autoTraderConfig: autoTraderConfigStore.getConfig(),
-                autoTraderRunning: autoTraderEngine.getIsRunning(),
-                traderPublicKey: trader.getPublicKey(),
-                traderReady: trader.isReady(),
-                solPriceUsd: monitor.getSolPriceUsd(),
-              },
-            });
           }
         } else if (message.type === "update_position_hold_duration") {
           // Token başına özel tutma süresi güncelle
