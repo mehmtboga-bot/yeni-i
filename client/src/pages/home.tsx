@@ -258,8 +258,12 @@ export default function Home() {
   };
 
   const handleAutoTraderConfigUpdate = (cfg: Partial<AutoTraderConfig>) => {
+    console.log("🤖 [Home] handleAutoTraderConfigUpdate çağrıldı:", cfg);
     if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log("📤 [Home] auto_trader_config_update mesajı gönderiliyor");
       ws.send(JSON.stringify({ type: "auto_trader_config_update", data: cfg }));
+    } else {
+      console.log("❌ [Home] WebSocket bağlı değil:", ws?.readyState);
     }
   };
 
