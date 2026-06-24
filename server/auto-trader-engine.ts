@@ -133,15 +133,37 @@ export class AutoTraderEngine {
     if (!this.isRunning) return;
 
     const now = Date.now();
+    const recordsArray = Array.from(this.records.entries());
 
-    for (const [, record] of this.records.entries()) {
-      if (record.status !== "active") continue;
+    // Debug: kaç record var?
+    if (recordsArray.length > 0) {
+      console.log(`🔍 [Auto-Trader] checkAndSell: ${recordsArray.length} record kontrol ediliyor`);
+    }
+
+    for (const [, record] of recordsArray) {
+      // Debug: record status'u
+      if (record.status !== "active") {
+        console.log(`⏭️ [Auto-Trader] ${record.tokenSymbol} — record status: ${record.status} (active değil)`);
+        continue;
+      }
 
       const position = this.tradeStore.getByMint(record.mintAddress);
-      if (!position || position.status !== "open") continue;
+      if (!position) {
+        console.warn(`⚠️ [Auto-Trader] ${record.tokenSymbol} — position bulunamadı`);
+        continue;
+      }
 
-      // sell() zaten tetiklendi mi? — tekrar tetikleme (sell() kendi döngüsünü yönetir)
-      if (this.sellInProgress.has(record.mintAddress)) continue;
+      // Debug: position status'u
+      if (position.status !== "open") {
+        console.log(`⏭️ [Auto-Trader] ${record.tokenSymbol} — position status: ${position.status} (open değil)`);
+        continue;
+      }
+
+      // sell() zaten tetiklendi mi?
+      if (this.sellInProgress.has(record.mintAddress)) {
+        console.log(`⏭️ [Auto-Trader] ${record.tokenSymbol} — satış zaten tetiklendi`);
+        continue;
+      }
 
       const config = this.configStore.getConfig();
 
@@ -152,7 +174,14 @@ export class AutoTraderEngine {
       // ─── Süre doldu mu? ───
       const shouldSellForTime = now >= record.shouldSellAt;
 
-      if (!shouldSellForProfit && !shouldSellForTime) continue;
+      // Debug: satış koşulları
+      if (!shouldSellForProfit && !shouldSellForTime) {
+        const secsLeft = Math.max(0, Math.floor((record.shouldSellAt - now) / 1000));
+        if (secsLeft % 10 === 0) { // Her 10 saniyede bir log
+          console.log(`⏳ [Auto-Trader] ${record.tokenSymbol} — ${secsLeft}s kaldı (kar: ${(position.unrealizedPnlPct ?? 0).toFixed(1)}%)`);
+        }
+        continue;
+      }
 
       const reason = shouldSellForProfit
         ? `Kar hedefi: +${(position.unrealizedPnlPct ?? 0).toFixed(1)}% (Hedef: ${config.profitTargetPct}%)`
