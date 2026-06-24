@@ -752,11 +752,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         } else if (message.type === "mark_rug_pull") {
-          // Rug Pull: pozisyonu "closed" olarak işaretle, pnlPct=-100, silme
           const { positionId } = message.data || {};
           if (positionId) {
-            const pos = tradeStore.getById(positionId);
-            if (pos && (pos.status === "open" || pos.status === "pending_buy" || pos.status === "pending_sell")) {
+            try {
+              console.log(`🚨 [MarkRugPull] Position işaretleniyor: ${positionId}`);
+
+              const pos = tradeStore.getById(positionId);
+              if (!pos) {
+                console.warn(`⚠️ [MarkRugPull] Position bulunamadı: ${positionId}`);
+                return;
+              }
+
+              // Position'u kapalı olarak işaretle (rug pull)
               const rugLoss = -(pos.buySolAmount ?? 0);
               const closed = {
                 ...pos,
@@ -766,15 +773,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 sellPriceSol: 0,
                 pnlSol: rugLoss,
                 pnlPct: -100,
-                error: "Rug Pull",
+                error: "Rug Pull (Manual)",
               };
+
               tradeStore.upsert(closed);
               autoTraderEngine.markRecordClosed(pos.mintAddress);
-              // Stop liquidity monitor if running
-              const lmRug = liquidityMonitors.get(positionId);
-              if (lmRug) { lmRug.stop(); liquidityMonitors.delete(positionId); }
+
+              // Liquidity monitor'ı durdur
+              const lm = liquidityMonitors.get(positionId);
+              if (lm) {
+                lm.stop();
+                liquidityMonitors.delete(positionId);
+              }
+
               broadcastToClients({ type: "position_update", data: closed });
-              console.log(`🚨 [Rug Pull] ${pos.symbol} manuel rug pull olarak kapatıldı (-%100)`);
+              console.log(`✅ [MarkRugPull] ${pos.symbol} rug pull olarak işaretlendi (-%100)`);
+            } catch (err) {
+              console.error(`❌ [MarkRugPull] Hata:`, err);
             }
           }
         } else if (message.type === "delete_position") {
