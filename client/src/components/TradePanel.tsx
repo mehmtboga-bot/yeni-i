@@ -21,7 +21,7 @@ interface TradePanelProps {
   ws?: WebSocket | null;
   onBuy: (mintAddress: string, name: string, symbol: string, dex?: "jupiter" | "pumpswap", solAmount?: number) => void;
   onAdditionalBuy?: (positionId: string, mintAddress: string, symbol: string, dex: "jupiter" | "pumpswap", solAmount: number) => void;
-  onSell: (positionId: string) => void;
+  onSell: (positionId: string, percentage?: number) => void;
   onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
@@ -510,7 +510,7 @@ interface PositionRowProps {
   onCopy: (addr: string, id: string) => void;
   onBuy: (mintAddress: string, name: string, symbol: string, dex?: "jupiter" | "pumpswap", solAmount?: number) => void;
   onAdditionalBuy?: (positionId: string, mintAddress: string, symbol: string, dex: "jupiter" | "pumpswap", solAmount: number) => void;
-  onSell: (positionId: string) => void;
+  onSell: (positionId: string, percentage?: number) => void;
   onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
@@ -587,7 +587,12 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     if (isNaN(pct) || pct <= 0 || pct > 100) return;
     setIsHalfSelling(true);
     setIsManualSelling(true);
-    onSell(p.id);
+    
+    // Backend'e percentage bilgisi gönder (şimdilik window'a kaydet)
+    (window as any).__manualSellPercentage = pct;
+    console.log(`🔥 Manuel satış başladı: ${pct}% - Bekleniyor...`);
+    
+    onSell(p.id, pct);
   };
 
   const handleSavePercentage = () => {
@@ -876,6 +881,19 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                     </Button>
                   </div>
                 )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                  onClick={() => {
+                    if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek ve "Kapanan" bölümünde görünecek.`)) {
+                      onMarkRugPull(p.id);
+                    }
+                  }}
+                  data-testid={`button-rug-${p.id}`}
+                >
+                  🚨 Rug
+                </Button>
               </>
             )}
 
