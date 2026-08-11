@@ -489,7 +489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       trader.sell(positionId).catch((err) => console.error("auto-sell hatası:", err));
     },
     (positionId: string) => {
-      trader.sellHalf(positionId).catch((err) => console.error("half-sell hatası:", err));
+      trader.sellHalf(positionId, 35).catch((err) => console.error("half-sell hatası:", err));
     },
     autoTraderConfigStore,
   );

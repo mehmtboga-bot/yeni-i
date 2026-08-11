@@ -524,8 +524,8 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : ""
   );
   const [isHalfSelling, setIsHalfSelling] = useState(false);
-  const [manualSellPercentage, setManualSellPercentage] = useState<string>("50");
-  const [savedSellPercentage, setSavedSellPercentage] = useState<string>("50");
+  const [manualSellPercentage, setManualSellPercentage] = useState<string>("30");
+  const [savedSellPercentage, setSavedSellPercentage] = useState<string>("30");
   const [isManualSelling, setIsManualSelling] = useState(false);
   const [additionalBuyInput, setAdditionalBuyInput] = useState<string>("");
   const [isAdditionalBuying, setIsAdditionalBuying] = useState(false);
