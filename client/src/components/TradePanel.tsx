@@ -524,6 +524,8 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : ""
   );
   const [isHalfSelling, setIsHalfSelling] = useState(false);
+  const [manualSellPercentage, setManualSellPercentage] = useState<string>("50");
+  const [isManualSelling, setIsManualSelling] = useState(false);
   const [additionalBuyInput, setAdditionalBuyInput] = useState<string>("");
   const [isAdditionalBuying, setIsAdditionalBuying] = useState(false);
   const [buyRetries, setBuyRetries] = useState(0);
@@ -531,10 +533,11 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
 
   // İşlem sunucuya ulaşınca (pending_sell) veya kapanınca loading'i temizle
   useEffect(() => {
-    if (isHalfSelling && (p.status === "pending_sell" || p.status === "closed" || p.status === "failed")) {
+    if ((isHalfSelling || isManualSelling) && (p.status === "pending_sell" || p.status === "closed" || p.status === "failed")) {
       setIsHalfSelling(false);
+      setIsManualSelling(false);
     }
-  }, [p.status, isHalfSelling]);
+  }, [p.status, isHalfSelling, isManualSelling]);
 
   // Tekrar alım fonksiyonu — mevcut pozisyona ekleme yapar (yeni pozisyon oluşturmaz)
   const handleAdditionalBuy = async () => {
@@ -576,6 +579,13 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     };
 
     attemptBuy(0);
+  };
+
+  const handleManualSell = () => {
+    const pct = parseFloat(manualSellPercentage);
+    if (isNaN(pct) || pct <= 0 || pct > 100) return;
+    setIsManualSelling(true);
+    onSell(p.id);
   };
 
   // Position buySolAmount güncellenince alım başarılı sayılır — timeout'u iptal et
@@ -846,23 +856,12 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                   Sat
                 </Button>
                 {(p.buyTokenAmount ?? 0) > 0 && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
-                    disabled={isPending || isHalfSelling}
-                    onClick={() => {
-                      setIsHalfSelling(true);
-                      onSellHalf(p.id);
-                    }}
-                    data-testid={`button-half-sell-${p.id}`}
-                  >
-                    {isHalfSelling ? (
-                      <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Satılıyor</>
-                    ) : (
-                      "½ Sat"
-                    )}
-                  </Button>
+                  <div className="flex gap-1 items-center">
+                    <input type="number" min="1" max="100" placeholder="%" value={manualSellPercentage} onChange={e => setManualSellPercentage(e.target.value)} disabled={isPending || isManualSelling} className="w-14 h-9 px-2 py-1 text-xs border border-amber-500/30 rounded bg-amber-500/5 text-amber-400" />
+                    <Button size="sm" variant="outline" className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10" disabled={isPending || isManualSelling} onClick={handleManualSell} title="Sat">
+                      {isManualSelling ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Satılıyor</> : "Sat"}
+                    </Button>
+                  </div>
                 )}
               </>
             )}
