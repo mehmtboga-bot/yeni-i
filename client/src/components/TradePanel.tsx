@@ -584,6 +584,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
   const handleManualSell = () => {
     const pct = parseFloat(manualSellPercentage);
     if (isNaN(pct) || pct <= 0 || pct > 100) return;
+    setIsHalfSelling(true);
     setIsManualSelling(true);
     onSell(p.id);
   };
