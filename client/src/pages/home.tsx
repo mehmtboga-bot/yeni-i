@@ -251,8 +251,13 @@ export default function Home() {
   };
 
   const handleMarkRugPull = (positionId: string) => {
+    console.log(`🚨 Rug Pull butonuna basıldı - positionId: ${positionId}`);
+    console.log(`WS status: ${ws ? ws.readyState : "WebSocket yok"}`);
     if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log(`📤 Rug Pull mesajı gönderiliyor...`);
       ws.send(JSON.stringify({ type: "mark_rug_pull", data: { positionId } }));
+    } else {
+      console.error(`❌ WebSocket hazır değil - readyState: ${ws?.readyState}`);
     }
   };
 
