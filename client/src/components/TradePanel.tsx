@@ -876,6 +876,19 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                     </Button>
                   </div>
                 )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                  onClick={() => {
+                    if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek ve "Kapanan" bölümünde görünecek.`)) {
+                      onMarkRugPull(p.id);
+                    }
+                  }}
+                  data-testid={`button-rug-${p.id}`}
+                >
+                  🚨 Rug
+                </Button>
               </>
             )}
 
