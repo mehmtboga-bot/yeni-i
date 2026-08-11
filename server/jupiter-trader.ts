@@ -666,7 +666,7 @@ export class JupiterTrader {
   // Satış başarısız olursa status "open" kalır, exponential backoff ile tekrar denenir.
   // MAX_SELL_RETRIES aşılırsa "failed" olarak işaretlenir.
   // Bakiye sıfırsa (rug pull) → "closed" pnlPct:-100. Başarılıysa → "closed".
-  async sell(positionId: string, _retryCount = 0): Promise<Position | null> {
+  async sell(positionId: string, percentage = 100, _retryCount = 0): Promise<Position | null> {
     const pos = this.store.getById(positionId);
     if (!pos) { console.warn(`⚠️ Pozisyon bulunamadı: ${positionId}`); return null; }
     if (!["open", "pending_sell"].includes(pos.status)) { console.warn(`⚠️ Satışa uygun değil (${pos.status}): ${pos.symbol}`); return pos; }
@@ -737,11 +737,12 @@ export class JupiterTrader {
         // PumpSwap satışı — 3 deneme, exponential backoff
         const result = await this.withRetry(async () => {
           const balance = await fetchBalance();
-          console.log(`🔍 [PumpSwap] Satılacak: ${balance.uiAmount.toLocaleString()} ${pos.symbol}`);
+          const sellAmount = balance.uiAmount * (percentage / 100);
+          console.log(`🔍 [PumpSwap] Satılacak: ${sellAmount.toLocaleString()} / ${balance.uiAmount.toLocaleString()} ${pos.symbol} (${percentage}%)`);
           const sig = await this.pumpSwapTx({
             action: "sell",
             mint: pos.mintAddress,
-            amount: balance.uiAmount,
+            amount: sellAmount,
             denominatedInSol: false,
             slippagePct,
             priorityFeeSol,
@@ -769,7 +770,7 @@ export class JupiterTrader {
           const reopened: Position = { ...updated, status: "open", error: undefined };
           this.updateAndEmit(reopened);
           console.warn(`⚠️ [PumpSwap] Token hala var (${tokenRemaining.toLocaleString()}), tekrar satış çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
-          return this.sell(positionId, _retryCount + 1);
+          return this.sell(positionId, percentage, _retryCount + 1);
         }
 
         const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.tokenAmount);
@@ -794,7 +795,10 @@ export class JupiterTrader {
         const result = await this.withRetry(async () => {
           const balance = await fetchBalance();
           if (BigInt(balance.raw) === 0n) throw new Error("Cüzdanda token bakiyesi yok");
-          const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: balance.raw, slippageBps: config.slippageBps });
+          const sellAmount = balance.uiAmount * (percentage / 100);
+          const sellAmountRaw = BigInt(Math.floor(sellAmount * Math.pow(10, balance.decimals)));
+          console.log(`📊 [Jupiter] Satılacak: ${sellAmount.toLocaleString()} / ${balance.uiAmount.toLocaleString()} ${pos.symbol} (${percentage}%)`);
+          const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: sellAmountRaw.toString(), slippageBps: config.slippageBps });
           const solOut = Number(quote.outAmount) / 1e9;
           const sellPriceSol = balance.uiAmount > 0 ? solOut / balance.uiAmount : 0;
           const sig = await this.swap(quote, config.priorityFeeManualMicroLamports, true);
@@ -835,7 +839,7 @@ export class JupiterTrader {
           const reopened: Position = { ...updated, status: "open", error: undefined };
           this.updateAndEmit(reopened);
           console.warn(`⚠️ [Jupiter] Token hala var (${tokenRemainingJup.toLocaleString()}), tekrar satış çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
-          return this.sell(positionId, _retryCount + 1);
+          return this.sell(positionId, percentage, _retryCount + 1);
         }
       }
       return updated;
@@ -889,7 +893,7 @@ export class JupiterTrader {
       updated = { ...pos, status: "open", error: message };
       this.updateAndEmit(updated);
       console.warn(`⚠️ [${dexLabel}] SATIŞ başarısız (${pos.symbol}) [${_retryCount + 1}/${MAX_SELL_RETRIES + 1}]: ${message} — ${retryDelay}ms sonra tekrar...`);
-      setTimeout(() => this.sell(positionId, _retryCount + 1), retryDelay);
+      setTimeout(() => this.sell(positionId, percentage, _retryCount + 1), retryDelay);
       return updated;
     } finally {
       // [DÜZELTİLDİ] inFlight temizliği sadece finally'de — catch içinde tekrar silmeye gerek yok

@@ -21,7 +21,7 @@ interface TradePanelProps {
   ws?: WebSocket | null;
   onBuy: (mintAddress: string, name: string, symbol: string, dex?: "jupiter" | "pumpswap", solAmount?: number) => void;
   onAdditionalBuy?: (positionId: string, mintAddress: string, symbol: string, dex: "jupiter" | "pumpswap", solAmount: number) => void;
-  onSell: (positionId: string) => void;
+  onSell: (positionId: string, percentage?: number) => void;
   onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
@@ -510,7 +510,7 @@ interface PositionRowProps {
   onCopy: (addr: string, id: string) => void;
   onBuy: (mintAddress: string, name: string, symbol: string, dex?: "jupiter" | "pumpswap", solAmount?: number) => void;
   onAdditionalBuy?: (positionId: string, mintAddress: string, symbol: string, dex: "jupiter" | "pumpswap", solAmount: number) => void;
-  onSell: (positionId: string) => void;
+  onSell: (positionId: string, percentage?: number) => void;
   onSellHalf: (positionId: string) => void;
   onDelete: (positionId: string) => void;
   onMarkRugPull: (positionId: string) => void;
@@ -592,7 +592,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     (window as any).__manualSellPercentage = pct;
     console.log(`🔥 Manuel satış başladı: ${pct}% - Bekleniyor...`);
     
-    onSell(p.id);
+    onSell(p.id, pct);
   };
 
   const handleSavePercentage = () => {

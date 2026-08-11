@@ -208,9 +208,14 @@ export default function Home() {
     }
   };
 
-  const handleSell = (positionId: string) => {
+  const handleSell = (positionId: string, percentage?: number) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "sell_token", data: { positionId } }));
+      const data: any = { positionId };
+      if (typeof percentage === "number" && percentage > 0 && percentage <= 100) {
+        data.percentage = percentage;
+      }
+      console.log(`📤 WebSocket: sell_token gönderiliyor - positionId: ${positionId}, percentage: ${percentage}%`);
+      ws.send(JSON.stringify({ type: "sell_token", data }));
     }
   };
 

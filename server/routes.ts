@@ -677,9 +677,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } else if (message.type === "sell_token") {
-          const { positionId } = message.data || {};
+          const { positionId, percentage } = message.data || {};
           if (positionId) {
-            trader.sell(positionId).then((result) => {
+            const pct = typeof percentage === "number" && percentage > 0 && percentage <= 100 ? percentage : 100;
+            console.log(`📊 Manual satış: ${pct}% - positionId: ${positionId}`);
+            trader.sell(positionId, pct).then((result) => {
               if (result && result.status === "closed") {
                 // Satış başarılı → auto-trader record'unu kapat
                 const pos = tradeStore.getById(positionId);
