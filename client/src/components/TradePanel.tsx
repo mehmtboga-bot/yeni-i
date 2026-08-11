@@ -524,6 +524,8 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     p.customHoldDurationMs ? String(Math.round(p.customHoldDurationMs / 1000)) : ""
   );
   const [isHalfSelling, setIsHalfSelling] = useState(false);
+  const [manualSellPercentage, setManualSellPercentage] = useState<string>("50");
+  const [isManualSelling, setIsManualSelling] = useState(false);
   const [additionalBuyInput, setAdditionalBuyInput] = useState<string>("");
   const [isAdditionalBuying, setIsAdditionalBuying] = useState(false);
   const [buyRetries, setBuyRetries] = useState(0);
@@ -531,10 +533,11 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
 
   // İşlem sunucuya ulaşınca (pending_sell) veya kapanınca loading'i temizle
   useEffect(() => {
-    if (isHalfSelling && (p.status === "pending_sell" || p.status === "closed" || p.status === "failed")) {
+    if ((isHalfSelling || isManualSelling) && (p.status === "pending_sell" || p.status === "closed" || p.status === "failed")) {
       setIsHalfSelling(false);
+      setIsManualSelling(false);
     }
-  }, [p.status, isHalfSelling]);
+  }, [p.status, isHalfSelling, isManualSelling]);
 
   // Tekrar alım fonksiyonu — mevcut pozisyona ekleme yapar (yeni pozisyon oluşturmaz)
   const handleAdditionalBuy = async () => {
@@ -576,6 +579,24 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     };
 
     attemptBuy(0);
+  };
+  const handleManualSell = () => {
+    const percentage = parseFloat(manualSellPercentage);
+    if (Number.isNaN(percentage) || percentage <= 0 || percentage > 100) {
+      console.warn("❌ Geçersiz yüzde (1-100 arası)");
+      return;
+    }
+
+    console.log(`💰 Manuel satış başlatılıyor: %${percentage} | Token: ${p.symbol}`);
+    setIsManualSelling(true);
+
+    const tokensToSell = (p.buyTokenAmount * percentage) / 100;
+    
+    console.log(`📊 Satılacak: ${tokensToSell.toFixed(6)} token (toplam ${p.buyTokenAmount.toFixed(6)} token)`);
+    
+    if (onSell) {
+      onSell(p.id, tokensToSell);
+    }
   };
 
   // Position buySolAmount güncellenince alım başarılı sayılır — timeout'u iptal et
