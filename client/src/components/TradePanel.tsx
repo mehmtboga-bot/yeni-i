@@ -525,6 +525,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
   );
   const [isHalfSelling, setIsHalfSelling] = useState(false);
   const [manualSellPercentage, setManualSellPercentage] = useState<string>("50");
+  const [savedSellPercentage, setSavedSellPercentage] = useState<string>("50");
   const [isManualSelling, setIsManualSelling] = useState(false);
   const [additionalBuyInput, setAdditionalBuyInput] = useState<string>("");
   const [isAdditionalBuying, setIsAdditionalBuying] = useState(false);
@@ -582,13 +583,21 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
   };
 
   const handleManualSell = () => {
-    const pct = parseFloat(manualSellPercentage);
+    const pct = parseFloat(savedSellPercentage);
     if (isNaN(pct) || pct <= 0 || pct > 100) return;
     setIsHalfSelling(true);
     setIsManualSelling(true);
     onSell(p.id);
   };
 
+  const handleSavePercentage = () => {
+    const pct = parseFloat(manualSellPercentage);
+    if (isNaN(pct) || pct <= 0 || pct > 100) {
+      alert("Yüzde 1-100 arası olmalı");
+      return;
+    }
+    setSavedSellPercentage(manualSellPercentage);
+  };
   // Position buySolAmount güncellenince alım başarılı sayılır — timeout'u iptal et
   useEffect(() => {
     if (isAdditionalBuying && p.status === "open") {
@@ -858,7 +867,10 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                 </Button>
                 {(p.buyTokenAmount ?? 0) > 0 && (
                   <div className="flex gap-1 items-center">
-                    <input type="number" min="1" max="100" placeholder="%" value={manualSellPercentage} onChange={e => setManualSellPercentage(e.target.value)} disabled={isPending || isManualSelling} className="w-14 h-9 px-2 py-1 text-xs border border-amber-500/30 rounded bg-amber-500/5 text-amber-400" />
+                    <input type="number" min="1" max="100" placeholder="%" value={manualSellPercentage} onChange={e => setManualSellPercentage(e.target.value)} disabled={isPending || isManualSelling} className="w-12 h-9 px-2 py-1 text-xs border border-amber-500/30 rounded bg-amber-500/5 text-amber-400" />
+                    <Button size="sm" variant="outline" className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 px-2" disabled={isPending || isManualSelling} onClick={handleSavePercentage} title="Yüzdeyi kaydet">
+                      ✓
+                    </Button>
                     <Button size="sm" variant="outline" className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10" disabled={isPending || isManualSelling} onClick={handleManualSell} title="Sat">
                       {isManualSelling ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Satılıyor</> : "Sat"}
                     </Button>
@@ -866,36 +878,7 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
                 )}
               </>
             )}
-            {(isOpen || isPending) && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-red-500/50 text-red-400 hover:bg-red-500/10"
-                  onClick={() => {
-                    if (confirm(`${p.symbol} rug pull olarak kapatsın? -%100 zarar kaydedilecek ve "Kapanan" bölümünde görünecek.`)) {
-                      onMarkRugPull(p.id);
-                    }
-                  }}
-                  data-testid={`button-rug-${p.id}`}
-                >
-                  🚨 Rug
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
-                  onClick={() => {
-                    if (confirm(`${p.symbol} işlemini iptal etmek istediğine emin misin?`)) {
-                      onDelete(p.id);
-                    }
-                  }}
-                  data-testid={`button-cancel-${p.id}`}
-                >
-                  ✕ İptal
-                </Button>
-              </>
-            )}
+
             {p.status === "failed" && p.buyTxSignature && (
               <Button size="sm" variant="destructive" onClick={() => onSell(p.id)} data-testid={`button-retry-sell-${p.id}`}>
                 Tekrar Sat
