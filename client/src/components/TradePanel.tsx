@@ -587,6 +587,11 @@ function PositionRow({ position: p, copiedId, solPriceUsd, takeProfitPct, onCopy
     if (isNaN(pct) || pct <= 0 || pct > 100) return;
     setIsHalfSelling(true);
     setIsManualSelling(true);
+    
+    // Backend'e percentage bilgisi gönder (şimdilik window'a kaydet)
+    (window as any).__manualSellPercentage = pct;
+    console.log(`🔥 Manuel satış başladı: ${pct}% - Bekleniyor...`);
+    
     onSell(p.id);
   };
 
