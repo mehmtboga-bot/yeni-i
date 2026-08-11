@@ -904,7 +904,7 @@ export class JupiterTrader {
   // ========== YARI SATIŞ ==========
   // Pozisyonun token bakiyesinin yarısını satar. Kalan yarısı pozisyonda kalır (status "open").
   // MAX_SELL_RETRIES aşılırsa "failed" olarak işaretlenir.
-  async sellHalf(positionId: string, percentage = 50, _retryCount = 0): Promise<Position | null> {
+  async sellHalf(positionId: string, percentage = 35, _retryCount = 0): Promise<Position | null> {
     const pos = this.store.getById(positionId);
     if (!pos) { console.warn(`⚠️ Pozisyon bulunamadı: ${positionId}`); return null; }
     if (pos.status !== "open") { console.warn(`⚠️ Yarı satış için pozisyon açık olmalı (${pos.status}): ${pos.symbol}`); return pos; }
