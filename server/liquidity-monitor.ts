@@ -10,11 +10,11 @@
  * spaced 6 seconds apart before the rug pull is finalised.
  */
 
-const DEXSCREENER_API_BASE = "https://api.dexscreener.com/tokens/v1/solana";
+const DEXSCREENER_API_BASE = "https://api.dexscreener.com/latest/dex/tokens";
 const RUG_LIQUIDITY_THRESHOLD_USD = 300;
 const INITIAL_DELAY_MS          = 15_000;  // Wait 15s after purchase before first check
 const POLL_INTERVAL_MS          = 5_000;   // Check every 5s
-const API_TIMEOUT_MS            = 5_000;   // Max 5s per API call
+const API_TIMEOUT_MS            = 8_000;   // Max 8s per API call
 const RUG_CONFIRMATION_DELAY_MS = 6_000;   // Wait 6s between confirmation checks
 const RUG_CONFIRMATION_ATTEMPTS = 2;       // Number of extra checks before confirming rug
 
@@ -53,42 +53,36 @@ export class LiquidityMonitor {
         this.check();
       }, POLL_INTERVAL_MS);
     }, INITIAL_DELAY_MS);
-
-    console.log(`🔍 [LiquidityMonitor] ${this.symbol} (${this.positionId}) izleme başlatıldı — 15s sonra kontrol başlayacak`);
-  }
-
-  /** Stop monitoring (call when position is closed). */
-  stop() {
-    if (this.stopped) return;
-    this.stopped = true;
-    if (this.initialTimer) {
-      clearTimeout(this.initialTimer);
-      this.initialTimer = null;
-    }
-    this.clearPoll();
-    this.clearConfirmationTimer();
-    console.log(`🛑 [LiquidityMonitor] ${this.symbol} (${this.positionId}) izleme durduruldu`);
-  }
-
-  private clearPoll() {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
-    }
-  }
-
-  private clearConfirmationTimer() {
-    if (this.rugConfirmationTimer) {
-      clearTimeout(this.rugConfirmationTimer);
-      this.rugConfirmationTimer = null;
-    }
   }
 
   private async check() {
-    if (this.stopped) return;
-
     try {
-      const url = `${DEXSCREENER_API_BASE}/${this.mintAddress}`;
+      const liq = await this.fetchLiquidity();
+
+      if (liq === null) {
+        // No data available yet, skip
+        return;
+      }
+
+      if (liq === 0) {
+        // Real zero liquidity (rug pull detected)
+        console.log(`🚨 [LiquidityMonitor] ${this.symbol} likidite = $0 — RUG PULL TESPİT EDİLDİ!`);
+        this.confirmRugPull();
+        return;
+      }
+
+      if (liq < RUG_LIQUIDITY_THRESHOLD_USD) {
+        console.log(`⚠️ [LiquidityMonitor] ${this.symbol} likidite $${liq.toFixed(0)} < $${RUG_LIQUIDITY_THRESHOLD_USD} — RUG ŞÜPHESİ! Doğrulama başlatılıyor...`);
+        this.confirmRugPull();
+      }
+    } catch (err) {
+      console.error(`❌ [LiquidityMonitor] ${this.symbol} check hatası:`, err);
+    }
+  }
+
+  private async fetchLiquidity(): Promise<number | null> {
+    try {
+      const url = `${DEXSCREENER_API_BASE}?tokens=${this.mintAddress}`;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
@@ -105,43 +99,41 @@ export class LiquidityMonitor {
 
       if (!res.ok) {
         console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} API yanıtı: ${res.status} — sonraki döngüde tekrar denenecek`);
-        return;
+        return null;
       }
 
       const json = await res.json();
 
-      // Debug: log the raw response structure on the first unexpected shape
-      // Resolve pairs from either a root-level array or the `pairs` property
+      // Parse response: { pairs: [ { liquidity: { usd: X } } ] }
       let pairs: any[] | null = null;
-      if (Array.isArray(json)) {
-        // API returned the pairs array directly at the root
-        pairs = json;
-      } else if (json && Array.isArray(json.pairs)) {
-        // API returned { pairs: [...] }
+      if (json && Array.isArray(json.pairs)) {
         pairs = json.pairs;
+      } else if (Array.isArray(json)) {
+        // Fallback for unexpected array response
+        pairs = json;
       } else {
-        // Unexpected shape — log the actual response so we can diagnose it
         const preview = JSON.stringify(json)?.slice(0, 300);
         console.warn(
           `⚠️ [LiquidityMonitor] ${this.symbol} geçersiz API yanıtı — ` +
           `beklenen yapı bulunamadı. Gerçek yanıt: ${preview} — atlanıyor`
         );
-        return;
+        return null;
       }
 
       if (pairs.length === 0) {
         // No pairs yet — data not available, skip this check
         console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} henüz pair bulunamadı — atlanıyor`);
-        return;
+        return null;
       }
 
       // Find the highest liquidity pair.
       // null  = no liquidity field present in any pair (data missing, retry)
       // 0     = real zero liquidity (rug pull)
+      // >0    = valid liquidity amount
       let maxLiquidityUsd: number | null = null;
       for (const pair of pairs) {
         const liq = pair?.liquidity?.usd;
-        if (typeof liq === "number") {
+        if (typeof liq === "number" && liq >= 0) {
           if (maxLiquidityUsd === null || liq > maxLiquidityUsd) {
             maxLiquidityUsd = liq;
           }
@@ -151,131 +143,84 @@ export class LiquidityMonitor {
       if (maxLiquidityUsd === null) {
         // Liquidity field missing from all pairs — data not yet available, skip
         console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} likidite verisi eksik — atlanıyor`);
-        return;
+        return null;
       }
 
-      console.log(`💧 [LiquidityMonitor] ${this.symbol} likidite: $` + `${maxLiquidityUsd.toFixed(0)} (${pairs.length} pair)`);
-
-      if (maxLiquidityUsd < RUG_LIQUIDITY_THRESHOLD_USD) {
-        console.log(`⚠️ [LiquidityMonitor] ${this.symbol} likidite ${maxLiquidityUsd.toFixed(0)} < ${RUG_LIQUIDITY_THRESHOLD_USD} — RUG PULL ŞÜPHESİ! Doğrulama başlatılıyor...`);
-        // Pause normal polling and begin the confirmation sequence
-        this.clearPoll();
-        this.rugConfirmationAttempts = 0;
-        this.scheduleNextConfirmation();
-      }
-    } catch (err: any) {
-      if (err?.name === "AbortError") {
-        console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} API isteği zaman aşımına uğradı — sonraki döngüde tekrar denenecek`);
-      } else {
-        console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} kontrol hatası: ${err?.message ?? err} — sonraki döngüde tekrar denenecek`);
-      }
-      // Don't crash — retry on next poll cycle
+      console.log(`💧 [LiquidityMonitor] ${this.symbol} likidite: $${maxLiquidityUsd.toFixed(0)} (${pairs.length} pair)`);
+      return maxLiquidityUsd;
+    } catch (err) {
+      console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} API hatası:`, (err as Error).message);
+      return null;
     }
   }
 
-  /** Fetch liquidity once more to verify the suspected rug pull. */
-  private async confirmRugPull() {
-    if (this.stopped) return;
+  private confirmRugPull() {
+    // Pause normal polling
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
 
-    this.rugConfirmationAttempts++;
-    console.log(`🔎 [LiquidityMonitor] ${this.symbol} rug pull doğrulama ${this.rugConfirmationAttempts}/${RUG_CONFIRMATION_ATTEMPTS} — likidite kontrol ediliyor...`);
+    this.rugConfirmationAttempts = 0;
+    this.confirmCheck();
+  }
 
-    try {
-      const url = `${DEXSCREENER_API_BASE}/${this.mintAddress}`;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-
-      let res: Response;
+  private confirmCheck() {
+    this.rugConfirmationTimer = setTimeout(async () => {
       try {
-        res = await fetch(url, {
-          headers: { Accept: "application/json" },
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timeoutId);
-      }
+        const liq = await this.fetchLiquidity();
 
-      let liquidityOk = false;
-
-      if (res.ok) {
-        const json = await res.json();
-
-        let pairs: any[] | null = null;
-        if (Array.isArray(json)) {
-          pairs = json;
-        } else if (json && Array.isArray(json.pairs)) {
-          pairs = json.pairs;
-        }
-
-        if (pairs && pairs.length > 0) {
-          let maxLiquidityUsd: number | null = null;
-          for (const pair of pairs) {
-            const liq = pair?.liquidity?.usd;
-            if (typeof liq === "number") {
-              if (maxLiquidityUsd === null || liq > maxLiquidityUsd) {
-                maxLiquidityUsd = liq;
+        if (liq !== null && liq >= RUG_LIQUIDITY_THRESHOLD_USD) {
+          // False positive — liquidity recovered
+          console.log(`✅ [LiquidityMonitor] ${this.symbol} likidite normal seviyeye döndü ($${liq.toFixed(0)}), rug pull yanlış alarm iptal edildi`);
+          // Resume normal polling
+          if (!this.stopped) {
+            this.pollTimer = setInterval(() => {
+              if (this.stopped) {
+                this.clearPoll();
+                return;
               }
-            }
+              this.check();
+            }, POLL_INTERVAL_MS);
           }
-
-          if (maxLiquidityUsd !== null && maxLiquidityUsd >= RUG_LIQUIDITY_THRESHOLD_USD) {
-            liquidityOk = true;
-            console.log(`✅ [LiquidityMonitor] ${this.symbol} likidite geri döndü (${maxLiquidityUsd.toFixed(0)}) — rug pull iptal, normal izleme devam ediyor`);
-          } else if (maxLiquidityUsd !== null) {
-            console.log(`⚠️ [LiquidityMonitor] ${this.symbol} doğrulama ${this.rugConfirmationAttempts}: likidite hâlâ düşük (${maxLiquidityUsd.toFixed(0)})`);
-          } else {
-            console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} doğrulama ${this.rugConfirmationAttempts}: likidite verisi eksik`);
-          }
-        } else {
-          console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} doğrulama ${this.rugConfirmationAttempts}: pair bulunamadı`);
+          return;
         }
-      } else {
-        console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} doğrulama ${this.rugConfirmationAttempts}: API yanıtı ${res.status}`);
-      }
 
-      if (liquidityOk) {
-        // Liquidity recovered — resume normal polling
-        this.rugConfirmationAttempts = 0;
-        this.pollTimer = setInterval(() => {
-          if (this.stopped) {
-            this.clearPoll();
-            return;
-          }
-          this.check();
-        }, POLL_INTERVAL_MS);
-        return;
-      }
-    } catch (err: any) {
-      if (err?.name === "AbortError") {
-        console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} doğrulama ${this.rugConfirmationAttempts}: istek zaman aşımına uğradı`);
-      } else {
-        console.warn(`⚠️ [LiquidityMonitor] ${this.symbol} doğrulama ${this.rugConfirmationAttempts} hatası: ${err?.message ?? err}`);
-      }
-    }
+        this.rugConfirmationAttempts++;
+        if (this.rugConfirmationAttempts >= RUG_CONFIRMATION_ATTEMPTS) {
+          // Confirmed rug pull
+          console.log(`🚨 [LiquidityMonitor] ${this.symbol} RUG PULL ONAYLANDI (${RUG_CONFIRMATION_ATTEMPTS} doğrulama)`);
+          this.onRugDetected(this.positionId);
+          this.stop();
+          return;
+        }
 
-    // Liquidity still missing/low — schedule next check or finalise
-    if (this.rugConfirmationAttempts < RUG_CONFIRMATION_ATTEMPTS) {
-      this.scheduleNextConfirmation();
-    } else {
-      this.finalizeRugPull();
-    }
-  }
-
-  /** Schedule the next confirmation check after RUG_CONFIRMATION_DELAY_MS. */
-  private scheduleNextConfirmation() {
-    this.clearConfirmationTimer();
-    this.rugConfirmationTimer = setTimeout(() => {
-      this.rugConfirmationTimer = null;
-      this.confirmRugPull();
+        // Schedule next confirmation check
+        this.confirmCheck();
+      } catch (err) {
+        console.error(`❌ [LiquidityMonitor] ${this.symbol} doğrulama hatası:`, err);
+      }
     }, RUG_CONFIRMATION_DELAY_MS);
-    console.log(`⏳ [LiquidityMonitor] ${this.symbol} sonraki doğrulama ${RUG_CONFIRMATION_DELAY_MS / 1_000}s içinde yapılacak`);
   }
 
-  /** All confirmation attempts exhausted — trigger the rug pull callback. */
-  private finalizeRugPull() {
-    console.log(`🚨 [LiquidityMonitor] ${this.symbol} RUG PULL DOĞRULANMIŞTIR! (${RUG_CONFIRMATION_ATTEMPTS} doğrulama tamamlandı) — pozisyon kapatılıyor`);
-    this.stop();
-    this.onRugDetected(this.positionId);
+  stop() {
+    this.stopped = true;
+    this.clearPoll();
+    if (this.initialTimer) {
+      clearTimeout(this.initialTimer);
+      this.initialTimer = null;
+    }
+    if (this.rugConfirmationTimer) {
+      clearTimeout(this.rugConfirmationTimer);
+      this.rugConfirmationTimer = null;
+    }
+  }
+
+  private clearPoll() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 }
+
