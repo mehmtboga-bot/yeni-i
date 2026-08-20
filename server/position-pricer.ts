@@ -134,19 +134,26 @@ export class PositionPricer {
       // Başarılı okuma — sayacı sıfırla
       this.failureCount.delete(pos.mintAddress);
 
-      // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
+      // [FİX] Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
+      // AMA lastValidPrice'i UPDATE ET — sonraki çevirde spike loop'u oluşmasın
       const lastPrice = this.lastValidPrice.get(pos.mintAddress);
+      let isSpike = false;
       if (lastPrice && lastPrice > 0 && priceInSol > lastPrice * 10) {
         console.warn(`⚠️ [Pricer] Spike: ${pos.symbol} ${lastPrice.toFixed(8)} → ${priceInSol.toFixed(8)} SOL`);
-        continue;
+        isSpike = true;
       }
-      this.lastValidPrice.set(pos.mintAddress, priceInSol);
+      this.lastValidPrice.set(pos.mintAddress, priceInSol); // Her zaman update et!
 
       // buyPriceSol: alım sırasında bir kez doğru set edilir, pricer tarafından değiştirilmez
       const buyPriceSol = pos.buyPriceSol;
       if (!buyPriceSol || buyPriceSol <= 0) {
         console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
         continue;
+      }
+
+      // [FİX] Spike'deyse fiyat update'i yapma — P&L hesapla
+      if (isSpike) {
+        continue; // ← Şimdi güvenle skip edebiliriz, sonraki iterasyonda repeat olmaz
       }
 
       // P&L hesaplamaları — tümü aynı priceInSol değerini kullanır
@@ -243,3 +250,4 @@ export class PositionPricer {
     }
   }
 }
+
