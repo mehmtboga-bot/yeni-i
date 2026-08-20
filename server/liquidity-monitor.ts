@@ -10,7 +10,7 @@
  * spaced 6 seconds apart before the rug pull is finalised.
  */
 
-const DEXSCREENER_API_BASE = "https://api.dexscreener.com/tokens/v1/solana/{mintAddress}";
+const DEXSCREENER_API_BASE = "https://api.dexscreener.com/latest/dex/tokens/{TOKEN_MINT}}";
 const RUG_LIQUIDITY_THRESHOLD_USD = 300;
 const INITIAL_DELAY_MS          = 15_000;  // Wait 15s after purchase before first check
 const POLL_INTERVAL_MS          = 5_000;   // Check every 5s
@@ -120,9 +120,10 @@ export class LiquidityMonitor {
         // API returned { pairs: [...] }
         pairs = json.pairs;
       } else {
+        
         // Unexpected shape — log the actual response so we can diagnose it
-        console.log("🔥 DEX RESPONSE:", JSON.stringify(json, null, 2));
-        const preview = JSON.stringify(json)?.slice(0, 300);
+  
+       const preview = JSON.stringify(json)?.slice(0, 300);
         console.warn(
           `⚠️ [LiquidityMonitor] ${this.symbol} geçersiz API yanıtı — ` +
           `beklenen yapı bulunamadı. Gerçek yanıt: ${preview} — atlanıyor`
