@@ -10,7 +10,7 @@
  * spaced 6 seconds apart before the rug pull is finalised.
  */
 
-const DEXSCREENER_API_BASE = "https://api.dexscreener.com/latest/dex/tokens";
+const DEXSCREENER_API_BASE = "https://api.dexscreener.com/tokens/v1/solana";
 const RUG_LIQUIDITY_THRESHOLD_USD = 300;
 const INITIAL_DELAY_MS          = 15_000;  // Wait 15s after purchase before first check
 const POLL_INTERVAL_MS          = 5_000;   // Check every 5s
@@ -82,7 +82,7 @@ export class LiquidityMonitor {
 
   private async fetchLiquidity(): Promise<number | null> {
     try {
-      const url = `${DEXSCREENER_API_BASE}?tokens=${this.mintAddress}`;
+      const url = `${DEXSCREENER_API_BASE}/${this.mintAddress}`;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
