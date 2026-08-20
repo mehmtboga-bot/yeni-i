@@ -10,7 +10,7 @@
  * spaced 6 seconds apart before the rug pull is finalised.
  */
 
-const DEXSCREENER_API_BASE = "https://api.dexscreener.com/tokens/v1/solana";
+const DEXSCREENER_API_BASE = "https://api.dexscreener.com/latest/dex/tokens?tokens={mintAddress}";
 const RUG_LIQUIDITY_THRESHOLD_USD = 300;
 const INITIAL_DELAY_MS          = 15_000;  // Wait 15s after purchase before first check
 const POLL_INTERVAL_MS          = 5_000;   // Check every 5s
