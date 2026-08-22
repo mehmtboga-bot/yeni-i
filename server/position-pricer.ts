@@ -149,13 +149,14 @@ export class PositionPricer {
         continue;
       }
 
-      // P&L hesaplamaları — tümü aynı priceInSol değerini kullanır
-      const unrealizedPnlSol =
-        (pos.buyTokenAmount ?? 0) * (priceInSol - buyPriceSol);
-
-      // ✅ DÜZELTİLDİ: SOL bazlı hesap — SOL/USD kuru dalgalanmasından etkilenmez
+      // [FİX] P&L hesaplamaları — %'yi hesapla
       const unrealizedPnlPct =
         buyPriceSol > 0 ? ((priceInSol - buyPriceSol) / buyPriceSol) * 100 : 0;
+
+      // [FİX] unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
+      // YANLIŞ: tokenAmount × fiyatFarkı (birim karışıklığı)
+      // DOĞRU: yatırılan_SOL × (kar% / 100)
+      const unrealizedPnlSol = (pos.buySolAmount ?? 0) * (unrealizedPnlPct / 100);
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
@@ -243,3 +244,4 @@ export class PositionPricer {
     }
   }
 }
+
