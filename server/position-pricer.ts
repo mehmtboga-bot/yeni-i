@@ -142,16 +142,21 @@ export class PositionPricer {
       }
       this.lastValidPrice.set(pos.mintAddress, priceInSol);
 
-      // buyPriceSol: alım sırasında bir kez doğru set edilir, pricer tarafından değiştirilmez
-      const buyPriceSol = pos.buyPriceSol;
-      if (!buyPriceSol || buyPriceSol <= 0) {
-        console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
-        continue;
-      }
+      // Alış fiyatı
+const buyPriceSol = pos.buyPriceSol;
 
-      // [FİX] P&L hesaplamaları — %'yi hesapla
-      const unrealizedPnlPct =
-        buyPriceSol > 0 ? ((priceInSol - buyPriceSol) / buyPriceSol) * 100 : 0;
+if (!buyPriceSol || buyPriceSol <= 0) {
+  console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
+  continue;
+}
+
+// Alış fiyatını USD'ye çevir
+const buyPriceUsd = buyPriceSol * solPrice;
+
+// P&L yüzdesini doğrudan USD fiyatları üzerinden hesapla
+const unrealizedPnlPct =
+  buyPriceUsd > 0 && currentPriceUsd > 0 
+  ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100: 0;
 
       // [FİX] unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
       // YANLIŞ: tokenAmount × fiyatFarkı (birim karışıklığı)
