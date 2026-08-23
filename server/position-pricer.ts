@@ -3,6 +3,7 @@ import { AutoTraderConfigStore } from "./auto-trader-config";
 import type { Position } from "@shared/schema";
 
 const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export class PositionPricer {
   private store: TradeStore;
@@ -64,6 +65,26 @@ export class PositionPricer {
   private async updatePrices() {
     const positions = this.store.getAll();
     const openPositions = positions.filter((p) => p.status === "open");
+    // Jupiter'dan canlı SOL/USD fiyatını çek
+try {
+  const solRes = await fetch(
+    `${JUP_PRICE_API}?ids=So11111111111111111111111111111111111111112`
+  );
+
+  if (solRes.ok) {
+    const solJson = await solRes.json();
+    const solData =
+      solJson?.data?.["So11111111111111111111111111111111111111112"];
+
+    const liveSolPrice = Number(solData?.usdPrice ?? 0);
+
+    if (liveSolPrice > 0) {
+      this.solPriceUsd = liveSolPrice;
+    }
+  }
+} catch (err) {
+  console.warn("⚠️ [Pricer] SOL fiyatı alınamadı");
+}
     if (openPositions.length === 0) return;
 
     const mints = openPositions.map((p) => p.mintAddress).join(",");
