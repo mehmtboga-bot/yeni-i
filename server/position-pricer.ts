@@ -116,7 +116,13 @@ export class PositionPricer {
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
 
-      const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 68;
+      // solPriceUsd tanımlı değilse bu pozisyonu atla (fallback 68 kaldırıldı)
+      if (!this.solPriceUsd || this.solPriceUsd <= 0) {
+        console.warn(`⚠️ [Pricer] SOL fiyatı tanımlı değil (${this.solPriceUsd}), ${pos.symbol} atlanıyor`);
+        continue;
+      }
+
+      const solPrice = this.solPriceUsd;
       const currentPriceUsd = priceData?.usdPrice ?? 0;
       const priceInSol = currentPriceUsd / solPrice;
 
@@ -143,24 +149,22 @@ export class PositionPricer {
       this.lastValidPrice.set(pos.mintAddress, priceInSol);
 
       // Alış fiyatı
-const buyPriceSol = pos.buyPriceSol;
+      const buyPriceSol = pos.buyPriceSol;
 
-if (!buyPriceSol || buyPriceSol <= 0) {
-  console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
-  continue;
-}
+      if (!buyPriceSol || buyPriceSol <= 0) {
+        console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
+        continue;
+      }
 
-// Alış fiyatını USD'ye çevir
-const buyPriceUsd = buyPriceSol * solPrice;
+      // DOĞRU: P&L yüzdesini SOL cinsinden hesapla
+      // currentPriceUsd ve buyPriceSol karşılaştırmak yerine
+      // ikisini de aynı birime (SOL) çevir
+      const currentPriceSol = currentPriceUsd / solPrice;
+      const unrealizedPnlPct =
+        buyPriceSol > 0 && currentPriceSol > 0 
+        ? ((currentPriceSol - buyPriceSol) / buyPriceSol) * 100 : 0;
 
-// P&L yüzdesini doğrudan USD fiyatları üzerinden hesapla
-const unrealizedPnlPct =
-  buyPriceUsd > 0 && currentPriceUsd > 0 
-  ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100: 0;
-
-      // [FİX] unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
-      // YANLIŞ: tokenAmount × fiyatFarkı (birim karışıklığı)
-      // DOĞRU: yatırılan_SOL × (kar% / 100)
+      // unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
       const unrealizedPnlSol = (pos.buySolAmount ?? 0) * (unrealizedPnlPct / 100);
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
@@ -249,4 +253,3 @@ const unrealizedPnlPct =
     }
   }
 }
-
