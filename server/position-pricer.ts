@@ -135,12 +135,6 @@ export class PositionPricer {
       this.failureCount.delete(pos.mintAddress);
 
       // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
-      const lastPrice = this.lastValidPrice.get(pos.mintAddress);
-      if (lastPrice && lastPrice > 0 && priceInSol > lastPrice * 10) {
-        console.warn(`⚠️ [Pricer] Spike: ${pos.symbol} ${lastPrice.toFixed(8)} → ${priceInSol.toFixed(8)} SOL`);
-        continue;
-      }
-      this.lastValidPrice.set(pos.mintAddress, priceInSol);
 
       // Alış fiyatı
 const buyPriceSol = pos.buyPriceSol;
