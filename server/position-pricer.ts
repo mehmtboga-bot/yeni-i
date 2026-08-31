@@ -116,7 +116,7 @@ export class PositionPricer {
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
 
-      const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 94;
+      const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 101;
       const currentPriceUsd = priceData?.usdPrice ?? 0;
       const priceInSol = currentPriceUsd / solPrice;
 
