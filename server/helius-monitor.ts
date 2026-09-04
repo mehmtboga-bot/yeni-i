@@ -94,7 +94,7 @@ const LP_LOG_PATTERN   = "Program log: Instruction: CreatePool";
 // Ek kontrol: PumpSwap programının invoke satırı (derinlik 1)
 const PUMPSWAP_INVOKE  = `Program ${PUMPSWAP} invoke [1]`;
 
-const MIN_TVL_USD_NOTIFY = 40000;
+const MIN_TVL_USD_NOTIFY = 40000000;
 
 const TROJAN_BOT = "solana_trojanbot";
 const TROJAN_REF = "mehmtbga";
