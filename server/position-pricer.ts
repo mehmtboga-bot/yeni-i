@@ -10,7 +10,7 @@ export class PositionPricer {
   private solPriceUsd: number = 0;
   private emit: (event: string, data: any) => void;
   private onAutoSell: ((positionId: string) => void) | null = null;
-  private onHalfSell: ((positionId: string) => void) | null = null;
+  private onHalfSell: ((positionId: string, percentage?: number) => void) | null = null;
   private updateInterval: ReturnType<typeof setInterval> | null = null;
   private autoSellInFlight: Set<string> = new Set();
 
@@ -33,7 +33,7 @@ export class PositionPricer {
     solPriceUsd: number,
     emit: (event: string, data: any) => void,
     onAutoSell?: (positionId: string) => void,
-    onHalfSell?: (positionId: string) => void,
+    onHalfSell?: (positionId: string, percentage?: number) => void,
     autoTraderConfigStore?: AutoTraderConfigStore,
   ) {
     this.store = store;
@@ -137,20 +137,20 @@ export class PositionPricer {
       // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
 
       // Alış fiyatı
-const buyPriceSol = pos.buyPriceSol;
+      const buyPriceSol = pos.buyPriceSol;
 
-if (!buyPriceSol || buyPriceSol <= 0) {
-  console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
-  continue;
-}
+      if (!buyPriceSol || buyPriceSol <= 0) {
+        console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
+        continue;
+      }
 
-// Alış fiyatını USD'ye çevir
-const buyPriceUsd = buyPriceSol * solPrice;
+      // Alış fiyatını USD'ye çevir
+      const buyPriceUsd = buyPriceSol * solPrice;
 
-// P&L yüzdesini doğrudan USD fiyatları üzerinden hesapla
-const unrealizedPnlPct =
-  buyPriceUsd > 0 && currentPriceUsd > 0 
-  ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100: 0;
+      // P&L yüzdesini doğrudan USD fiyatları üzerinden hesapla
+      const unrealizedPnlPct =
+        buyPriceUsd > 0 && currentPriceUsd > 0 
+        ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100: 0;
 
       // [FİX] unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
       // YANLIŞ: tokenAmount × fiyatFarkı (birim karışıklığı)
@@ -191,43 +191,43 @@ const unrealizedPnlPct =
         }
       }
 
-      // Yarı satış hedef 1
+      // Yarı satış hedef 1 — %35 sat
       if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget1 ?? 0) && (effectiveTakeProfitPct === 0 || unrealizedPnlPct < effectiveTakeProfitPct)) {
         const count = (this.halfSellTarget1Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget1Count.set(pos.id, count);
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
           this.autoSellInFlight.add(pos.id);
           this.halfSellTarget1Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 1: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget1}%)`);
-          this.onHalfSell(pos.id);
+          console.log(`✂️ [Pricer] Yarı satış 1: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget1}%, satış: %35)`);
+          this.onHalfSell(pos.id, 35);
         }
       } else if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget1 ?? 0)) {
         this.halfSellTarget1Count.delete(pos.id);
       }
 
-      // Yarı satış hedef 2
+      // Yarı satış hedef 2 — %50 sat
       if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget2 ?? 0) && (effectiveTakeProfitPct === 0 || unrealizedPnlPct < effectiveTakeProfitPct)) {
         const count = (this.halfSellTarget2Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget2Count.set(pos.id, count);
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
           this.autoSellInFlight.add(pos.id);
           this.halfSellTarget2Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget2}%)`);
-          this.onHalfSell(pos.id);
+          console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget2}%, satış: %50)`);
+          this.onHalfSell(pos.id, 50);
         }
       } else if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget2 ?? 0)) {
         this.halfSellTarget2Count.delete(pos.id);
       }
 
-      // Yarı satış hedef 3
+      // Yarı satış hedef 3 — %50 sat
       if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget3 ?? 0) && (effectiveTakeProfitPct === 0 || unrealizedPnlPct < effectiveTakeProfitPct)) {
         const count = (this.halfSellTarget3Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget3Count.set(pos.id, count);
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
           this.autoSellInFlight.add(pos.id);
           this.halfSellTarget3Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 3: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget3}%)`);
-          this.onHalfSell(pos.id);
+          console.log(`✂️ [Pricer] Yarı satış 3: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget3}%, satış: %50)`);
+          this.onHalfSell(pos.id, 50);
         }
       } else if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget3 ?? 0)) {
         this.halfSellTarget3Count.delete(pos.id);
