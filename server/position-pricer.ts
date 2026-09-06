@@ -27,6 +27,9 @@ export class PositionPricer {
   private halfSellTarget1Count: Map<string, number> = new Map();
   private halfSellTarget2Count: Map<string, number> = new Map();
   private halfSellTarget3Count: Map<string, number> = new Map();
+  
+  // Yarı satış hedefleri için ayrı in-flight setiyle bloke önleme
+  private halfSellInFlight: Set<string> = new Set();
 
   constructor(
     store: TradeStore,
@@ -192,11 +195,11 @@ export class PositionPricer {
       }
 
       // Yarı satış hedef 1 — %35 sat
-      if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget1 ?? 0) && (effectiveTakeProfitPct === 0 || unrealizedPnlPct < effectiveTakeProfitPct)) {
+      if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget1 ?? 0)) {
         const count = (this.halfSellTarget1Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget1Count.set(pos.id, count);
-        if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
-          this.autoSellInFlight.add(pos.id);
+        if (count >= 2 && !this.halfSellInFlight.has(pos.id) && this.onHalfSell) {
+          this.halfSellInFlight.add(pos.id);
           this.halfSellTarget1Count.delete(pos.id);
           console.log(`✂️ [Pricer] Yarı satış 1: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget1}%, satış: %35)`);
           this.onHalfSell(pos.id, 35);
@@ -206,11 +209,11 @@ export class PositionPricer {
       }
 
       // Yarı satış hedef 2 — %50 sat
-      if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget2 ?? 0) && (effectiveTakeProfitPct === 0 || unrealizedPnlPct < effectiveTakeProfitPct)) {
+      if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget2 ?? 0)) {
         const count = (this.halfSellTarget2Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget2Count.set(pos.id, count);
-        if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
-          this.autoSellInFlight.add(pos.id);
+        if (count >= 2 && !this.halfSellInFlight.has(pos.id) && this.onHalfSell) {
+          this.halfSellInFlight.add(pos.id);
           this.halfSellTarget2Count.delete(pos.id);
           console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget2}%, satış: %50)`);
           this.onHalfSell(pos.id, 50);
@@ -220,11 +223,11 @@ export class PositionPricer {
       }
 
       // Yarı satış hedef 3 — %50 sat
-      if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget3 ?? 0) && (effectiveTakeProfitPct === 0 || unrealizedPnlPct < effectiveTakeProfitPct)) {
+      if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget3 ?? 0)) {
         const count = (this.halfSellTarget3Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget3Count.set(pos.id, count);
-        if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
-          this.autoSellInFlight.add(pos.id);
+        if (count >= 2 && !this.halfSellInFlight.has(pos.id) && this.onHalfSell) {
+          this.halfSellInFlight.add(pos.id);
           this.halfSellTarget3Count.delete(pos.id);
           console.log(`✂️ [Pricer] Yarı satış 3: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget3}%, satış: %50)`);
           this.onHalfSell(pos.id, 50);
@@ -241,5 +244,14 @@ export class PositionPricer {
         this.autoSellInFlight.delete(id);
       }
     }
+    
+    // Yarı satış verilerini de temizle
+    for (const id of this.halfSellInFlight) {
+      const p = this.store.getById(id);
+      if (!p || p.status === "closed") {
+        this.halfSellInFlight.delete(id);
+      }
+    }
   }
 }
+
