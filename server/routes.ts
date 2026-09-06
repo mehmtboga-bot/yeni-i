@@ -16,6 +16,7 @@ import { LiquidityMonitor } from "./liquidity-monitor";
 import { PhantomMonitor } from "./phantom-monitor";
 import { TokenBalancePoller } from "./token-balance-poller";
 
+import { sendRugPullAlert } from "./telegram-service";
 const ROOT = process.cwd();
 
 const ALLOWED_FILES = [
@@ -300,6 +301,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       broadcastToClients({ type: "rug_pull_detected", data: { positionId, mintAddress, symbol, reason } });
       console.error(`🚨 [Routes] ${symbol} — satış 3 denemede başarısız, rug pull olarak işaretlendi`);
+
+      // Telegram'a rug pull bildirimini gönder
+      const pos = tradeStore.getById(positionId);
+      const lossAmount = pos?.buySolAmount ?? 0;
+      await sendRugPullAlert(symbol, mintAddress, lossAmount);
     }
   });
 
