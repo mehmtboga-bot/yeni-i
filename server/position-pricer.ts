@@ -28,8 +28,10 @@ export class PositionPricer {
   private halfSellTarget2Count: Map<string, number> = new Map();
   private halfSellTarget3Count: Map<string, number> = new Map();
   
-  // Yarı satış hedefleri için ayrı in-flight setiyle bloke önleme
-  private halfSellInFlight: Set<string> = new Set();
+  // Her yarı satış hedefi için ayrı in-flight setleriyle bloke önleme
+  private halfSellInFlight1: Set<string> = new Set();
+  private halfSellInFlight2: Set<string> = new Set();
+  private halfSellInFlight3: Set<string> = new Set();
 
   constructor(
     store: TradeStore,
@@ -198,8 +200,8 @@ export class PositionPricer {
       if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget1 ?? 0)) {
         const count = (this.halfSellTarget1Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget1Count.set(pos.id, count);
-        if (count >= 2 && !this.halfSellInFlight.has(pos.id) && this.onHalfSell) {
-          this.halfSellInFlight.add(pos.id);
+        if (count >= 2 && !this.halfSellInFlight1.has(pos.id) && this.onHalfSell) {
+          this.halfSellInFlight1.add(pos.id);
           this.halfSellTarget1Count.delete(pos.id);
           console.log(`✂️ [Pricer] Yarı satış 1: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget1}%, satış: %35)`);
           this.onHalfSell(pos.id, 35);
@@ -212,8 +214,8 @@ export class PositionPricer {
       if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget2 ?? 0)) {
         const count = (this.halfSellTarget2Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget2Count.set(pos.id, count);
-        if (count >= 2 && !this.halfSellInFlight.has(pos.id) && this.onHalfSell) {
-          this.halfSellInFlight.add(pos.id);
+        if (count >= 2 && !this.halfSellInFlight2.has(pos.id) && this.onHalfSell) {
+          this.halfSellInFlight2.add(pos.id);
           this.halfSellTarget2Count.delete(pos.id);
           console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget2}%, satış: %50)`);
           this.onHalfSell(pos.id, 50);
@@ -226,8 +228,8 @@ export class PositionPricer {
       if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct >= (autoConfig?.halfSellTarget3 ?? 0)) {
         const count = (this.halfSellTarget3Count.get(pos.id) ?? 0) + 1;
         this.halfSellTarget3Count.set(pos.id, count);
-        if (count >= 2 && !this.halfSellInFlight.has(pos.id) && this.onHalfSell) {
-          this.halfSellInFlight.add(pos.id);
+        if (count >= 2 && !this.halfSellInFlight3.has(pos.id) && this.onHalfSell) {
+          this.halfSellInFlight3.add(pos.id);
           this.halfSellTarget3Count.delete(pos.id);
           console.log(`✂️ [Pricer] Yarı satış 3: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget3}%, satış: %50)`);
           this.onHalfSell(pos.id, 50);
@@ -245,13 +247,24 @@ export class PositionPricer {
       }
     }
     
-    // Yarı satış verilerini de temizle
-    for (const id of this.halfSellInFlight) {
+    // Yarı satış verilerini de temizle (her hedef için ayrı set)
+    for (const id of this.halfSellInFlight1) {
       const p = this.store.getById(id);
       if (!p || p.status === "closed") {
-        this.halfSellInFlight.delete(id);
+        this.halfSellInFlight1.delete(id);
+      }
+    }
+    for (const id of this.halfSellInFlight2) {
+      const p = this.store.getById(id);
+      if (!p || p.status === "closed") {
+        this.halfSellInFlight2.delete(id);
+      }
+    }
+    for (const id of this.halfSellInFlight3) {
+      const p = this.store.getById(id);
+      if (!p || p.status === "closed") {
+        this.halfSellInFlight3.delete(id);
       }
     }
   }
 }
-
