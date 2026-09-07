@@ -990,7 +990,7 @@ export class JupiterTrader {
         }, `PumpSwap HalfSell ${pos.symbol}`);
 
         const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.halfAmount);
-        const remainingAmount = (pos.buyTokenAmount ?? 0) * (percentage / 100);
+        const remainingAmount = (pos.buyTokenAmount ?? 0) * (1 - percentage / 100);
         const halfBuyCost = (pos.buySolAmount ?? 0) * (percentage / 100);
         const pnlSol = estimatedSolOut - halfBuyCost;
         const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
@@ -1045,7 +1045,7 @@ export class JupiterTrader {
           }, `Jupiter HalfSell ${pos.symbol}`);
 
           jupiterOk = true;
-          const remainingAmount = (pos.buyTokenAmount ?? 0) * (percentage / 100);
+          const remainingAmount = (pos.buyTokenAmount ?? 0) * (1 - percentage / 100);
           const halfBuyCost = (pos.buySolAmount ?? 0) * (percentage / 100);
           const pnlSol = result.solOut - halfBuyCost;
           const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
@@ -1096,7 +1096,7 @@ export class JupiterTrader {
           }, `PumpSwap Fallback HalfSell ${pos.symbol}`);
 
           const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.halfAmount);
-          const remainingAmount = (pos.buyTokenAmount ?? 0) * (percentage / 100);
+          const remainingAmount = (pos.buyTokenAmount ?? 0) * (1 - percentage / 100);
           const halfBuyCost = (pos.buySolAmount ?? 0) * (percentage / 100);
           const pnlSol = estimatedSolOut - halfBuyCost;
           const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
