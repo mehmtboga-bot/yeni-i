@@ -1172,7 +1172,7 @@ export class JupiterTrader {
       const failedPos: Position = { ...pos, status: "open", error: message };
       this.updateAndEmit(failedPos);
       console.warn(`⚠️ [${dexLabel}] YARI SATIŞ başarısız (${pos.symbol}) [${_retryCount + 1}/${MAX_SELL_RETRIES}]: ${message} — ${retryDelay}ms sonra tekrar...`);
-      setTimeout(() => this.sellHalf(positionId, _retryCount + 1), retryDelay);
+      setTimeout(() => this.sellHalf(positionId, percentage, _retryCount + 1), retryDelay);
       return failedPos;
     } finally {
       // [DÜZELTİLDİ] inFlight temizliği sadece finally'de — catch içinde tekrar silmeye gerek yok
