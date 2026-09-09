@@ -140,7 +140,12 @@ export class PositionPricer {
   private async updatePrices() {
     const positions = this.store.getAll();
     const openPositions = positions.filter((p) => p.status === "open");
-    if (openPositions.length === 0) return;
+    if (openPositions.length === 0) {
+      console.log(`[Pricer] Open position yok, skip`);
+      return;
+    }
+
+    console.log(`[Pricer Debug] Open position sayısı: ${openPositions.length}`);
 
     const mints = openPositions.map((p) => p.mintAddress).join(",");
     
@@ -168,16 +173,22 @@ export class PositionPricer {
       return;
     }
 
+    console.log(`[Pricer Debug] API'den alınan mint sayısı: ${Object.keys(data).length}`);
+
     const config = this.store.getConfig();
     const autoConfig = this.autoTraderConfigStore?.getConfig();
     const takeProfitPct = config.takeProfitPct ?? autoConfig?.profitTargetPct ?? 0;
 
     for (const pos of openPositions) {
       const priceData = data[pos.mintAddress];
+      
+      console.log(`[Pricer Debug] ${pos.symbol} (${pos.mintAddress}) - priceData:`, priceData ? "✅ var" : "❌ yok");
 
       const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 101;
       const currentPriceUsd = priceData?.usdPrice ?? 0;
       const priceInSol = currentPriceUsd / solPrice;
+
+      console.log(`[Pricer Debug] ${pos.symbol}: currentPriceUsd=${currentPriceUsd}, priceInSol=${priceInSol}`);
 
       // Veri gelmediyse
       if (!priceInSol || priceInSol <= 0) {
@@ -214,6 +225,9 @@ export class PositionPricer {
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
+      
+      console.log(`[Pricer Debug] ${pos.symbol} UPDATE: currentPrice=${currentPriceUsd.toFixed(6)}, P&L=${unrealizedPnlPct.toFixed(2)}%`);
+      
       this.emit("position_update", updated);
 
       // Position başına kar hedefi varsa onu kullan, yoksa global config'i kullan
