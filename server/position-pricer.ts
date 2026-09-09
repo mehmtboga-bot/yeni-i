@@ -2,7 +2,12 @@ import { TradeStore } from "./trade-store";
 import { AutoTraderConfigStore } from "./auto-trader-config";
 import type { Position } from "@shared/schema";
 
-const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
+// 3 tane API — sırayla denesin, hangisinden veri gelirse o devam etsin
+const PRICE_APIS = [
+  { name: "Jupiter v3", url: "https://lite-api.jup.ag/price/v3" },
+  { name: "Jupiter v2", url: "https://api.jup.ag/price/v2" },
+  { name: "DexScreener", url: "https://api.dexscreener.com/latest/dex/tokens" },
+];
 
 export class PositionPricer {
   private store: TradeStore;
@@ -13,6 +18,9 @@ export class PositionPricer {
   private onHalfSell: ((positionId: string, percentage?: number) => void) | null = null;
   private updateInterval: ReturnType<typeof setInterval> | null = null;
   private autoSellInFlight: Set<string> = new Set();
+  
+  // Hangi API'nin çalıştığını takip et
+  private lastWorkingApiIndex: number = 0;
 
   // Yanlış fiyat spike'larını filtrele: art arda kaç kez hedef aşıldı
   private aboveThresholdCount: Map<string, number> = new Map();
@@ -53,7 +61,7 @@ export class PositionPricer {
 
   start() {
     if (this.updateInterval) return;
-    console.log("🎯 [Pricer] Başlatıldı (1.5s aralık)");
+    console.log("🎯 [Pricer] Başlatıldı (1.5s aralık) | 3 API testi yapılacak");
     this.updateInterval = setInterval(() => this.updatePrices(), 1500);
     this.updatePrices();
   }
@@ -66,6 +74,69 @@ export class PositionPricer {
     }
   }
 
+  private async fetchPricesFromApi(apiIndex: number, mints: string): Promise<Record<string, { usdPrice?: number; price?: number }> | null> {
+    const api = PRICE_APIS[apiIndex];
+    
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        
+        let url = "";
+        if (api.name.includes("Jupiter")) {
+          url = `${api.url}?ids=${mints}`;
+        } else if (api.name === "DexScreener") {
+          url = `${api.url}?tokens=${mints}`;
+        }
+        
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+        
+        if (!res.ok) {
+          console.warn(`⚠️ [${api.name}] HTTP ${res.status} (${attempt}/2)`);
+          if (attempt < 2) await new Promise(r => setTimeout(r, 300));
+          continue;
+        }
+        
+        const json = await res.json();
+        
+        // Her API'nin farklı response formatı var
+        let data: Record<string, any> | null = null;
+        
+        if (api.name.includes("Jupiter")) {
+          // Jupiter: { "data": { mint: { usdPrice } } }
+          data = json?.data ?? json;
+        } else if (api.name === "DexScreener") {
+          // DexScreener: { "pairs": [ { address: mint, priceUsd } ] }
+          const pairs = json?.pairs || [];
+          data = {};
+          for (const pair of pairs) {
+            if (pair?.baseToken?.address) {
+              data[pair.baseToken.address] = { 
+                usdPrice: parseFloat(pair.priceUsd) || 0 
+              };
+            }
+          }
+        }
+        
+        if (!data || Object.keys(data).length === 0) {
+          console.warn(`⚠️ [${api.name}] Boş yanıt (${attempt}/2)`);
+          if (attempt < 2) await new Promise(r => setTimeout(r, 300));
+          continue;
+        }
+        
+        console.log(`✅ [${api.name}] Veri alındı (${Object.keys(data).length} token)`);
+        return data;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`⚠️ [${api.name}] ${msg} (${attempt}/2)`);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 300));
+      }
+    }
+    
+    return null;
+  }
+
   private async updatePrices() {
     const positions = this.store.getAll();
     const openPositions = positions.filter((p) => p.status === "open");
@@ -73,44 +144,27 @@ export class PositionPricer {
 
     const mints = openPositions.map((p) => p.mintAddress).join(",");
     
-    // Retry ile API çağrısı yap (3 deneme)
     let data: Record<string, { usdPrice?: number; price?: number }> | null = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        
-        const res = await fetch(`${JUP_PRICE_API}?ids=${mints}`, {
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        
-        if (!res.ok) {
-          console.warn(`⚠️ [Pricer] HTTP ${res.status} (deneme ${attempt}/3)`);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
-          continue;
+    
+    // 1️⃣ Son çalışan API'den başla (öncelik ver)
+    data = await this.fetchPricesFromApi(this.lastWorkingApiIndex, mints);
+    
+    // 2️⃣ Veri yok → diğer API'leri sırayla dene
+    if (!data) {
+      for (let i = 0; i < PRICE_APIS.length; i++) {
+        if (i === this.lastWorkingApiIndex) continue; // Zaten denedik
+        data = await this.fetchPricesFromApi(i, mints);
+        if (data) {
+          this.lastWorkingApiIndex = i; // Çalışan API'yi kaydet
+          console.log(`🔄 [Pricer] Çalışan API güncellenmiş: ${PRICE_APIS[i].name}`);
+          break;
         }
-        
-        const json = await res.json();
-        data = json?.data ?? json; // API { "data": { ... } } veya { ... } döndürebilir
-        if (!data || Object.keys(data).length === 0) {
-          console.warn(`⚠️ [Pricer] Boş API yanıtı (deneme ${attempt}/3)`);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
-          continue;
-        }
-        
-        // Başarılı — döngüden çık
-        break;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`⚠️ [Pricer] Hata: ${msg} (deneme ${attempt}/3)`);
-        if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
       }
     }
 
-    // Hala veri yok
+    // 3️⃣ Hiçbirinden veri yok
     if (!data) {
-      console.warn("❌ [Pricer] 3 deneme sonrası veri alınamadı");
+      console.warn("❌ [Pricer] Tüm API'ler başarısız, sonraki döngüde tekrar denenir");
       return;
     }
 
@@ -139,8 +193,6 @@ export class PositionPricer {
       // Başarılı okuma — sayacı sıfırla
       this.failureCount.delete(pos.mintAddress);
 
-      // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
-
       // Alış fiyatı
       const buyPriceSol = pos.buyPriceSol;
 
@@ -157,9 +209,7 @@ export class PositionPricer {
         buyPriceUsd > 0 && currentPriceUsd > 0 
         ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100: 0;
 
-      // [FİX] unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
-      // YANLIŞ: tokenAmount × fiyatFarkı (birim karışıklığı)
-      // DOĞRU: yatırılan_SOL × (kar% / 100)
+      // unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
       const unrealizedPnlSol = (pos.buySolAmount ?? 0) * (unrealizedPnlPct / 100);
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
@@ -217,7 +267,7 @@ export class PositionPricer {
         if (count >= 2 && !this.halfSellInFlight2.has(pos.id) && this.onHalfSell) {
           this.halfSellInFlight2.add(pos.id);
           this.halfSellTarget2Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget2}%, satış: %50)`);
+          console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget2}%, satış: %35)`);
           this.onHalfSell(pos.id, 35);
         }
       } else if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget2 ?? 0)) {
@@ -268,3 +318,4 @@ export class PositionPricer {
     }
   }
 }
+
