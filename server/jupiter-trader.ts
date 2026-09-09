@@ -904,7 +904,7 @@ export class JupiterTrader {
   // ========== YARI SATIŞ ==========
   // Pozisyonun token bakiyesinin yarısını satar. Kalan yarısı pozisyonda kalır (status "open").
   // MAX_SELL_RETRIES aşılırsa "failed" olarak işaretlenir.
-  async sellHalf(positionId: string, percentage = 55, _retryCount = 0): Promise<Position | null> {
+  async sellHalf(positionId: string, _retryCount = 0): Promise<Position | null> {
     const pos = this.store.getById(positionId);
     if (!pos) { console.warn(`⚠️ Pozisyon bulunamadı: ${positionId}`); return null; }
     if (pos.status !== "open") { console.warn(`⚠️ Yarı satış için pozisyon açık olmalı (${pos.status}): ${pos.symbol}`); return pos; }
@@ -975,8 +975,8 @@ export class JupiterTrader {
         // PumpSwap yarı satışı — 3 deneme, exponential backoff
         const result = await this.withRetry(async () => {
           const balance = await fetchBalance();
-          const halfAmount = balance.uiAmount * (percentage / 100);
-          console.log(`🔍 [PumpSwap] Satılacak (%${percentage}): ${halfAmount.toLocaleString()} ${pos.symbol} (toplam: ${balance.uiAmount.toLocaleString()})`);
+          const halfAmount = balance.uiAmount / 2;
+          console.log(`🔍 [PumpSwap] Yarısı satılacak: ${halfAmount.toLocaleString()} ${pos.symbol} (toplam: ${balance.uiAmount.toLocaleString()})`);
           const sig = await this.pumpSwapTx({
             action: "sell",
             mint: pos.mintAddress,
@@ -990,8 +990,8 @@ export class JupiterTrader {
         }, `PumpSwap HalfSell ${pos.symbol}`);
 
         const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.halfAmount);
-        const remainingAmount = (pos.buyTokenAmount ?? 0) * (percentage / 100);
-        const halfBuyCost = (pos.buySolAmount ?? 0) * (percentage / 100);
+        const remainingAmount = (pos.buyTokenAmount ?? 0) / 2;
+        const halfBuyCost = (pos.buySolAmount ?? 0) / 2;
         const pnlSol = estimatedSolOut - halfBuyCost;
         const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
         updated = {
@@ -1017,7 +1017,7 @@ export class JupiterTrader {
           }
         }
         // Beklenen kalan miktardan fazlası varsa TX başarısız olmuş demektir — tekrar sat
-        const expectedRemaining = (pos.buyTokenAmount ?? 0) * (percentage / 100);
+        const expectedRemaining = (pos.buyTokenAmount ?? 0) / 2;
         if (halfTokenRemaining > expectedRemaining * 1.05) {
           if (_retryCount >= MAX_SELL_RETRIES) {
             throw new Error(`FINAL: ${MAX_SELL_RETRIES} deneme sonrası token hala var (${halfTokenRemaining.toLocaleString()})`);
@@ -1026,7 +1026,7 @@ export class JupiterTrader {
           const reopened: Position = { ...updated, status: "open", error: undefined };
           this.updateAndEmit(reopened);
           console.warn(`⚠️ [PumpSwap] Yarı satış sonrası token fazla (${halfTokenRemaining.toLocaleString()} > beklenen ~${expectedRemaining.toLocaleString()}), tekrar çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
-          return this.sellHalf(positionId, percentage, _retryCount + 1);
+          return this.sellHalf(positionId, _retryCount + 1);
         }
       } else {
         // Jupiter yarı satışı — route yoksa PumpSwap'a fallback
@@ -1034,19 +1034,19 @@ export class JupiterTrader {
         try {
           const result = await this.withRetry(async () => {
             const balance = await fetchBalance();
-            const halfRaw = (BigInt(balance.raw) * BigInt(percentage) / 100n).toString();
+            const halfRaw = (BigInt(balance.raw) / 2n).toString();
             if (BigInt(halfRaw) === 0n) throw new Error("Yarı bakiye sıfır");
             const quote = await this.getQuote({ inputMint: pos.mintAddress, outputMint: SOL_MINT, amount: halfRaw, slippageBps: config.slippageBps });
             const solOut = Number(quote.outAmount) / 1e9;
-            const halfUiAmount = balance.uiAmount * (percentage / 100);
+            const halfUiAmount = balance.uiAmount / 2;
             const sellPriceSol = halfUiAmount > 0 ? solOut / halfUiAmount : 0;
             const sig = await this.swap(quote, config.priorityFeeManualMicroLamports, true);
             return { sig, solOut, sellPriceSol, halfUiAmount };
           }, `Jupiter HalfSell ${pos.symbol}`);
 
           jupiterOk = true;
-          const remainingAmount = (pos.buyTokenAmount ?? 0) * (percentage / 100);
-          const halfBuyCost = (pos.buySolAmount ?? 0) * (percentage / 100);
+          const remainingAmount = (pos.buyTokenAmount ?? 0) / 2;
+          const halfBuyCost = (pos.buySolAmount ?? 0) / 2;
           const pnlSol = result.solOut - halfBuyCost;
           const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
           updated = {
@@ -1072,7 +1072,7 @@ export class JupiterTrader {
             }
           }
           // Beklenen kalan miktardan fazlası varsa TX başarısız olmuş demektir — tekrar sat
-          const expectedRemainingJup = (pos.buyTokenAmount ?? 0) * (percentage / 100);
+          const expectedRemainingJup = (pos.buyTokenAmount ?? 0) / 2;
           if (halfTokenRemainingJup > expectedRemainingJup * 1.05) {
             if (_retryCount >= MAX_SELL_RETRIES) {
               throw new Error(`FINAL: ${MAX_SELL_RETRIES} deneme sonrası token hala var (${halfTokenRemainingJup.toLocaleString()})`);
@@ -1081,7 +1081,7 @@ export class JupiterTrader {
             const reopened: Position = { ...updated, status: "open", error: undefined };
             this.updateAndEmit(reopened);
             console.warn(`⚠️ [Jupiter] Yarı satış sonrası token fazla (${halfTokenRemainingJup.toLocaleString()} > beklenen ~${expectedRemainingJup.toLocaleString()}), tekrar çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
-            return this.sellHalf(positionId, percentage, _retryCount + 1);
+            return this.sellHalf(positionId, _retryCount + 1);
           }
         } catch (jupErr) {
           if (jupiterOk) throw jupErr;
@@ -1089,15 +1089,15 @@ export class JupiterTrader {
           console.warn(`⚠️ [Jupiter] YARI SATIŞ başarısız, PumpSwap'a geçiliyor: ${(jupErr as Error).message}`);
           const result = await this.withRetry(async () => {
             const balance = await fetchBalance();
-            const halfAmount = balance.uiAmount * (percentage / 100);
+            const halfAmount = balance.uiAmount / 2;
             console.log(`🔍 [PumpSwap Fallback] Yarısı satılacak: ${halfAmount.toLocaleString()} ${pos.symbol}`);
             const sig = await this.pumpSwapTx({ action: "sell", mint: pos.mintAddress, amount: halfAmount, denominatedInSol: false, slippagePct, priorityFeeSol, confirmForeground: true });
             return { sig, halfAmount };
           }, `PumpSwap Fallback HalfSell ${pos.symbol}`);
 
           const estimatedSolOut = await this.estimateSolValue(pos.mintAddress, result.halfAmount);
-          const remainingAmount = (pos.buyTokenAmount ?? 0) * (percentage / 100);
-          const halfBuyCost = (pos.buySolAmount ?? 0) * (percentage / 100);
+          const remainingAmount = (pos.buyTokenAmount ?? 0) / 2;
+          const halfBuyCost = (pos.buySolAmount ?? 0) / 2;
           const pnlSol = estimatedSolOut - halfBuyCost;
           const pnlPct = halfBuyCost > 0 ? (pnlSol / halfBuyCost) * 100 : 0;
           updated = {
@@ -1123,7 +1123,7 @@ export class JupiterTrader {
             }
           }
           // Beklenen kalan miktardan fazlası varsa TX başarısız olmuş demektir — tekrar sat
-          const expectedRemainingFallback = (pos.buyTokenAmount ?? 0) * (percentage / 100);
+          const expectedRemainingFallback = (pos.buyTokenAmount ?? 0) / 2;
           if (halfTokenRemainingFallback > expectedRemainingFallback * 1.05) {
             if (_retryCount >= MAX_SELL_RETRIES) {
               throw new Error(`FINAL: ${MAX_SELL_RETRIES} deneme sonrası token hala var (${halfTokenRemainingFallback.toLocaleString()})`);
@@ -1132,7 +1132,7 @@ export class JupiterTrader {
             const reopened: Position = { ...updated, status: "open", error: undefined };
             this.updateAndEmit(reopened);
             console.warn(`⚠️ [PumpSwap Fallback] Yarı satış sonrası token fazla (${halfTokenRemainingFallback.toLocaleString()} > beklenen ~${expectedRemainingFallback.toLocaleString()}), tekrar çağrılıyor... [${_retryCount + 1}/${MAX_SELL_RETRIES}]`);
-            return this.sellHalf(positionId, percentage, _retryCount + 1);
+            return this.sellHalf(positionId, _retryCount + 1);
           }
         }
       }
@@ -1172,7 +1172,7 @@ export class JupiterTrader {
       const failedPos: Position = { ...pos, status: "open", error: message };
       this.updateAndEmit(failedPos);
       console.warn(`⚠️ [${dexLabel}] YARI SATIŞ başarısız (${pos.symbol}) [${_retryCount + 1}/${MAX_SELL_RETRIES}]: ${message} — ${retryDelay}ms sonra tekrar...`);
-      setTimeout(() => this.sellHalf(positionId, percentage, _retryCount + 1), retryDelay);
+      setTimeout(() => this.sellHalf(positionId, _retryCount + 1), retryDelay);
       return failedPos;
     } finally {
       // [DÜZELTİLDİ] inFlight temizliği sadece finally'de — catch içinde tekrar silmeye gerek yok
