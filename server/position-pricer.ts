@@ -5,6 +5,8 @@ import type { Position } from "@shared/schema";
 const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
 const DEX_SCREENER_API = "https://api.dexscreener.com/latest/dex/tokens";
 
+type PriceSource = "jupiter" | "dexscreener" | null;
+
 export class PositionPricer {
   private store: TradeStore;
   private autoTraderConfigStore: AutoTraderConfigStore | null = null;
@@ -28,6 +30,9 @@ export class PositionPricer {
   private halfSellTarget1Count: Map<string, number> = new Map();
   private halfSellTarget2Count: Map<string, number> = new Map();
   private halfSellTarget3Count: Map<string, number> = new Map();
+
+  // Her pozisyon için hangi API'den fiyat alındığını takip et
+  private positionPriceSource: Map<string, PriceSource> = new Map();
 
   constructor(
     store: TradeStore,
@@ -62,6 +67,55 @@ export class PositionPricer {
     }
   }
 
+  private async fetchFromJupiter(mints: string[]): Promise<Record<string, { usdPrice?: number; price?: number }> | null> {
+    const mintsStr = mints.join(",");
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        
+        const res = await fetch(`${JUP_PRICE_API}?ids=${mintsStr}`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        
+        if (!res.ok) {
+          console.warn(`⚠️ [Pricer] Jupiter HTTP ${res.status} (deneme ${attempt}/3)`);
+          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+          continue;
+        }
+        
+        const json = await res.json();
+        const data = json?.data ?? json;
+        
+        if (!data || Object.keys(data).length === 0) {
+          console.warn(`⚠️ [Pricer] Jupiter boş veri döndü (deneme ${attempt}/3)`);
+          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+          continue;
+        }
+
+        // Gelen verilerde gerçekten fiyat var mı kontrol et
+        const hasValidPrices = Object.values(data).some(item => 
+          item?.usdPrice && item.usdPrice > 0
+        );
+
+        if (!hasValidPrices) {
+          console.warn(`⚠️ [Pricer] Jupiter geçerli fiyat verisi yok (deneme ${attempt}/3)`);
+          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+          continue;
+        }
+        
+        console.log("✅ [Pricer] Jupiter API başarılı");
+        return data;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`⚠️ [Pricer] Jupiter hatası: ${msg} (deneme ${attempt}/3)`);
+        if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+      }
+    }
+    return null;
+  }
+
   private async fetchFromDexScreener(mints: string[]): Promise<Record<string, { usdPrice?: number }> | null> {
     try {
       const promises = mints.map(mint =>
@@ -91,67 +145,60 @@ export class PositionPricer {
     const openPositions = positions.filter((p) => p.status === "open");
     if (openPositions.length === 0) return;
 
-    const mints = openPositions.map((p) => p.mintAddress).join(",");
-    
-    // Jupiter API'den veri çek (3 deneme)
-    let data: Record<string, { usdPrice?: number; price?: number }> | null = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        
-        const res = await fetch(`${JUP_PRICE_API}?ids=${mints}`, {
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        
-        if (!res.ok) {
-          console.warn(`⚠️ [Pricer] Jupiter HTTP ${res.status} (deneme ${attempt}/3)`);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
-          continue;
-        }
-        
-        const json = await res.json();
-        data = json?.data ?? json;
-        
-        // Jupiter'dan başarılı yanıt aldı ama fiyat yok mu? Kontrol et
-        if (!data || Object.keys(data).length === 0) {
-          console.warn(`⚠️ [Pricer] Jupiter boş veri döndü (deneme ${attempt}/3)`);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
-          continue;
-        }
+    // Pozisyonları kaynak türüne göre böl
+    const jupiterMints: string[] = [];
+    const dexscreenerMints: string[] = [];
 
-        // Gelen verilerde gerçekten fiyat var mı kontrol et
-        const hasValidPrices = Object.values(data).some(item => 
-          item?.usdPrice && item.usdPrice > 0
-        );
-
-        if (!hasValidPrices) {
-          console.warn(`⚠️ [Pricer] Jupiter geçerli fiyat verisi yok (deneme ${attempt}/3)`);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
-          continue;
-        }
-        
-        console.log("✅ [Pricer] Jupiter API başarılı ve fiyat verisi mevcut");
-        break;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`⚠️ [Pricer] Jupiter hatası: ${msg} (deneme ${attempt}/3)`);
-        if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+    for (const pos of openPositions) {
+      const source = this.positionPriceSource.get(pos.id);
+      
+      if (source === "dexscreener") {
+        dexscreenerMints.push(pos.mintAddress);
+      } else {
+        // null veya "jupiter" ise Jupiter'dan çek
+        jupiterMints.push(pos.mintAddress);
       }
     }
 
-    // Jupiter başarısız olursa Dex Screener'a geri dön
-    if (!data) {
-      console.log("🔄 [Pricer] Jupiter başarısız, Dex Screener'a geçiliyor...");
-      const mintArray = mints.split(",");
-      data = await this.fetchFromDexScreener(mintArray);
-      
-      if (!data) {
-        console.error("❌ [Pricer] Tüm API'ler başarısız, fiyat verisi alınamadı");
-        return;
+    let allData: Record<string, { usdPrice?: number; price?: number }> = {};
+
+    // Jupiter'dan fiyat çek
+    if (jupiterMints.length > 0) {
+      const jupiterData = await this.fetchFromJupiter(jupiterMints);
+      if (jupiterData) {
+        // Jupiter başarılı olan mintleri işaretle
+        jupiterMints.forEach(mint => {
+          const pos = openPositions.find(p => p.mintAddress === mint);
+          if (pos && jupiterData[mint]?.usdPrice) {
+            this.positionPriceSource.set(pos.id, "jupiter");
+          }
+        });
+        allData = { ...allData, ...jupiterData };
+      } else {
+        // Jupiter başarısız olan mintleri Dex Screener'a ekle
+        console.log("🔄 [Pricer] Başarısız Jupiter mintleri Dex Screener'a geçiliyor...");
+        dexscreenerMints.push(...jupiterMints);
       }
-      console.log("✅ [Pricer] Dex Screener API başarılı");
+    }
+
+    // Dex Screener'dan fiyat çek
+    if (dexscreenerMints.length > 0) {
+      const dexData = await this.fetchFromDexScreener(dexscreenerMints);
+      if (dexData) {
+        // Dex Screener başarılı olan mintleri işaretle
+        dexscreenerMints.forEach(mint => {
+          const pos = openPositions.find(p => p.mintAddress === mint);
+          if (pos && dexData[mint]?.usdPrice) {
+            this.positionPriceSource.set(pos.id, "dexscreener");
+          }
+        });
+        allData = { ...allData, ...dexData };
+      }
+    }
+
+    if (Object.keys(allData).length === 0) {
+      console.error("❌ [Pricer] Tüm API'ler başarısız, fiyat verisi alınamadı");
+      return;
     }
 
     const config = this.store.getConfig();
@@ -159,7 +206,8 @@ export class PositionPricer {
     const takeProfitPct = config.takeProfitPct ?? autoConfig?.profitTargetPct ?? 0;
 
     for (const pos of openPositions) {
-      const priceData = data[pos.mintAddress];
+      const priceData = allData[pos.mintAddress];
+      const source = this.positionPriceSource.get(pos.id) || "jupiter";
 
       const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 101;
       const currentPriceUsd = priceData?.usdPrice ?? 0;
@@ -170,7 +218,7 @@ export class PositionPricer {
         this.failureCount.set(pos.mintAddress, fails);
         
         if (fails === this.maxFailuresBeforeAlert) {
-          console.warn(`⚠️ [Pricer] ${pos.symbol} (${pos.mintAddress}) fiyatı alınamıyor (${fails}x)`);
+          console.warn(`⚠️ [Pricer] ${pos.symbol} (${pos.mintAddress}) fiyatı alınamıyor (${fails}x) - Kaynak: ${source}`);
         }
         continue;
       }
@@ -217,7 +265,7 @@ export class PositionPricer {
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onAutoSell) {
           this.autoSellInFlight.add(pos.id);
           this.aboveThresholdCount.delete(pos.id);
-          console.log(`🎯 [Pricer] Kar hedefi: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}%`);
+          console.log(`🎯 [Pricer] Kar hedefi: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (Kaynak: ${source})`);
           this.onAutoSell(pos.id);
         }
       } else {
@@ -225,11 +273,12 @@ export class PositionPricer {
         if (this.aboveThresholdCount.has(pos.id)) {
           this.aboveThresholdCount.delete(pos.id);
         }
-        // Satış tamamlandıysa inFlight'ı temizle
+        // Satış tamamlandıysa inFlight'ı temizle ve kaynak bilgisini sil
         if (this.autoSellInFlight.has(pos.id)) {
           const fresh = this.store.getById(pos.id);
           if (!fresh || fresh.status === "closed") {
             this.autoSellInFlight.delete(pos.id);
+            this.positionPriceSource.delete(pos.id); // Kapanınca kaynak bilgisini sil
           }
         }
       }
@@ -241,7 +290,7 @@ export class PositionPricer {
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
           this.autoSellInFlight.add(pos.id);
           this.halfSellTarget1Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 1: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget1}%)`);
+          console.log(`✂️ [Pricer] Yarı satış 1: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget1}%, Kaynak: ${source})`);
           this.onHalfSell(pos.id);
         }
       } else if ((autoConfig?.halfSellTarget1 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget1 ?? 0)) {
@@ -255,7 +304,7 @@ export class PositionPricer {
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
           this.autoSellInFlight.add(pos.id);
           this.halfSellTarget2Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget2}%)`);
+          console.log(`✂️ [Pricer] Yarı satış 2: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget2}%, Kaynak: ${source})`);
           this.onHalfSell(pos.id);
         }
       } else if ((autoConfig?.halfSellTarget2 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget2 ?? 0)) {
@@ -269,7 +318,7 @@ export class PositionPricer {
         if (count >= 2 && !this.autoSellInFlight.has(pos.id) && this.onHalfSell) {
           this.autoSellInFlight.add(pos.id);
           this.halfSellTarget3Count.delete(pos.id);
-          console.log(`✂️ [Pricer] Yarı satış 3: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget3}%)`);
+          console.log(`✂️ [Pricer] Yarı satış 3: ${pos.symbol} +${unrealizedPnlPct.toFixed(1)}% (hedef: ${autoConfig?.halfSellTarget3}%, Kaynak: ${source})`);
           this.onHalfSell(pos.id);
         }
       } else if ((autoConfig?.halfSellTarget3 ?? 0) > 0 && unrealizedPnlPct < (autoConfig?.halfSellTarget3 ?? 0)) {
@@ -282,6 +331,7 @@ export class PositionPricer {
       const p = this.store.getById(id);
       if (!p || p.status === "closed") {
         this.autoSellInFlight.delete(id);
+        this.positionPriceSource.delete(id); // Kaynak bilgisini sil
       }
     }
   }
