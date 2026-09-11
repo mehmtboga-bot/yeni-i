@@ -3,6 +3,7 @@ import { AutoTraderConfigStore } from "./auto-trader-config";
 import type { Position } from "@shared/schema";
 
 const JUP_PRICE_API = "https://lite-api.jup.ag/price/v3";
+const DEX_SCREENER_API = "https://api.dexscreener.com/latest/dex/tokens";
 
 export class PositionPricer {
   private store: TradeStore;
@@ -61,6 +62,30 @@ export class PositionPricer {
     }
   }
 
+  private async fetchFromDexScreener(mints: string[]): Promise<Record<string, { usdPrice?: number }> | null> {
+    try {
+      const promises = mints.map(mint =>
+        fetch(`${DEX_SCREENER_API}/${mint}`, { signal: AbortSignal.timeout(5000) })
+          .then(res => res.ok ? res.json() : null)
+          .catch(() => null)
+      );
+      
+      const results = await Promise.all(promises);
+      const data: Record<string, { usdPrice?: number }> = {};
+      
+      results.forEach((result, idx) => {
+        if (result?.pairs?.[0]?.priceUsd) {
+          data[mints[idx]] = { usdPrice: parseFloat(result.pairs[0].priceUsd) };
+        }
+      });
+      
+      return Object.keys(data).length > 0 ? data : null;
+    } catch (err) {
+      console.warn(`⚠️ [Pricer] Dex Screener hatası: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  }
+
   private async updatePrices() {
     const positions = this.store.getAll();
     const openPositions = positions.filter((p) => p.status === "open");
@@ -68,7 +93,7 @@ export class PositionPricer {
 
     const mints = openPositions.map((p) => p.mintAddress).join(",");
     
-    // Retry ile API çağrısı yap (3 deneme)
+    // Jupiter API'den veri çek (3 deneme)
     let data: Record<string, { usdPrice?: number; price?: number }> | null = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -81,32 +106,38 @@ export class PositionPricer {
         clearTimeout(timeout);
         
         if (!res.ok) {
-          console.warn(`⚠️ [Pricer] HTTP ${res.status} (deneme ${attempt}/3)`);
+          console.warn(`⚠️ [Pricer] Jupiter HTTP ${res.status} (deneme ${attempt}/3)`);
           if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
           continue;
         }
         
         const json = await res.json();
-        data = json?.data ?? json; // API { "data": { ... } } veya { ... } döndürebilir
+        data = json?.data ?? json;
         if (!data || Object.keys(data).length === 0) {
-          console.warn(`⚠️ [Pricer] Boş API yanıtı (deneme ${attempt}/3)`);
+          console.warn(`⚠️ [Pricer] Jupiter boş yanıt (deneme ${attempt}/3)`);
           if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
           continue;
         }
         
-        // Başarılı — döngüden çık
+        console.log("✅ [Pricer] Jupiter API başarılı");
         break;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`⚠️ [Pricer] Hata: ${msg} (deneme ${attempt}/3)`);
+        console.warn(`⚠️ [Pricer] Jupiter hatası: ${msg} (deneme ${attempt}/3)`);
         if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
       }
     }
 
-    // Hala veri yok
+    // Jupiter başarısız olursa Dex Screener'a geri dön
     if (!data) {
-      console.warn("❌ [Pricer] 3 deneme sonrası veri alınamadı");
-      return;
+      console.log("🔄 [Pricer] Dex Screener'a geçiliyor...");
+      const mintArray = mints.split(",");
+      data = await this.fetchFromDexScreener(mintArray);
+      
+      if (!data) {
+        console.error("❌ [Pricer] Tüm API'ler başarısız");
+        return;
+      }
     }
 
     const config = this.store.getConfig();
@@ -134,27 +165,24 @@ export class PositionPricer {
       // Başarılı okuma — sayacı sıfırla
       this.failureCount.delete(pos.mintAddress);
 
-      // Fiyat spike koruması: önceki geçerli fiyata göre 10x'ten büyük sıçramayı yoksay
-
       // Alış fiyatı
-const buyPriceSol = pos.buyPriceSol;
+      const buyPriceSol = pos.buyPriceSol;
 
-if (!buyPriceSol || buyPriceSol <= 0) {
-  console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
-  continue;
-}
+      if (!buyPriceSol || buyPriceSol <= 0) {
+        console.warn(`⚠️ [Pricer] ${pos.symbol} buyPriceSol tanımlı değil, atlanıyor`);
+        continue;
+      }
 
-// Alış fiyatını USD'ye çevir
-const buyPriceUsd = buyPriceSol * solPrice;
+      // Alış fiyatını USD'ye çevir
+      const buyPriceUsd = buyPriceSol * solPrice;
 
-// P&L yüzdesini doğrudan USD fiyatları üzerinden hesapla
-const unrealizedPnlPct =
-  buyPriceUsd > 0 && currentPriceUsd > 0 
-  ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100: 0;
+      // P&L yüzdesini doğrudan USD fiyatları üzerinden hesapla
+      const unrealizedPnlPct =
+        buyPriceUsd > 0 && currentPriceUsd > 0 
+        ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100
+        : 0;
 
-      // [FİX] unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
-      // YANLIŞ: tokenAmount × fiyatFarkı (birim karışıklığı)
-      // DOĞRU: yatırılan_SOL × (kar% / 100)
+      // unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
       const unrealizedPnlSol = (pos.buySolAmount ?? 0) * (unrealizedPnlPct / 100);
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
