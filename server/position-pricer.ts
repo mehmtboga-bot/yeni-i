@@ -113,13 +113,26 @@ export class PositionPricer {
         
         const json = await res.json();
         data = json?.data ?? json;
+        
+        // Jupiter'dan başarılı yanıt aldı ama fiyat yok mu? Kontrol et
         if (!data || Object.keys(data).length === 0) {
-          console.warn(`⚠️ [Pricer] Jupiter boş yanıt (deneme ${attempt}/3)`);
+          console.warn(`⚠️ [Pricer] Jupiter boş veri döndü (deneme ${attempt}/3)`);
+          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+          continue;
+        }
+
+        // Gelen verilerde gerçekten fiyat var mı kontrol et
+        const hasValidPrices = Object.values(data).some(item => 
+          item?.usdPrice && item.usdPrice > 0
+        );
+
+        if (!hasValidPrices) {
+          console.warn(`⚠️ [Pricer] Jupiter geçerli fiyat verisi yok (deneme ${attempt}/3)`);
           if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
           continue;
         }
         
-        console.log("✅ [Pricer] Jupiter API başarılı");
+        console.log("✅ [Pricer] Jupiter API başarılı ve fiyat verisi mevcut");
         break;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -130,14 +143,15 @@ export class PositionPricer {
 
     // Jupiter başarısız olursa Dex Screener'a geri dön
     if (!data) {
-      console.log("🔄 [Pricer] Dex Screener'a geçiliyor...");
+      console.log("🔄 [Pricer] Jupiter başarısız, Dex Screener'a geçiliyor...");
       const mintArray = mints.split(",");
       data = await this.fetchFromDexScreener(mintArray);
       
       if (!data) {
-        console.error("❌ [Pricer] Tüm API'ler başarısız");
+        console.error("❌ [Pricer] Tüm API'ler başarısız, fiyat verisi alınamadı");
         return;
       }
+      console.log("✅ [Pricer] Dex Screener API başarılı");
     }
 
     const config = this.store.getConfig();
@@ -149,18 +163,19 @@ export class PositionPricer {
 
       const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 101;
       const currentPriceUsd = priceData?.usdPrice ?? 0;
-      const priceInSol = currentPriceUsd / solPrice;
 
-      // Veri gelmediyse
-      if (!priceInSol || priceInSol <= 0) {
+      // Fiyat verisi gelmediyse bu pozisyonu atla
+      if (!currentPriceUsd || currentPriceUsd <= 0) {
         const fails = (this.failureCount.get(pos.mintAddress) ?? 0) + 1;
         this.failureCount.set(pos.mintAddress, fails);
         
         if (fails === this.maxFailuresBeforeAlert) {
-          console.warn(`⚠️ [Pricer] ${pos.symbol} fiyatı alınamıyor (${fails}x)`);
+          console.warn(`⚠️ [Pricer] ${pos.symbol} (${pos.mintAddress}) fiyatı alınamıyor (${fails}x)`);
         }
         continue;
       }
+
+      const priceInSol = currentPriceUsd / solPrice;
 
       // Başarılı okuma — sayacı sıfırla
       this.failureCount.delete(pos.mintAddress);
