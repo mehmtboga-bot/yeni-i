@@ -236,21 +236,27 @@ export class PositionPricer {
         continue;
       }
 
-      // Alış fiyatını USD'ye çevir
-      const buyPriceUsd = buyPriceSol * solPrice;
+      // Alış maliyeti (USD): harcanan gerçek SOL miktarı × alış anındaki SOL fiyatı
+      const buyPriceUsd = (pos.buySolAmount ?? 0) * solPrice;
 
-      // P&L yüzdesini doğrudan USD fiyatları üzerinden hesapla
-      const unrealizedPnlPct =
-        buyPriceUsd > 0 && currentPriceUsd > 0 
-        ? ((currentPriceUsd - buyPriceUsd) / buyPriceUsd) * 100
-        : 0;
+      // Mevcut pozisyon değeri (USD): elde tutulan token miktarı × güncel token fiyatı
+      const buyTokenAmount = pos.buyTokenAmount ?? 0;
+      const currentPositionValueUsd = buyTokenAmount * currentPriceUsd;
 
-      // unrealizedPnlSol'u doğru hesapla: yatırılan SOL × kar%
-      const unrealizedPnlSol = (pos.buySolAmount ?? 0) * (unrealizedPnlPct / 100);
+      // Gerçekleşmemiş K/Z (USD)
+      const unrealizedPnlUsd = currentPositionValueUsd - buyPriceUsd;
+
+      // SOL cinsine çevir
+      const unrealizedPnlSol = solPrice > 0 ? unrealizedPnlUsd / solPrice : 0;
+
+      // Yüzde hesapla
+      const unrealizedPnlPct = buyPriceUsd > 0 ? (unrealizedPnlUsd / buyPriceUsd) * 100 : 0;
 
       const updated: Position = { ...pos, currentPriceUsd, unrealizedPnlSol, unrealizedPnlPct };
       this.store.upsert(updated);
       this.emit("position_update", updated);
+
+      console.log(`${pos.symbol} | PnL: ${unrealizedPnlSol.toFixed(4)} SOL (${unrealizedPnlPct.toFixed(1)}%) | Held: ${buyTokenAmount} tokens @ ${currentPriceUsd.toFixed(6)} USD/token (Kaynak: ${source})`);
 
       // Position başına kar hedefi varsa onu kullan, yoksa global config'i kullan
       const effectiveTakeProfitPct = (pos.takeProfitPct != null && pos.takeProfitPct > 0)
