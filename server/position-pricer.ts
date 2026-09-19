@@ -209,7 +209,7 @@ export class PositionPricer {
       const priceData = allData[pos.mintAddress];
       const source = this.positionPriceSource.get(pos.id) || "jupiter";
 
-      const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 101;
+      const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 110;
       const currentPriceUsd = priceData?.usdPrice ?? 0;
 
       // Fiyat verisi gelmediyse bu pozisyonu atla
