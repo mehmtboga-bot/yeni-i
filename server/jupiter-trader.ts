@@ -903,7 +903,8 @@ export class JupiterTrader {
 
   // ========== YARI SATIŞ ==========
   // Pozisyonun token bakiyesinin yarısını satar. Kalan yarısı pozisyonda kalır (status "open").
-  // MAX_SELL_RETRIES aşılırsa "failed" olarak işaretlenir.
+  // MAX_SELL_RETRIES aşılırsa rug değilse pozisyon açık kalır;
+  // ilgili yarı satış hedefi tekrar denenmez, sonraki hedef çalışabilir.
   async sellHalf(positionId: string, _retryCount = 0): Promise<Position | null> {
     const pos = this.store.getById(positionId);
     if (!pos) { console.warn(`⚠️ Pozisyon bulunamadı: ${positionId}`); return null; }
@@ -1161,9 +1162,15 @@ export class JupiterTrader {
 
       // Maksimum retry aşıldı
       if (_retryCount >= MAX_SELL_RETRIES) {
-        const failedPos: Position = { ...pos, status: "failed", error: `${MAX_SELL_RETRIES} deneme sonrası yarı satış başarısız: ${message}` };
+        const failedPos: Position = {
+          ...pos,
+          // Rug değilse kart/pozisyon kapanmamalı; yalnızca bu yarı satış
+          // hedefi başarısız kabul edilip sonraki hedefe geçilebilmeli.
+          status: "open",
+          error: `${MAX_SELL_RETRIES} deneme sonrası yarı satış başarısız: ${message}`,
+        };
         this.updateAndEmit(failedPos);
-        console.error(`❌ [${dexLabel}] YARI SATIŞ ${MAX_SELL_RETRIES} denemede başarısız, "failed": ${pos.symbol}`);
+        console.error(`❌ [${dexLabel}] YARI SATIŞ ${MAX_SELL_RETRIES} denemede başarısız, pozisyon açık bırakıldı: ${pos.symbol}`);
         return failedPos;
       }
 
