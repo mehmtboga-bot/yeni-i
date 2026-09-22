@@ -10,7 +10,7 @@ type PriceSource = "jupiter" | "dexscreener" | null;
 export class PositionPricer {
   private store: TradeStore;
   private autoTraderConfigStore: AutoTraderConfigStore | null = null;
-  private solPriceUsd: number = 0;
+  private getSolPriceUsd: () => number;
   private emit: (event: string, data: any) => void;
   private onAutoSell: ((positionId: string) => void) | null = null;
   private onHalfSell: ((positionId: string) => void) | null = null;
@@ -39,21 +39,19 @@ export class PositionPricer {
 
   constructor(
     store: TradeStore,
-    solPriceUsd: number,
+    getSolPriceUsd: () => number,
     emit: (event: string, data: any) => void,
     onAutoSell?: (positionId: string) => void,
     onHalfSell?: (positionId: string) => void,
     autoTraderConfigStore?: AutoTraderConfigStore,
   ) {
     this.store = store;
-    this.solPriceUsd = solPriceUsd;
+    this.getSolPriceUsd = getSolPriceUsd;
     this.emit = emit;
     this.onAutoSell = onAutoSell ?? null;
     this.onHalfSell = onHalfSell ?? null;
     this.autoTraderConfigStore = autoTraderConfigStore ?? null;
   }
-
-  setSolPrice(price: number) { this.solPriceUsd = price; }
 
   start() {
     if (this.updateInterval) return;
@@ -148,6 +146,12 @@ export class PositionPricer {
     const openPositions = positions.filter((p) => p.status === "open");
     if (openPositions.length === 0) return;
 
+    const solPrice = this.getSolPriceUsd();
+    if (!Number.isFinite(solPrice) || solPrice <= 0) {
+      console.warn("⚠️ [Pricer] Monitor'dan geçerli SOL fiyatı alınamadı, pozisyon fiyatları atlanıyor");
+      return;
+    }
+
     // Pozisyonları kaynak türüne göre böl
     const jupiterMints: string[] = [];
     const dexscreenerMints: string[] = [];
@@ -212,7 +216,6 @@ export class PositionPricer {
       const priceData = allData[pos.mintAddress];
       const source = this.positionPriceSource.get(pos.id) || "jupiter";
 
-      const solPrice = this.solPriceUsd > 0 ? this.solPriceUsd : 110;
       const currentPriceUsd = priceData?.usdPrice ?? 0;
 
       // Fiyat verisi gelmediyse bu pozisyonu atla
