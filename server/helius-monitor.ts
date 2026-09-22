@@ -10,39 +10,6 @@ const WS_URL  = `wss://api.mainnet-beta.solana.com`;
 // HTTP: Helius — sadece CreatePool tespitinde getTransaction + getAsset için kullanılır
 const HTTP_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 
-const TELEGRAM_BOT_TOKEN = secrets.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID   = secrets.TELEGRAM_CHAT_ID;
-
-async function sendTelegramNotification(message: string): Promise<void> {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.warn("⚠️ Telegram bilgileri eksik.");
-    return;
-  }
-  try {
-    const res = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: message,
-          parse_mode: "HTML",
-          disable_web_page_preview: true,
-        }),
-      }
-    );
-    const data = await res.json();
-    if (data.ok) {
-      console.log("📲 Telegram bildirimi gönderildi.");
-    } else {
-      console.error("❌ Telegram hatası:", data.description);
-    }
-  } catch (err) {
-    console.error("❌ Telegram bildirim hatası:", err);
-  }
-}
-
 // ─── Rate Limiter ─────────────────────────────────────────────────────────────
 class RateLimiter {
   private queue: Array<() => void> = [];
@@ -93,13 +60,7 @@ const WSOL     = "So11111111111111111111111111111111111111112";
 const LP_LOG_PATTERN   = "Program log: Instruction: CreatePool";
 // Ek kontrol: PumpSwap programının invoke satırı (derinlik 1)
 const PUMPSWAP_INVOKE  = `Program ${PUMPSWAP} invoke [1]`;
-
-const MIN_TVL_USD_NOTIFY = 40000000;
-
-const TROJAN_BOT = "solana_trojanbot";
-const TROJAN_REF = "mehmtbga";
-const trojanUrl  = (mint: string) =>
-  `https://t.me/${TROJAN_BOT}?start=r-${TROJAN_REF}-${mint}`;
+const SOL_PRICE_REFRESH_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
 interface TokenMetadata {
   name: string;
@@ -120,8 +81,8 @@ export class HeliusMonitor {
   private readonly MAX_SKIPPED_TOKENS = 50;
 
   private reconnectTimeoutDex: NodeJS.Timeout | null = null;
-  private heartbeatInterval: NodeJS.Timeout | null   = null;
   private pingIntervalDex: NodeJS.Timeout | null     = null;
+  private solPriceRefreshTimer: NodeJS.Timeout | null = null;
 
   private eventEmitter: (event: string, data: any) => void;
   private isRunning = false;
@@ -171,8 +132,22 @@ export class HeliusMonitor {
     this.eventEmitter("monitoring_state", { isMonitoring: true });
 
     await this.fetchSolPriceOnce();
+    this.startSolPriceRefresh();
     this.connectDex();
-    this.startHeartbeat();
+  }
+
+  private startSolPriceRefresh() {
+    if (this.solPriceRefreshTimer) {
+      clearInterval(this.solPriceRefreshTimer);
+    }
+
+    this.solPriceRefreshTimer = setInterval(() => {
+      if (this.isRunning) {
+        void this.fetchSolPriceOnce();
+      }
+    }, SOL_PRICE_REFRESH_INTERVAL_MS);
+
+    this.solPriceRefreshTimer.unref?.();
   }
 
   // Monitoring durumunu değiştir ve kalıcı olarak kaydet
@@ -197,6 +172,7 @@ export class HeliusMonitor {
       const price = data?.[SOL_MINT]?.usdPrice;
       if (typeof price === "number" && price > 0) {
         this.solPriceUsd = price;
+        this.eventEmitter("sol_price_updated", { solPriceUsd: price });
         console.log(`💵 SOL/USD (Jupiter): $${price.toFixed(2)}`);
         return;
       }
@@ -210,6 +186,7 @@ export class HeliusMonitor {
       const price = data?.solana?.usd;
       if (typeof price === "number" && price > 0) {
         this.solPriceUsd = price;
+        this.eventEmitter("sol_price_updated", { solPriceUsd: price });
         console.log(`💵 SOL/USD (CoinGecko): $${price.toFixed(2)}`);
         return;
       }
@@ -217,8 +194,13 @@ export class HeliusMonitor {
       console.error("❌ CoinGecko da başarısız:", (err as Error).message);
     }
 
-    this.solPriceUsd = FALLBACK;
-    console.warn(`⚠️ Fiyat API'si çalışmadı, sabit $${FALLBACK} kullanılıyor.`);
+    if (this.solPriceUsd <= 0) {
+      this.solPriceUsd = FALLBACK;
+      this.eventEmitter("sol_price_updated", { solPriceUsd: FALLBACK });
+      console.warn(`⚠️ Fiyat API'si çalışmadı, sabit $${FALLBACK} kullanılıyor.`);
+    } else {
+      console.warn(`⚠️ Fiyat API'si çalışmadı, son geçerli SOL fiyatı korunuyor: $${this.solPriceUsd.toFixed(2)}`);
+    }
   }
 
   private toUsd(sol: number | undefined): { usd?: number; tvlUsd?: number } {
@@ -245,23 +227,6 @@ export class HeliusMonitor {
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
     return (data.result?.value ?? 0) / 1e9;
-  }
-
-  private startHeartbeat() {
-    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
-    this.sendHeartbeat();
-    this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), 60 * 60 * 1000);
-  }
-
-  private sendHeartbeat() {
-    const now = new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
-    sendTelegramNotification(
-      `📡 <b>Sistem Aktif — Taranıyor</b>\n\n` +
-      `🕐 <b>Saat:</b> ${now}\n` +
-      `✅ Bağlantı canlı (Public RPC → WS | Helius → HTTP)\n` +
-      `🔍 Yalnızca PumpSwap LP oluşturmaları izleniyor\n\n` +
-      `<i>LP tespit edildiği anda bildirim alacaksınız.</i>`
-    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -423,29 +388,6 @@ export class HeliusMonitor {
         pumpfunUrl:     `https://pump.fun/${tokenMint}`,
       });
 
-      const meetsThreshold = (tvlUsd ?? 0) >= MIN_TVL_USD_NOTIFY;
-      if (!meetsThreshold) {
-
-        console.log(
-          `🚫 [LP] Telegram atlandı | ${symbol} | TVL=${tvlUsd?.toFixed(0) ?? "?"} | eşik=${MIN_TVL_USD_NOTIFY}`
-        );
-        return;
-      }
-
-      const usdLine = liquidityUsd ? `\n💵 <b>USD:</b> $${liquidityUsd.toFixed(2)}` : "";
-      const tvlLine = tvlUsd       ? `\n📊 <b>TVL (~×2):</b> $${tvlUsd.toFixed(2)}` : "";
-      sendTelegramNotification(
-        `💰 <b>YENİ LP TESPİT EDİLDİ! TVL: $${(tvlUsd ?? 0).toFixed(0)}</b>\n\n` +
-        `🏊 <b>Platform:</b> PumpSwap\n` +
-        `🪙 <b>Token:</b> ${name} (${symbol})\n` +
-        `💧 <b>Likidite:</b> ${sol}${usdLine}${tvlLine}\n` +
-        `📋 <b>Token Mint:</b> <code>${tokenMint}</code>\n` +
-        `🔗 <b>LP Mint:</b> <code>${lpMint ?? "Yok"}</code>\n\n` +
-        `🔍 <a href="https://dexscreener.com/solana/${tokenMint}">Dexscreener</a> | ` +
-        `🪐 <a href="https://jup.ag/swap/SOL-${tokenMint}">Jupiter</a> | ` +
-        `🤖 <a href="${trojanUrl(tokenMint)}">Trojan ile Aç</a> | ` +
-        `🌊 <a href="https://pump.fun/${tokenMint}">Pump.fun</a>`
-      );
     } catch (err) {
       console.error("❌ [WS] DEX LP hatası:", err);
     }
@@ -571,8 +513,8 @@ export class HeliusMonitor {
     this.isRunning = false;
 
     if (this.reconnectTimeoutDex) { clearTimeout(this.reconnectTimeoutDex);  this.reconnectTimeoutDex = null; }
-    if (this.heartbeatInterval)   { clearInterval(this.heartbeatInterval);   this.heartbeatInterval   = null; }
     if (this.pingIntervalDex)     { clearInterval(this.pingIntervalDex);      this.pingIntervalDex     = null; }
+    if (this.solPriceRefreshTimer) { clearInterval(this.solPriceRefreshTimer); this.solPriceRefreshTimer = null; }
 
     if (this.dexWebSocket) {
       this.dexWebSocket.removeAllListeners();
