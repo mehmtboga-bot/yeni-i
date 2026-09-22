@@ -15,6 +15,7 @@ import { EventStore } from "./event-store";
 import { LiquidityMonitor } from "./liquidity-monitor";
 import { PhantomMonitor } from "./phantom-monitor";
 import { TokenBalancePoller } from "./token-balance-poller";
+import { sendRugPullAlert } from "./telegram-service";
 
 const ROOT = process.cwd();
 
@@ -254,6 +255,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 tradeStore.upsert(closed);
                 autoTraderEngine.markRecordClosed(pos.mintAddress);
                 broadcastToClients({ type: "position_update", data: closed });
+                void sendRugPullAlert(
+                  pos.symbol,
+                  pos.mintAddress,
+                  Math.abs(pos.buySolAmount ?? 0),
+                );
                 console.log(`🚨 [LiquidityMonitor] ${pos.symbol} likidite düşüşü nedeniyle rug pull olarak kapatıldı (-%100)`);
               }
               liquidityMonitors.delete(positionId);
@@ -273,6 +279,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Manuel satış veya rug pull tespiti — auto-trader record'unu kapat
       if (data.status === "closed") {
+        // Bakiye sıfırı / RUG_PULL nedeniyle kapanan pozisyonlar.
+        if (data.error === "Rug Pull Detected") {
+          void sendRugPullAlert(
+            data.symbol,
+            data.mintAddress,
+            Math.abs(data.buySolAmount ?? 0),
+          );
+        }
         autoTraderEngine.markRecordClosed(data.mintAddress);
         // Stop liquidity monitoring when position closes
         const lm = liquidityMonitors.get(data.id);
@@ -298,6 +312,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lmFailed.stop();
         liquidityMonitors.delete(positionId);
       }
+      const failedPosition = tradeStore.getById(positionId);
+      void sendRugPullAlert(
+        symbol,
+        mintAddress,
+        Math.abs(failedPosition?.buySolAmount ?? 0),
+      );
       broadcastToClients({ type: "rug_pull_detected", data: { positionId, mintAddress, symbol, reason } });
       console.error(`🚨 [Routes] ${symbol} — satış 3 denemede başarısız, rug pull olarak işaretlendi`);
     }
@@ -459,6 +479,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastToClients({ type: "connection_status", data });
     } else if (event === "monitoring_state") {
       broadcastToClients({ type: "monitoring_state", data });
+    } else if (event === "sol_price_updated") {
+      broadcastToClients({ type: "sol_price_updated", data });
     } else if (event === "error") {
       broadcastToClients({ type: "error", data });
     } else if (event === "token_skipped") {
@@ -481,7 +503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Canlı fiyat güncelleme (açık pozisyonlar için)
   const pricer = new PositionPricer(
     tradeStore,
-    monitor.getSolPriceUsd(),
+    () => monitor.getSolPriceUsd(),
     (event: string, data: any) => {
       if (event === "position_update") broadcastToClients({ type: "position_update", data });
     },
