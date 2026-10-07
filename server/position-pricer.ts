@@ -343,5 +343,26 @@ export class PositionPricer {
         this.positionPriceSource.delete(id); // Kaynak bilgisini sil
       }
     }
+
+    for (const id of this.halfSellInFlightTarget1) {
+      const p = this.store.getById(id);
+      if (!p || p.status === "closed") {
+        this.halfSellInFlightTarget1.delete(id);
+      }
+    }
+
+    for (const id of this.halfSellInFlightTarget2) {
+      const p = this.store.getById(id);
+      if (!p || p.status === "closed") {
+        this.halfSellInFlightTarget2.delete(id);
+      }
+    }
+
+    for (const id of this.halfSellInFlightTarget3) {
+      const p = this.store.getById(id);
+      if (!p || p.status === "closed") {
+        this.halfSellInFlightTarget3.delete(id);
+      }
+    }
   }
 }
