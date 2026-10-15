@@ -53,13 +53,13 @@ export function AutoTraderPanel({
     const partial: Partial<AutoTraderConfig> = {};
 
     const sol = parseFloat(solAmountInput);
-    if (!Number.isNaN(sol) && sol > 0) partial.solAmountPerTrade = sol;
+    if (!Number.isNaN(sol) && sol >= 0.0001) partial.solAmountPerTrade = sol;
 
     const maxTokens = parseInt(maxTokensInput, 10);
-    if (!Number.isNaN(maxTokens) && maxTokens > 0) partial.maxTokensHeld = maxTokens;
+    if (!Number.isNaN(maxTokens) && maxTokens >= 1) partial.maxTokensHeld = maxTokens;
 
     const holdDuration = parseInt(holdDurationInput, 10);
-    if (!Number.isNaN(holdDuration) && holdDuration > 0) partial.holdDurationMs = holdDuration * 1000;
+    if (!Number.isNaN(holdDuration) && holdDuration >= 10) partial.holdDurationMs = holdDuration * 1000;
 
     const profitTarget = parseFloat(profitTargetInput);
     if (!Number.isNaN(profitTarget) && profitTarget >= 0) partial.profitTargetPct = profitTarget;
