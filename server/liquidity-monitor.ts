@@ -88,7 +88,7 @@ export class LiquidityMonitor {
     if (this.stopped) return;
 
     try {
-      const url = `${DEXSCREENER_API_BASE}/${this.mintAddress}`;
+      const url = `${DEXSCREENER_API_BASE}?tokens=${this.mintAddress}`;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
@@ -183,7 +183,7 @@ export class LiquidityMonitor {
     console.log(`🔎 [LiquidityMonitor] ${this.symbol} rug pull doğrulama ${this.rugConfirmationAttempts}/${RUG_CONFIRMATION_ATTEMPTS} — likidite kontrol ediliyor...`);
 
     try {
-      const url = `${DEXSCREENER_API_BASE}/${this.mintAddress}`;
+      const url = `${DEXSCREENER_API_BASE}?tokens=${this.mintAddress}`;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
