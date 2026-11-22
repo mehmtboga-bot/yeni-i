@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import type { MintedToken, LPDetection, WSMessage, Position, TradeConfig, AutoTraderConfig } from "@shared/schema";
 import type { ServerLog } from "@/components/LogPanel";
+import type { WalletMintEvent, WalletTrackingState } from "@shared/wallet-tracking";
 
 const MAX_MINTED_TOKENS = 7;
 const MAX_LP_LOGS = 30;
@@ -45,6 +46,7 @@ const DEFAULT_AUTO_TRADER_CONFIG: AutoTraderConfig = {
   slippageBps: 5000,
   priorityFeeMicroLamports: 1000000,
   minLiquidityUsd: 5000,
+  skipRecentlyTradedSymbols: true,
   halfSellTarget1: 0,
   halfSellTarget2: 0,
   halfSellTarget3: 0,
@@ -168,6 +170,19 @@ function loadAutoTraderConfig(): AutoTraderConfig {
   }
 }
 
+const EMPTY_WALLET_TRACKING: WalletTrackingState = {
+  walletAddress: "",
+  isWatching: false,
+  autoBuyRunning: false,
+  tokens: [],
+};
+
+function upsertWalletMint(tokens: WalletMintEvent[], token: WalletMintEvent) {
+  const index = tokens.findIndex((item) => item.mintAddress === token.mintAddress);
+  if (index < 0) return [token, ...tokens].slice(0, 100);
+  return tokens.map((item, itemIndex) => itemIndex === index ? { ...item, ...token } : item);
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [autoTraderOpen, setAutoTraderOpen] = useState(false);
@@ -187,6 +202,8 @@ export default function Home() {
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
+  const [walletTrackingState, setWalletTrackingState] = useState<WalletTrackingState>(EMPTY_WALLET_TRACKING);
+  const [walletTrackingError, setWalletTrackingError] = useState("");
   const [tokenComparison, setTokenComparison] = useState<any[]>([]);
   // logIdRef'i localStorage'dan yüklenen logların max id'sinden başlat
   // böylece sayfa yenilenince yeni loglar çakışan key almaz
@@ -278,6 +295,14 @@ export default function Home() {
   const handleUpdateHoldDuration = (positionId: string, holdDurationMs: number) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "update_position_hold_duration", data: { positionId, holdDurationMs } }));
+    }
+  };
+
+  const sendWalletTrackingMessage = (type: string, data?: unknown) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type, data }));
+    } else {
+      setWalletTrackingError("Sunucu bağlantısı yok. Bağlantı kurulunca tekrar deneyin.");
     }
   };
 
@@ -391,6 +416,17 @@ export default function Home() {
 
         setMintedTokens(incomingTokens.slice(0, MAX_MINTED_TOKENS));
         setLpLogs(incomingLpLogs.slice(0, MAX_LP_LOGS));
+      } else if (msg.type === "wallet_tracking_state") {
+        setWalletTrackingState(msg.data as WalletTrackingState);
+        setWalletTrackingError("");
+      } else if (msg.type === "wallet_mint_detected" || msg.type === "wallet_mint_updated") {
+        const token = msg.data as WalletMintEvent;
+        setWalletTrackingState((current) => ({
+          ...current,
+          tokens: upsertWalletMint(current.tokens, token),
+        }));
+      } else if (msg.type === "wallet_tracking_error") {
+        setWalletTrackingError(msg.data?.message || "Cüzdan takibi isteği başarısız oldu.");
       }
     };
 
@@ -405,6 +441,7 @@ export default function Home() {
         wsInstance?.send(JSON.stringify({ type: "request_token_comparison" }));
         // Sunucudan tüm aktif tokenları çek — localStorage değil, sunucu tek kaynak
         wsInstance?.send(JSON.stringify({ type: "request_active_tokens" }));
+        wsInstance?.send(JSON.stringify({ type: "request_wallet_tracking_state" }));
       };
 
       wsInstance.onmessage = (event) => {
@@ -690,7 +727,22 @@ export default function Home() {
 
         <div className={`h-full overflow-y-auto ${activeTab === "wallet" ? "block" : "hidden"}`}>
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-            <WalletTrackingPanel />
+            <WalletTrackingPanel
+              state={walletTrackingState}
+              traderReady={traderReady}
+              openMints={activeBuyMints}
+              error={walletTrackingError}
+              onSaveAddress={(walletAddress) =>
+                sendWalletTrackingMessage("wallet_tracking_save", { walletAddress })
+              }
+              onToggleWatching={(enabled) =>
+                sendWalletTrackingMessage("wallet_tracking_toggle", { enabled })
+              }
+              onToggleAutoBuy={(enabled) =>
+                sendWalletTrackingMessage("wallet_auto_buy_toggle", { enabled })
+              }
+              onBuy={(token) => handleBuy(token.mintAddress, token.name, token.symbol, "jupiter")}
+            />
           </div>
         </div>
 
