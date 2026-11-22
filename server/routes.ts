@@ -16,6 +16,8 @@ import { LiquidityMonitor } from "./liquidity-monitor";
 import { PhantomMonitor } from "./phantom-monitor";
 import { TokenBalancePoller } from "./token-balance-poller";
 import { sendRugPullAlert } from "./telegram-service";
+import { WalletTrackingMonitor } from "./wallet-tracking-monitor";
+import type { WalletMintEvent } from "@shared/wallet-tracking";
 
 const ROOT = process.cwd();
 
@@ -489,6 +491,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   });
 
+  const pendingWalletAutoBuys = new Set<string>();
+  const walletTrackingMonitor = new WalletTrackingMonitor((event, data) => {
+    if (event === "wallet_tracking_state") {
+      broadcastToClients({ type: event, data });
+    } else if (event === "wallet_mint_detected") {
+      broadcastToClients({ type: event, data });
+      if (walletTrackingMonitor.getState().autoBuyRunning) {
+        const generation = walletTrackingMonitor.getAutoBuyGeneration();
+        void autoBuyWatchedWalletMint(data as WalletMintEvent, generation);
+      }
+    } else if (event === "wallet_mint_updated") {
+      broadcastToClients({ type: event, data });
+    }
+  });
+
+  const autoBuyWatchedWalletMint = async (token: WalletMintEvent, generation: number) => {
+    const config = autoTraderConfigStore.getConfig();
+    const isCurrentRun = () => walletTrackingMonitor.isAutoBuyGenerationActive(generation);
+    const setStatus = (status: WalletMintEvent["autoBuyStatus"], message?: string) =>
+      walletTrackingMonitor.updateAutoBuyStatus(token.mintAddress, status, message);
+
+    if (!isCurrentRun()) return;
+    if (!trader.isReady()) {
+      setStatus("failed", "Trader cüzdanı hazır değil.");
+      return;
+    }
+
+    if (pendingWalletAutoBuys.has(token.mintAddress)) return;
+    pendingWalletAutoBuys.add(token.mintAddress);
+    try {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        if (!isCurrentRun()) return;
+
+        const currentPosition = tradeStore.getByMint(token.mintAddress);
+        if (currentPosition) {
+          setStatus("skipped", "Bu mint için zaten açık veya bekleyen bir pozisyon var.");
+          return;
+        }
+
+        const openCount = tradeStore.getAll().filter(
+          (position) => ["open", "pending_buy", "pending_sell"].includes(position.status),
+        ).length;
+        if (openCount + pendingWalletAutoBuys.size - 1 >= config.maxTokensHeld) {
+          setStatus("skipped", `Açık pozisyon sınırı (${config.maxTokensHeld}) dolu.`);
+          return;
+        }
+
+        let liquidityUsd = token.liquidityUsd;
+        try {
+          liquidityUsd = await walletTrackingMonitor.refreshLiquidity(token.mintAddress) ?? liquidityUsd;
+        } catch (error) {
+          console.warn(`Cüzdan tokeni likiditesi kontrol edilemedi (${token.symbol}):`, error);
+        }
+        if (!isCurrentRun()) return;
+
+        if (config.minLiquidityUsd > 0 && liquidityUsd === undefined) {
+          setStatus("waiting", "DEX likiditesi henüz bulunamadı; yeniden kontrol ediliyor.");
+          await new Promise((resolve) => setTimeout(resolve, 3_000));
+          continue;
+        }
+        if (config.minLiquidityUsd > 0 && liquidityUsd! < config.minLiquidityUsd) {
+          setStatus("skipped", `Likidite ($${liquidityUsd!.toFixed(0)}) minimum $${config.minLiquidityUsd.toFixed(0)} eşiğinin altında.`);
+          return;
+        }
+
+        try {
+          const position = await trader.buy({
+            mintAddress: token.mintAddress,
+            name: token.name,
+            symbol: token.symbol,
+            solAmount: config.solAmountPerTrade,
+            isAuto: true,
+          });
+          if (position?.status !== "open") {
+            setStatus("failed", position?.error || "Jupiter alımı tamamlanamadı.");
+            return;
+          }
+
+          autoTraderEngine.createRecordForManualBuy(
+            token.mintAddress,
+            token.name,
+            token.symbol,
+            config.holdDurationMs,
+            position.buyTimestamp,
+          );
+          setStatus("bought", `${config.solAmountPerTrade} SOL ile Jupiter üzerinden alındı.`);
+          return;
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          console.error(`İzlenen cüzdan tokeni alımı başarısız (${token.symbol}):`, reason);
+          setStatus("failed", reason);
+          return;
+        }
+      }
+
+      if (isCurrentRun()) {
+        setStatus("skipped", "Belirlenen sürede uygun likidite oluşmadı.");
+      }
+    } finally {
+      pendingWalletAutoBuys.delete(token.mintAddress);
+    }
+  };
+
   monitor.start();
 
   // ---- Phantom Cüzdan Monitor ----
@@ -540,6 +645,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: { isMonitoring: monitor.getState() },
       })
     );
+    ws.send(JSON.stringify({
+      type: "wallet_tracking_state",
+      data: walletTrackingMonitor.getState(),
+    }));
     sendPositionsSnapshot(ws);
 
     // Auto-trader config'i gönder
@@ -558,7 +667,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on("message", async (data: Buffer) => {
       try {
         const message = JSON.parse(data.toString());
-        if (message.type === "get_balance") {
+        if (message.type === "request_wallet_tracking_state") {
+          ws.send(JSON.stringify({
+            type: "wallet_tracking_state",
+            data: walletTrackingMonitor.getState(),
+          }));
+        } else if (message.type === "wallet_tracking_save") {
+          try {
+            await walletTrackingMonitor.saveWalletAddress(message.data?.walletAddress ?? "");
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
+            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { message: reason } }));
+          }
+        } else if (message.type === "wallet_tracking_toggle") {
+          try {
+            if (message.data?.enabled === true) await walletTrackingMonitor.startWatching();
+            else walletTrackingMonitor.stopWatching();
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
+            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { message: reason } }));
+          }
+        } else if (message.type === "wallet_auto_buy_toggle") {
+          try {
+            if (typeof message.data?.enabled !== "boolean") {
+              throw new Error("Otomatik alım durumu geçersiz.");
+            }
+            walletTrackingMonitor.setAutoBuyRunning(message.data.enabled);
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
+            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { message: reason } }));
+          }
+        } else if (message.type === "get_balance") {
           const publicKey = message.data.publicKey;
           try {
             const balance = await monitor.getWalletBalance(publicKey);
@@ -984,8 +1123,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   // -----------------------------------
 
-  process.on("SIGTERM", () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
-  process.on("SIGINT",  () => { monitor.stop(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
+  process.on("SIGTERM", () => { monitor.stop(); walletTrackingMonitor.stopWatching(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
+  process.on("SIGINT",  () => { monitor.stop(); walletTrackingMonitor.stopWatching(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
 
   return httpServer;
 }
