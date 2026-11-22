@@ -16,6 +16,7 @@ import { LiquidityMonitor } from "./liquidity-monitor";
 import { PhantomMonitor } from "./phantom-monitor";
 import { TokenBalancePoller } from "./token-balance-poller";
 import { sendRugPullAlert } from "./telegram-service";
+import { WalletTracker } from "./wallet-tracker";
 
 const ROOT = process.cwd();
 
@@ -94,6 +95,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       data: { level, message, timestamp: Date.now() },
     });
   };
+
+  // ---- Cüzdan Takibi API ----
+  const walletTracker = new WalletTracker();
+  const walletState = () => ({ success: true, ...walletTracker.getConfig() });
+  app.get("/api/wallet-tracking", (_req, res) => res.json(walletState()));
+  app.post("/api/wallet-tracking/address", (req, res) => {
+    const r = walletTracker.setAddress(String(req.body?.walletAddress ?? ""));
+    res.status(r.ok ? 200 : 400).json({ ...walletState(), ...(r.ok ? {} : { success: false, message: r.error }) });
+  });
+  app.post("/api/wallet-tracking/start", (_req, res) => {
+    const r = walletTracker.start();
+    broadcastToClients({ type: "wallet_tracking_status", data: walletTracker.getConfig() });
+    res.status(r.ok ? 200 : 400).json({ ...walletState(), ...(r.ok ? {} : { success: false, message: r.error }) });
+  });
+  app.post("/api/wallet-tracking/stop", (_req, res) => {
+    walletTracker.stop();
+    broadcastToClients({ type: "wallet_tracking_status", data: walletTracker.getConfig() });
+    res.json(walletState());
+  });
 
   // ---- Dosya Editörü API ----
   app.get("/api/files/list", (_req, res) => {

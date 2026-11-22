@@ -6,6 +6,7 @@ import { LPLogTable } from "@/components/LPLogTable";
 import { WalletBalance } from "@/components/WalletBalance";
 import { FileEditor } from "@/components/FileEditor";
 import { TradePanel } from "@/components/TradePanel";
+import { WalletTrackingPanel } from "@/components/WalletTrackingPanel";
 import { AutoTraderPanel } from "@/components/AutoTraderPanel";
 import { TokenComparisonPanel } from "@/components/TokenComparisonPanel";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +25,7 @@ const MAX_LP_LOGS = 30;
 const MINT_DISPLAY_DURATION = 3 * 60 * 1000;
 const LP_LOG_DURATION = 5 * 60 * 1000;
 
-type Tab = "console" | "dashboard" | "trade" | "files";
+type Tab = "console" | "dashboard" | "trade" | "wallet" | "files";
 
 const DEFAULT_CONFIG: TradeConfig = {
   solAmount: 0.01,
@@ -457,6 +458,7 @@ export default function Home() {
     { id: "console",   label: "Konsol",   icon: (a) => <TriangleIcon active={a} /> },
     { id: "dashboard", label: "Dashboard", icon: (a) => <SquareIcon  active={a} /> },
     { id: "trade",     label: "Trade",    icon: (a) => <PlusIcon    active={a} /> },
+    { id: "wallet",    label: "Cüzdan Takibi", icon: (a) => <span className={`h-5 w-5 flex items-center justify-center text-base font-bold leading-none ${a ? "text-primary" : ""}`}>%</span> },
     { id: "files",     label: "Dosyalar", icon: (a) => <CircleIcon   active={a} /> },
   ];
 
@@ -683,6 +685,12 @@ export default function Home() {
                 )}
               </Button>
             </div>
+          </div>
+        </div>
+
+        <div className={`h-full overflow-y-auto ${activeTab === "wallet" ? "block" : "hidden"}`}>
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+            <WalletTrackingPanel />
           </div>
         </div>
 
