@@ -98,72 +98,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // ---- Cüzdan Takibi API ----
+  const WALLET_TRACKING_SLOTS = 2;
+  const MAX_WALLET_MINT_CARDS = 10;
   const pendingWalletAutoBuys = new Set<string>();
-  let autoBuyWatchedWalletMint: ((token: WalletMintEvent, generation: number) => Promise<void>) | undefined;
-  const walletTrackingMonitor = new WalletTrackingMonitor((event, data) => {
-    if (event === "wallet_tracking_state") {
-      broadcastToClients({ type: event, data });
-    } else if (event === "wallet_mint_detected") {
-      broadcastToClients({ type: event, data });
-      if (walletTrackingMonitor.getState().autoBuyRunning && autoBuyWatchedWalletMint) {
-        const generation = walletTrackingMonitor.getAutoBuyGeneration();
-        void autoBuyWatchedWalletMint(data as WalletMintEvent, generation).catch((error) => {
-          console.error("İzlenen cüzdan tokeni alım akışı başarısız:", error);
-        });
-      }
-    } else if (event === "wallet_mint_updated") {
-      broadcastToClients({ type: event, data });
+  let autoBuyWatchedWalletMint: ((token: WalletMintEvent, generation: number, slot: number) => Promise<void>) | undefined;
+  const walletTrackingMonitors: WalletTrackingMonitor[] = [];
+  const trimWalletMintCards = () => {
+    const tokens = walletTrackingMonitors.flatMap((walletMonitor, slot) =>
+      walletMonitor.getState().tokens.map((token) => ({ token, walletMonitor, slot })),
+    ).sort((left, right) => left.token.expiresAt - right.token.expiresAt);
+    while (tokens.length > MAX_WALLET_MINT_CARDS) {
+      const oldest = tokens.shift();
+      if (oldest) oldest.walletMonitor.removeToken(oldest.token.mintAddress);
     }
-  });
-  const walletState = () => ({
-    success: true,
-    ...walletTrackingMonitor.getState(),
-    running: walletTrackingMonitor.getState().isWatching,
-  });
+  };
+  for (let slot = 0; slot < WALLET_TRACKING_SLOTS; slot++) {
+    const monitor = new WalletTrackingMonitor((event, data) => {
+      if (event === "wallet_tracking_state") {
+        broadcastToClients({
+          type: event,
+          data: walletTrackingMonitors.map((walletMonitor) => walletMonitor.getState()),
+        });
+      } else if (event === "wallet_mint_detected" || event === "wallet_mint_updated") {
+        const token = data as WalletMintEvent;
+        if (event === "wallet_mint_detected") trimWalletMintCards();
+        broadcastToClients({ type: event, data: { slot, token } });
+        if (event === "wallet_mint_detected" && monitor.getState().autoBuyRunning && autoBuyWatchedWalletMint) {
+          const generation = monitor.getAutoBuyGeneration();
+          void autoBuyWatchedWalletMint(token, generation, slot).catch((error) => {
+            console.error(`İzlenen cüzdan ${slot + 1} tokeni alım akışı başarısız:`, error);
+          });
+        }
+      }
+    }, slot);
+    walletTrackingMonitors.push(monitor);
+  }
+  const getWalletMonitor = (slot: unknown = 0) => {
+    const index = Number(slot);
+    if (!Number.isInteger(index) || index < 0 || index >= walletTrackingMonitors.length) {
+      throw new Error("Cüzdan takip alanı geçersiz.");
+    }
+    return walletTrackingMonitors[index];
+  };
+  const walletStates = () => walletTrackingMonitors.map((monitor) => monitor.getState());
+  const walletState = (slot: unknown = 0) => {
+    const state = getWalletMonitor(slot).getState();
+    return { success: true, ...state, running: state.isWatching, wallets: walletStates() };
+  };
+  const walletErrorState = (slot: unknown = 0) => {
+    try {
+      return walletState(slot);
+    } catch {
+      return { success: false, wallets: walletStates() };
+    }
+  };
   app.get("/api/wallet-tracking", (_req, res) => res.json(walletState()));
   app.post("/api/wallet-tracking/address", (req, res) => {
     try {
-      walletTrackingMonitor.saveWalletAddress(String(req.body?.walletAddress ?? ""));
-      res.json(walletState());
+      const slot = req.body?.slot ?? 0;
+      getWalletMonitor(slot).saveWalletAddress(String(req.body?.walletAddress ?? ""));
+      res.json(walletState(slot));
     } catch (error) {
       res.status(400).json({
-        ...walletState(),
+        ...walletErrorState(req.body?.slot ?? 0),
         success: false,
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
-  app.post("/api/wallet-tracking/start", async (_req, res) => {
+  app.post("/api/wallet-tracking/start", async (req, res) => {
     try {
-      await walletTrackingMonitor.startWatching();
-      res.json(walletState());
+      const slot = req.body?.slot ?? 0;
+      await getWalletMonitor(slot).startWatching();
+      res.json(walletState(slot));
     } catch (error) {
       res.status(400).json({
-        ...walletState(),
+        ...walletErrorState(req.body?.slot ?? 0),
         success: false,
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
-  app.post("/api/wallet-tracking/stop", (_req, res) => {
-    walletTrackingMonitor.stopWatching();
-    res.json(walletState());
+  app.post("/api/wallet-tracking/stop", (req, res) => {
+    const slot = req.body?.slot ?? 0;
+    getWalletMonitor(slot).stopWatching();
+    res.json(walletState(slot));
   });
-  app.post("/api/wallet-tracking/auto-buy/start", (_req, res) => {
+  app.post("/api/wallet-tracking/auto-buy/start", (req, res) => {
     try {
-      walletTrackingMonitor.setAutoBuyRunning(true);
-      res.json(walletState());
+      const slot = req.body?.slot ?? 0;
+      getWalletMonitor(slot).setAutoBuyRunning(true);
+      res.json(walletState(slot));
     } catch (error) {
       res.status(400).json({
-        ...walletState(),
+        ...walletErrorState(req.body?.slot ?? 0),
         success: false,
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
-  app.post("/api/wallet-tracking/auto-buy/stop", (_req, res) => {
-    walletTrackingMonitor.setAutoBuyRunning(false);
-    res.json(walletState());
+  app.post("/api/wallet-tracking/auto-buy/stop", (req, res) => {
+    const slot = req.body?.slot ?? 0;
+    getWalletMonitor(slot).setAutoBuyRunning(false);
+    res.json(walletState(slot));
+  });
+  app.post("/api/wallet-tracking/clear", (req, res) => {
+    try {
+      const slot = req.body?.slot ?? 0;
+      getWalletMonitor(slot).clearTokens();
+      res.json(walletState(slot));
+    } catch (error) {
+      res.status(400).json({
+        ...walletErrorState(req.body?.slot ?? 0),
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   // ---- Dosya Editörü API ----
@@ -259,11 +309,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/update-secrets", (req, res) => {
-    const { HELIUS_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TRADER_PRIVATE_KEY, PHANTOM_WALLET_ADDRESS } = req.body || {};
+    const { HELIUS_API_KEY, SOLSCAN_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TRADER_PRIVATE_KEY, PHANTOM_WALLET_ADDRESS } = req.body || {};
     try {
-      if (HELIUS_API_KEY !== undefined || TELEGRAM_BOT_TOKEN !== undefined || TELEGRAM_CHAT_ID !== undefined || TRADER_PRIVATE_KEY !== undefined || PHANTOM_WALLET_ADDRESS !== undefined) {
+      if (HELIUS_API_KEY !== undefined || SOLSCAN_API_KEY !== undefined || TELEGRAM_BOT_TOKEN !== undefined || TELEGRAM_CHAT_ID !== undefined || TRADER_PRIVATE_KEY !== undefined || PHANTOM_WALLET_ADDRESS !== undefined) {
         const updates: Record<string, string> = {};
         if (typeof HELIUS_API_KEY === "string") updates.HELIUS_API_KEY = HELIUS_API_KEY;
+        if (typeof SOLSCAN_API_KEY === "string") updates.SOLSCAN_API_KEY = SOLSCAN_API_KEY;
         if (typeof TELEGRAM_BOT_TOKEN === "string") updates.TELEGRAM_BOT_TOKEN = TELEGRAM_BOT_TOKEN;
         if (typeof TELEGRAM_CHAT_ID === "string") updates.TELEGRAM_CHAT_ID = TELEGRAM_CHAT_ID;
         if (typeof TRADER_PRIVATE_KEY === "string") updates.TRADER_PRIVATE_KEY = TRADER_PRIVATE_KEY;
@@ -468,12 +519,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   autoTraderEngine.start();
   // ----------------------------
 
-  autoBuyWatchedWalletMint = async (token, generation) => {
-    const isCurrentRun = () => walletTrackingMonitor.isAutoBuyGenerationActive(generation);
+  autoBuyWatchedWalletMint = async (token, generation, slot) => {
+    const walletMonitor = getWalletMonitor(slot);
+    const isCurrentRun = () => walletMonitor.isAutoBuyGenerationActive(generation);
     const setStatus = (status: WalletMintEvent["autoBuyStatus"], message?: string) =>
-      walletTrackingMonitor.updateAutoBuyStatus(token.mintAddress, status, message);
+      walletMonitor.updateAutoBuyStatus(token.mintAddress, status, message);
 
     if (!isCurrentRun()) return;
+    if (!token.solscanVerified) {
+      setStatus("skipped", `Solscan doğrulaması başarısız: ${token.solscanMessage ?? "doğrulanamadı."}`);
+      return;
+    }
     if (!trader.isReady()) {
       setStatus("failed", "Trader cüzdanı hazır değil.");
       return;
@@ -500,7 +556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         let liquidityUsd = token.liquidityUsd;
         try {
-          liquidityUsd = await walletTrackingMonitor.refreshLiquidity(token.mintAddress) ?? liquidityUsd;
+          liquidityUsd = await walletMonitor.refreshLiquidity(token.mintAddress) ?? liquidityUsd;
         } catch (error) {
           console.warn(`Cüzdan tokeni likiditesi kontrol edilemedi (${token.symbol}):`, error);
         }
@@ -697,7 +753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     );
     ws.send(JSON.stringify({
       type: "wallet_tracking_state",
-      data: walletTrackingMonitor.getState(),
+      data: walletStates(),
     }));
     sendPositionsSnapshot(ws);
 
@@ -720,32 +776,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (message.type === "request_wallet_tracking_state") {
           ws.send(JSON.stringify({
             type: "wallet_tracking_state",
-            data: walletTrackingMonitor.getState(),
+            data: walletStates(),
           }));
         } else if (message.type === "wallet_tracking_save") {
+          const slot = message.data?.slot ?? 0;
           try {
-            walletTrackingMonitor.saveWalletAddress(message.data?.walletAddress ?? "");
+            getWalletMonitor(slot).saveWalletAddress(message.data?.walletAddress ?? "");
           } catch (error) {
             const reason = error instanceof Error ? error.message : String(error);
-            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { message: reason } }));
+            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { slot: Number(slot), message: reason } }));
           }
         } else if (message.type === "wallet_tracking_toggle") {
+          const slot = message.data?.slot ?? 0;
           try {
-            if (message.data?.enabled === true) await walletTrackingMonitor.startWatching();
-            else walletTrackingMonitor.stopWatching();
+            const walletMonitor = getWalletMonitor(slot);
+            if (message.data?.enabled === true) await walletMonitor.startWatching();
+            else walletMonitor.stopWatching();
           } catch (error) {
             const reason = error instanceof Error ? error.message : String(error);
-            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { message: reason } }));
+            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { slot: Number(slot), message: reason } }));
           }
         } else if (message.type === "wallet_auto_buy_toggle") {
+          const slot = message.data?.slot ?? 0;
           try {
             if (typeof message.data?.enabled !== "boolean") {
               throw new Error("Otomatik alım durumu geçersiz.");
             }
-            walletTrackingMonitor.setAutoBuyRunning(message.data.enabled);
+            getWalletMonitor(slot).setAutoBuyRunning(message.data.enabled);
           } catch (error) {
             const reason = error instanceof Error ? error.message : String(error);
-            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { message: reason } }));
+            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { slot: Number(slot), message: reason } }));
+          }
+        } else if (message.type === "wallet_tracking_clear") {
+          const slot = message.data?.slot ?? 0;
+          try {
+            getWalletMonitor(slot).clearTokens();
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
+            ws.send(JSON.stringify({ type: "wallet_tracking_error", data: { slot: Number(slot), message: reason } }));
           }
         } else if (message.type === "get_balance") {
           const publicKey = message.data.publicKey;
@@ -1173,8 +1241,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   // -----------------------------------
 
-  process.on("SIGTERM", () => { monitor.stop(); walletTrackingMonitor.stopWatching(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
-  process.on("SIGINT",  () => { monitor.stop(); walletTrackingMonitor.stopWatching(); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
+  process.on("SIGTERM", () => { monitor.stop(); walletTrackingMonitors.forEach((walletMonitor) => walletMonitor.stop()); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
+  process.on("SIGINT",  () => { monitor.stop(); walletTrackingMonitors.forEach((walletMonitor) => walletMonitor.stop()); phantomMonitor.stop(); autoTraderEngine.stop(); tokenBalancePoller.stop(); wss.close(); });
 
   return httpServer;
 }
