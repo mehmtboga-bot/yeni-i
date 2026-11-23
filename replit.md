@@ -39,6 +39,13 @@ TRADER_PRIVATE_KEY=base58_encoded_private_key
   - DEX linkleri
   - Kalan süre göstergesi
 
+### Cüzdan Takibi
+- İki ayrı cüzdan adresi kaydedilebilir ve bağımsız izlenebilir.
+- Helius yeni işlemleri tarar; aday mintler Solscan token metaverisi, oluşturma imzası ve creator/mint authority alanlarıyla doğrulanır.
+- Solscan doğrulaması başarısız veya yapılandırılmamışsa token kartı gösterilir ancak otomatik alım yapılmaz.
+- Her cüzdan için en fazla 5 token kartı tutulur; yeni kartlar eskileri otomatik olarak kaldırır ve her kart 4 dakika sonra ayrı olarak kaldırılır.
+- Bilinmeyen ad veya sembol bilgisi bulunan tokenler gösterilmez ve otomatik alım için işleme alınmaz.
+
 ### Kontroller
 - **Başlat/Durdur butonu**: Monitor'u manuel olarak durdurabilir veya başlatabilirsiniz
 - **Bağlantı durumu**: Helius API bağlantı durumu canlı gösterilir
@@ -66,7 +73,10 @@ TRADER_PRIVATE_KEY=base58_encoded_private_key
 ### Environment Variables
 ```
 HELIUS_API_KEY=your_api_key_here
+SOLSCAN_API_KEY=your_solscan_pro_api_key_here
 ```
+
+`SOLSCAN_API_KEY`, Solscan Pro API V2 token metadata endpoint'inde doğrulama yapmak için gereklidir. Anahtar yoksa otomatik alımlar Solscan doğrulaması nedeniyle atlanır.
 
 **Önemli**: Helius API anahtarınızın geçerli olduğundan emin olun. 401 hatası alıyorsanız, API anahtarınızı kontrol edin.
 

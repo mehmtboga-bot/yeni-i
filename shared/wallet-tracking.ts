@@ -16,10 +16,13 @@ export interface WalletMintEvent {
   symbol: string;
   creator: string;
   detectedAt: number;
+  expiresAt: number;
   jupiterUrl: string;
   dexscreenerUrl: string;
   pumpfunUrl: string;
   liquidityUsd?: number;
+  solscanVerified: boolean;
+  solscanMessage?: string;
   autoBuyStatus: WalletMintBuyStatus;
   autoBuyMessage?: string;
 }

@@ -11,30 +11,49 @@ import type {
 type EventEmitter = (event: string, data: unknown) => void;
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
-const CONFIG_PATH = path.join(DATA_DIR, "wallet-tracking.json");
 const POLL_INTERVAL_MS = 3_000;
-const MAX_TOKENS = 100;
+const TOKEN_TTL_MS = 4 * 60 * 1_000;
+const TOKEN_EXPIRY_CHECK_MS = 1_000;
+const MAX_TOKENS = 5;
 
 export class WalletTrackingMonitor {
   private readonly emit: EventEmitter;
+  private readonly configPath: string;
   private walletAddress = "";
   private isWatching = false;
   private autoBuyRunning = false;
   private autoBuyGeneration = 0;
   private lastSeenSignature: string | undefined;
   private pollTimer: NodeJS.Timeout | null = null;
+  private expiryTimer: NodeJS.Timeout;
   private polling = false;
   private tokens: WalletMintEvent[] = [];
 
-  constructor(emit: EventEmitter) {
+  constructor(emit: EventEmitter, slot = 0) {
     this.emit = emit;
+    this.configPath = path.join(DATA_DIR, slot === 0 ? "wallet-tracking.json" : `wallet-tracking-${slot + 1}.json`);
     this.loadConfig();
+    this.expiryTimer = setInterval(() => this.pruneExpiredTokens(), TOKEN_EXPIRY_CHECK_MS);
+    this.expiryTimer.unref?.();
+  }
+
+  stop() {
+    this.stopWatching();
+    clearInterval(this.expiryTimer);
+  }
+
+  private pruneExpiredTokens() {
+    const now = Date.now();
+    const retainedTokens = this.tokens.filter((token) => token.expiresAt > now);
+    if (retainedTokens.length === this.tokens.length) return;
+    this.tokens = retainedTokens;
+    this.emitState();
   }
 
   private loadConfig() {
     try {
-      if (!fs.existsSync(CONFIG_PATH)) return;
-      const saved = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8")) as { walletAddress?: unknown };
+      if (!fs.existsSync(this.configPath)) return;
+      const saved = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { walletAddress?: unknown };
       if (typeof saved.walletAddress === "string") {
         this.walletAddress = new PublicKey(saved.walletAddress).toBase58();
       }
@@ -45,7 +64,7 @@ export class WalletTrackingMonitor {
 
   private saveConfig() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify({ walletAddress: this.walletAddress }, null, 2), "utf-8");
+    fs.writeFileSync(this.configPath, JSON.stringify({ walletAddress: this.walletAddress }, null, 2), "utf-8");
   }
 
   getState(): WalletTrackingState {
@@ -69,7 +88,7 @@ export class WalletTrackingMonitor {
     this.emit("wallet_tracking_state", this.getState());
   }
 
-  async saveWalletAddress(address: string) {
+  saveWalletAddress(address: string) {
     if (this.isWatching) throw new Error("Cüzdan adresini değiştirmek için önce izlemeyi durdurun.");
     const trimmed = address.trim();
     if (!trimmed) throw new Error("Cüzdan adresi gerekli.");
@@ -110,6 +129,15 @@ export class WalletTrackingMonitor {
     }
     this.autoBuyGeneration++;
     this.autoBuyRunning = enabled;
+    if (!enabled) {
+      for (const token of this.tokens) {
+        if (token.autoBuyStatus === "waiting") {
+          token.autoBuyStatus = "watch_only";
+          token.autoBuyMessage = "Otomatik alım durduruldu.";
+          this.emit("wallet_mint_updated", { ...token });
+        }
+      }
+    }
     this.emitState();
     return this.getState();
   }
@@ -124,6 +152,19 @@ export class WalletTrackingMonitor {
     token.autoBuyStatus = status;
     token.autoBuyMessage = message;
     this.emit("wallet_mint_updated", { ...token });
+  }
+
+  removeToken(mintAddress: string) {
+    const tokenIndex = this.tokens.findIndex((token) => token.mintAddress === mintAddress);
+    if (tokenIndex < 0) return;
+    this.tokens.splice(tokenIndex, 1);
+    this.emitState();
+  }
+
+  clearTokens() {
+    if (this.tokens.length === 0) return;
+    this.tokens = [];
+    this.emitState();
   }
 
   async refreshLiquidity(mintAddress: string): Promise<number | undefined> {
@@ -148,6 +189,72 @@ export class WalletTrackingMonitor {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private async verifySolscanMint(
+    mintAddress: string,
+    signature: string,
+  ): Promise<{ verified: boolean; name?: string; symbol?: string; message: string }> {
+    if (!secrets.SOLSCAN_API_KEY) {
+      return { verified: false, message: "SOLSCAN_API_KEY yapılandırılmamış." };
+    }
+
+    const url = new URL("https://pro-api.solscan.io/v2.0/token/meta");
+    url.searchParams.set("address", mintAddress);
+    let failureMessage = "Solscan minti doğrulayamadı.";
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5_000);
+      try {
+        const response = await fetch(url, {
+          headers: { token: secrets.SOLSCAN_API_KEY },
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          failureMessage = `Solscan yanıtı: ${response.status}`;
+          if (response.status === 400 || response.status === 401 || response.status === 403) break;
+        } else {
+          const result = await response.json() as {
+            success?: boolean;
+            data?: {
+              address?: string;
+              create_tx?: string;
+              creator?: string;
+              mint_authority?: string | null;
+              name?: string;
+              symbol?: string;
+            };
+          };
+          const tokenData = result.data;
+          if (!result.success || !tokenData || tokenData.address !== mintAddress) {
+            failureMessage = "Solscan mint adresini doğrulayamadı.";
+            break;
+          }
+          if (tokenData.create_tx !== signature) {
+            failureMessage = "Solscan oluşturma işlemi Helius işlemiyle eşleşmedi.";
+          } else if (tokenData.creator !== this.walletAddress && tokenData.mint_authority !== this.walletAddress) {
+            failureMessage = "Solscan token yaratıcısını izlenen cüzdanla eşleştiremedi.";
+          } else {
+            return {
+              verified: true,
+              name: tokenData.name,
+              symbol: tokenData.symbol,
+              message: "Mint adresi ve oluşturma işlemi Solscan ile doğrulandı.",
+            };
+          }
+        }
+      } catch (error) {
+        failureMessage = error instanceof Error ? error.message : String(error);
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1_500));
+    }
+
+    console.warn(`Solscan mint doğrulaması başarısız (${mintAddress}):`, failureMessage);
+    return { verified: false, message: failureMessage };
   }
 
   private async rpc<T>(method: string, params: unknown): Promise<T> {
@@ -196,6 +303,7 @@ export class WalletTrackingMonitor {
   }
 
   private async processTransaction(signature: string, transaction: any) {
+    if (transaction.meta?.err) return;
     const message = transaction.transaction?.message;
     const instructions = [
       ...(message?.instructions ?? []),
@@ -219,19 +327,38 @@ export class WalletTrackingMonitor {
     for (const instruction of mintInstructions) {
       const mintAddress = instruction.parsed.info.mint as string;
       if (this.tokens.some((token) => token.mintAddress === mintAddress)) continue;
-      const metadata = await this.getMetadata(mintAddress);
+      const [metadata, solscan] = await Promise.all([
+        this.getMetadata(mintAddress),
+        this.verifySolscanMint(mintAddress, signature),
+      ]);
+      const name = solscan.name || metadata.name;
+      const symbol = solscan.symbol || metadata.symbol;
+      const unknownName = !name || /^(unknown|bilinmeyen token)$/i.test(name.trim());
+      const unknownSymbol = !symbol || symbol.trim() === "?" || /^unknown$/i.test(symbol.trim());
+      if (unknownName || unknownSymbol) {
+        console.warn(`Bilinmeyen token atlandı (${mintAddress}).`);
+        return;
+      }
       const detectedAt = transaction.blockTime ? transaction.blockTime * 1000 : Date.now();
       const token: WalletMintEvent = {
         id: `${signature}-${mintAddress}`,
         mintAddress,
-        name: metadata.name,
-        symbol: metadata.symbol,
+        name,
+        symbol,
         creator: this.walletAddress,
         detectedAt,
+        expiresAt: Date.now() + TOKEN_TTL_MS,
         jupiterUrl: `https://jup.ag/swap/SOL-${mintAddress}`,
         dexscreenerUrl: `https://dexscreener.com/solana/${mintAddress}`,
         pumpfunUrl: `https://pump.fun/${mintAddress}`,
-        autoBuyStatus: this.autoBuyRunning ? "waiting" : "watch_only",
+        solscanVerified: solscan.verified,
+        solscanMessage: solscan.message,
+        autoBuyStatus: this.autoBuyRunning
+          ? solscan.verified ? "waiting" : "skipped"
+          : "watch_only",
+        autoBuyMessage: this.autoBuyRunning && !solscan.verified
+          ? `Solscan doğrulaması başarısız: ${solscan.message}`
+          : undefined,
       };
       this.tokens.unshift(token);
       if (this.tokens.length > MAX_TOKENS) this.tokens.length = MAX_TOKENS;
@@ -241,6 +368,7 @@ export class WalletTrackingMonitor {
         console.warn(`Likidite bilgisi alınamadı (${mintAddress}):`, error);
       }
       this.emit("wallet_mint_detected", { ...token });
+      this.emitState();
     }
   }
 
