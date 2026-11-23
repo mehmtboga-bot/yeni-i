@@ -644,14 +644,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Auto-trader'a bildir (record tutması için) — özel süreyi data'ya ekle
         autoTraderEngine.onLPDetected({ ...data, customHoldDurationMs }).catch((err) => console.error("Auto-trader LP hatası:", err));
 
-        // Eğer token son 15 dakikada görüldüyse, manuel alım için arayüzde göster ama otomatik alım yapma
-        const isRecentlySkipped = monitor.isTokenRecentlySkipped(sym);
-        if (isRecentlySkipped) {
-          console.log(`⏭️ [Fast-Buy] ${sym} son 15 dakikada görüldü, manuel alım için arayüzde gösteriliyor`);
-          // Otomatik alım yapma, sadece arayüzde göster (zaten token_skipped event'i yayınlanıyor)
-          return;
-        }
-
         // Yeni token ise 300ms bekle ve sonra direkt alım yap
         console.log(`⏳ [Fast-Buy] ${sym} 300ms bekleniyor... (${mintAddress})`);
 
