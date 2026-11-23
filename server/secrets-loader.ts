@@ -5,6 +5,7 @@ const SECRETS_PATH = path.resolve(process.cwd(), "data", "secrets.json");
 
 interface Secrets {
   HELIUS_API_KEY: string;
+  SOLSCAN_API_KEY: string;
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
   TRADER_PRIVATE_KEY: string;
@@ -13,6 +14,7 @@ interface Secrets {
 
 const DEFAULT_SECRETS: Secrets = {
   HELIUS_API_KEY: process.env.HELIUS_API_KEY || "",
+  SOLSCAN_API_KEY: process.env.SOLSCAN_API_KEY || "",
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",
   TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || "",
   TRADER_PRIVATE_KEY: process.env.TRADER_PRIVATE_KEY || "",

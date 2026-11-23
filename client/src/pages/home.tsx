@@ -176,6 +176,10 @@ const EMPTY_WALLET_TRACKING: WalletTrackingState = {
   autoBuyRunning: false,
   tokens: [],
 };
+const EMPTY_WALLET_TRACKINGS: WalletTrackingState[] = [
+  { ...EMPTY_WALLET_TRACKING },
+  { ...EMPTY_WALLET_TRACKING },
+];
 
 function upsertWalletMint(tokens: WalletMintEvent[], token: WalletMintEvent) {
   const index = tokens.findIndex((item) => item.mintAddress === token.mintAddress);
@@ -202,8 +206,8 @@ export default function Home() {
   const [traderPublicKey, setTraderPublicKey] = useState<string | undefined>();
   const [traderReady, setTraderReady] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number>(0);
-  const [walletTrackingState, setWalletTrackingState] = useState<WalletTrackingState>(EMPTY_WALLET_TRACKING);
-  const [walletTrackingError, setWalletTrackingError] = useState("");
+  const [walletTrackingStates, setWalletTrackingStates] = useState<WalletTrackingState[]>(EMPTY_WALLET_TRACKINGS);
+  const [walletTrackingErrors, setWalletTrackingErrors] = useState(["", ""]);
   const [tokenComparison, setTokenComparison] = useState<any[]>([]);
   // logIdRef'i localStorage'dan yüklenen logların max id'sinden başlat
   // böylece sayfa yenilenince yeni loglar çakışan key almaz
@@ -302,7 +306,12 @@ export default function Home() {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type, data }));
     } else {
-      setWalletTrackingError("Sunucu bağlantısı yok. Bağlantı kurulunca tekrar deneyin.");
+      const slot = typeof data === "object" && data !== null && "slot" in data
+        ? Number((data as { slot: unknown }).slot)
+        : 0;
+      setWalletTrackingErrors((current) => current.map((error, index) =>
+        index === slot ? "Sunucu bağlantısı yok. Bağlantı kurulunca tekrar deneyin." : error,
+      ));
     }
   };
 
@@ -417,16 +426,23 @@ export default function Home() {
         setMintedTokens(incomingTokens.slice(0, MAX_MINTED_TOKENS));
         setLpLogs(incomingLpLogs.slice(0, MAX_LP_LOGS));
       } else if (msg.type === "wallet_tracking_state") {
-        setWalletTrackingState(msg.data as WalletTrackingState);
-        setWalletTrackingError("");
+        setWalletTrackingStates(msg.data as WalletTrackingState[]);
+        setWalletTrackingErrors(["", ""]);
       } else if (msg.type === "wallet_mint_detected" || msg.type === "wallet_mint_updated") {
-        const token = msg.data as WalletMintEvent;
-        setWalletTrackingState((current) => ({
-          ...current,
-          tokens: upsertWalletMint(current.tokens, token),
-        }));
+        const { slot, token } = msg.data as { slot: number; token: WalletMintEvent };
+        setWalletTrackingStates((current) => current.map((state, index) =>
+          index === slot ? { ...state, tokens: upsertWalletMint(state.tokens, token) } : state,
+        ));
+      } else if (msg.type === "wallet_tracking_cleared") {
+        const { slot } = msg.data as { slot: number };
+        setWalletTrackingStates((current) => current.map((state, index) =>
+          index === slot ? { ...state, tokens: [] } : state,
+        ));
       } else if (msg.type === "wallet_tracking_error") {
-        setWalletTrackingError(msg.data?.message || "Cüzdan takibi isteği başarısız oldu.");
+        const { slot, message } = msg.data as { slot: number; message?: string };
+        setWalletTrackingErrors((current) => current.map((error, index) =>
+          index === slot ? message || "Cüzdan takibi isteği başarısız oldu." : error,
+        ));
       }
     };
 
@@ -728,20 +744,23 @@ export default function Home() {
         <div className={`h-full overflow-y-auto ${activeTab === "wallet" ? "block" : "hidden"}`}>
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
             <WalletTrackingPanel
-              state={walletTrackingState}
+              states={walletTrackingStates}
               traderReady={traderReady}
               openMints={activeBuyMints}
-              error={walletTrackingError}
-              onSaveAddress={(walletAddress) =>
-                sendWalletTrackingMessage("wallet_tracking_save", { walletAddress })
+              errors={walletTrackingErrors}
+              onSaveAddress={(slot, walletAddress) =>
+                sendWalletTrackingMessage("wallet_tracking_save", { slot, walletAddress })
               }
-              onToggleWatching={(enabled) =>
-                sendWalletTrackingMessage("wallet_tracking_toggle", { enabled })
+              onToggleWatching={(slot, enabled) =>
+                sendWalletTrackingMessage("wallet_tracking_toggle", { slot, enabled })
               }
-              onToggleAutoBuy={(enabled) =>
-                sendWalletTrackingMessage("wallet_auto_buy_toggle", { enabled })
+              onToggleAutoBuy={(slot, enabled) =>
+                sendWalletTrackingMessage("wallet_auto_buy_toggle", { slot, enabled })
               }
-              onBuy={(token) => handleBuy(token.mintAddress, token.name, token.symbol, "jupiter")}
+              onBuy={(_slot, token) => handleBuy(token.mintAddress, token.name, token.symbol, "jupiter")}
+              onClear={(slot) =>
+                sendWalletTrackingMessage("wallet_tracking_clear", { slot })
+              }
             />
           </div>
         </div>
