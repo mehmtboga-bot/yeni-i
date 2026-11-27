@@ -231,11 +231,22 @@ export class HeliusMonitor {
   // Sadece CreatePool logları içeren TX'ler işlenir;
   // swap / remove / claim / diğerleri sıfır HTTP çağrısıyla atlanır.
   // ═══════════════════════════════════════════════════════════════════════════
+  // Kopma loglarını en fazla 30 sn'de bir bas
+  private lastWsDropLog = 0;
+  private wsConnectedOnce = false;
+  private logWsDrop(msg: string) {
+    const now = Date.now();
+    if (now - this.lastWsDropLog < 30_000) return;
+    this.lastWsDropLog = now;
+    console.error(`${msg} (yeniden bağlanılıyor)`);
+  }
+
   private connectDex() {
     this.dexWebSocket = new WebSocket(WS_URL);
 
     this.dexWebSocket.on("open", () => {
-      console.log("✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)");
+      if (!this.wsConnectedOnce) console.log("✅ [WS] DEX WebSocket bağlandı (Public RPC — PumpSwap LP only)");
+      this.wsConnectedOnce = true;
       this.dexWebSocket?.send(JSON.stringify({
         jsonrpc: "2.0",
         id: 100,
@@ -285,14 +296,14 @@ export class HeliusMonitor {
     });
 
     this.dexWebSocket.on("error", (err) => {
-      console.error("❌ [WS] Hata:", err);
+      this.logWsDrop(`❌ [WS] Hata: ${err?.message ?? err}`);
     });
 
     this.dexWebSocket.on("close", () => {
-      console.log("🔌 [WS] DEX bağlantısı kapandı");
+      this.logWsDrop("🔌 [WS] DEX bağlantısı kapandı");
       if (this.pingIntervalDex) { clearInterval(this.pingIntervalDex); this.pingIntervalDex = null; }
       if (this.isRunning) {
-        this.reconnectTimeoutDex = setTimeout(() => this.connectDex(), 3000);
+        this.reconnectTimeoutDex = setTimeout(() => this.connectDex(), 1000);
       }
     });
   }
