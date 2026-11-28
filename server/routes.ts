@@ -15,7 +15,7 @@ import { EventStore } from "./event-store";
 import { LiquidityMonitor } from "./liquidity-monitor";
 import { PhantomMonitor } from "./phantom-monitor";
 import { TokenBalancePoller } from "./token-balance-poller";
-import { sendRugPullAlert } from "./telegram-service";
+import { sendRugPullAlert, sendWalletMintAlert } from "./telegram-service";
 import { WalletTrackingMonitor } from "./wallet-tracking-monitor";
 import type { WalletMintEvent } from "@shared/wallet-tracking";
 
@@ -122,6 +122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (event === "wallet_mint_detected" || event === "wallet_mint_updated") {
         const token = data as WalletMintEvent;
         if (event === "wallet_mint_detected") trimWalletMintCards();
+        if (event === "wallet_mint_detected") void sendWalletMintAlert(slot, token);
         broadcastToClients({ type: event, data: { slot, token } });
         if (event === "wallet_mint_detected" && monitor.getState().autoBuyRunning && autoBuyWatchedWalletMint) {
           const generation = monitor.getAutoBuyGeneration();

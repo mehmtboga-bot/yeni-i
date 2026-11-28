@@ -43,3 +43,42 @@ export async function sendRugPullAlert(symbol: string, mintAddress: string, loss
 
   await sendTelegramAlert(message);
 }
+
+const escapeHtml = (value: string) =>
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+export async function sendWalletMintAlert(
+  slot: number,
+  token: {
+    name: string;
+    symbol: string;
+    mintAddress: string;
+    creator: string;
+    detectedAt: number;
+    liquidityUsd?: number;
+    solscanVerified: boolean;
+    solscanMessage?: string;
+    jupiterUrl: string;
+    dexscreenerUrl: string;
+    pumpfunUrl: string;
+  },
+): Promise<void> {
+  const liquidity = token.liquidityUsd !== undefined
+    ? `$${Math.round(token.liquidityUsd).toLocaleString("en-US")}`
+    : "Henüz yok";
+  const message = [
+    `👀 <b>İZLENEN CÜZDAN ${slot + 1}: YENİ TOKEN</b>`,
+    ``,
+    `<b>Ad:</b> ${escapeHtml(token.name)}`,
+    `<b>Sembol:</b> ${escapeHtml(token.symbol)}`,
+    `<b>Mint:</b> <code>${token.mintAddress}</code>`,
+    `<b>Cüzdan:</b> <code>${token.creator}</code>`,
+    `<b>Likidite:</b> ${liquidity}`,
+    `<b>Solscan:</b> ${token.solscanVerified ? "Doğrulandı" : "Doğrulanamadı"}${token.solscanMessage ? ` (${escapeHtml(token.solscanMessage)})` : ""}`,
+    `<b>Zaman:</b> ${new Date(token.detectedAt).toISOString()}`,
+    ``,
+    `<a href="${token.jupiterUrl}">Jupiter</a> | <a href="${token.dexscreenerUrl}">DexScreener</a> | <a href="${token.pumpfunUrl}">Pump.fun</a>`,
+  ].join("\n");
+
+  await sendTelegramAlert(message);
+}
